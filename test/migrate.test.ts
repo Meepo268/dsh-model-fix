@@ -8,7 +8,7 @@ import { check, stable } from '@test/helper'
 /** 执行本文件的全部用例 */
 export function run(): void {
     // 当前版本默认值（台阶侧的逐级升级语义见 test/upgrade.test.ts）
-    const COMPAT = { disableDeveloper: true }
+    const COMPAT = { disableDeveloper: true, disableStore: true }
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
     const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }
@@ -17,7 +17,7 @@ export function run(): void {
     check('toStored 补 configVersion 且含三组布尔与排除列表与 efforts 与 userExperience（含 defaultHigh 与 forgetRemoved 与 followParent 与 selfTune）', stable(toStored({
         autoFill: { reasoning: false, context: true, image: false },
         allowUpdate: { reasoning: true, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false },
@@ -25,15 +25,15 @@ export function run(): void {
         configVersion: 8,
         autoFill: { reasoning: false, context: true, image: false },
         allowUpdate: { reasoning: true, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false },
-    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false } }))
+    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false } }))
     check('DEFAULT_STORED 即 toStored(默认配置)', stable(DEFAULT_STORED) === stable(toStored({
         autoFill: { reasoning: true, context: true, image: true },
         allowUpdate: { reasoning: false, context: false, image: false },
-        compat: { disableDeveloper: true },
+        compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -51,7 +51,7 @@ export function run(): void {
     check('自愈沿用可用旧快照语义（未落默认，保留 efforts 记忆与 userExperience 现值并补 defaultHigh / forgetRemoved）', stable(resolveConfig(healed)) === stable({
         autoFill: { reasoning: false, context: false, image: true },
         allowUpdate: { reasoning: true, context: true, image: false },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -114,7 +114,7 @@ export function run(): void {
     // 规范完整但含多余键 → 物化时 toStored 剥离未知键，比对不一致即重写
     check('当前版本键含多余键被规范化剥离', stable(canonicalizeCurrentOp({ [CURRENT]: { ...DEFAULT_STORED, extra: 'x', unknown: 1 } })) === stable([{ op: 'set', path: [CURRENT], value: DEFAULT_STORED }]), canonicalizeCurrentOp({ [CURRENT]: { ...DEFAULT_STORED, extra: 'x', unknown: 1 } }))
     // 用户改过四组布尔且完整 → 与规范物化结果一致（同值不同键序/引用），零 op（不误伤合法自定义配置）
-    const customFull = { ...DEFAULT_STORED, autoFill: { reasoning: false, context: false, image: false }, allowUpdate: { reasoning: true, context: true, image: true }, compat: { disableDeveloper: false }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }
+    const customFull = { ...DEFAULT_STORED, autoFill: { reasoning: false, context: false, image: false }, allowUpdate: { reasoning: true, context: true, image: true }, compat: { disableDeveloper: false, disableStore: false }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }
     check('合法自定义完整当前版本键零 op（不误伤）', canonicalizeCurrentOp({ [CURRENT]: customFull }).length === 0, canonicalizeCurrentOp({ [CURRENT]: customFull }))
     // 当前版本键不存在 → 零 op（交给迁移分支）
     check('无当前版本键零 op', canonicalizeCurrentOp({ 'version-5': { ...DEFAULT_STORED, configVersion: 5 } }).length === 0, canonicalizeCurrentOp({ 'version-5': { ...DEFAULT_STORED, configVersion: 5 } }))

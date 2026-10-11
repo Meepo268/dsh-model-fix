@@ -6,12 +6,12 @@ import { check, stable } from '@test/helper'
 /** 执行本文件的全部用例 */
 export function run(): void {
     // 台阶补的默认值（与当前版本默认同值：defaultHigh 与 forgetRemoved 的台阶默认值均为 true，故全新用户直写 DEFAULT_STORED 与走升级链结果一致）
-    const COMPAT = { disableDeveloper: true }
+    const COMPAT = { disableDeveloper: true, disableStore: true }
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
     const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }
 
-    // ---------- v3 → v8：三组布尔与 compat 原样沿用，补 excludes（v4 起）、efforts/userExperience（v5 起）、defaultHigh（v6 起）、forgetRemoved（v7 起）、followParent 默认（v8 起） ----------
+    // ---------- v3 → v8：三组布尔与 compat 原样沿用，补 excludes（v4 起）、efforts/userExperience（v5 起）、defaultHigh（v6 起）、forgetRemoved（v7 起）、followParent / selfTune / disableStore 默认（v8 起） ----------
     const v3Stored = {
         configVersion: 3,
         allowUpdate: { reasoning: true, context: false, image: false },
@@ -22,7 +22,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v3Stored.allowUpdate,
         autoFill: v3Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: EXCLUDES,
         efforts: EFFORTS,
         userExperience: USER_EXPERIENCE,
@@ -49,7 +49,7 @@ export function run(): void {
     // 台阶产物形态恒定：即便未来默认演进，历史各台阶补的仍是空对象与默认开关
     check('升级产物不携带用户段之外的多余键', Object.keys(upgradeConfig(v3Stored, 3)).sort().join(',') === 'allowUpdate,autoFill,compat,configVersion,efforts,excludes,userExperience', upgradeConfig(v3Stored, 3))
 
-    // ---------- v4 → v8：三组布尔 + compat + excludes 原样沿用，补 efforts / userExperience（v5 起）、defaultHigh（v6 起）、forgetRemoved（v7 起）、followParent 默认（v8 起） ----------
+    // ---------- v4 → v8：三组布尔 + compat + excludes 原样沿用，补 efforts / userExperience（v5 起）、defaultHigh（v6 起）、forgetRemoved（v7 起）、followParent / selfTune / disableStore 默认（v8 起） ----------
     const v4Stored = {
         configVersion: 4,
         allowUpdate: { reasoning: true, context: false, image: true },
@@ -61,7 +61,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v4Stored.allowUpdate,
         autoFill: v4Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: EFFORTS,
         userExperience: USER_EXPERIENCE,
@@ -90,7 +90,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v5Stored.allowUpdate,
         autoFill: v5Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -103,7 +103,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v5Stored.allowUpdate,
         autoFill: v5Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -134,7 +134,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v6Stored.allowUpdate,
         autoFill: v6Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -147,7 +147,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v6Stored.allowUpdate,
         autoFill: v6Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -178,7 +178,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v7Stored.allowUpdate,
         autoFill: v7Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false },
@@ -200,7 +200,7 @@ export function run(): void {
         configVersion: 8,
         allowUpdate: v7Stored.allowUpdate,
         autoFill: v7Stored.autoFill,
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false },

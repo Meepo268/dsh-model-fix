@@ -33,16 +33,24 @@ export interface FieldRules {
 }
 
 /**
- * 兼容性规则：每条对应宿主 provider 路由 compat 下的一个字段（当前仅 supportsDeveloperRole）。
+ * 兼容性规则：每条对应宿主 provider 路由 compat 下的一个字段。
  * 同组新增键对既有形态只是「多一个可选字段」，向后兼容，因此不需要递增 CONFIG_VERSION。
  */
 export interface CompatRules {
     /**
-     * 为 true 时给该 provider 的路由写入 `compat.supportsDeveloperRole: false`（不使用 developer 角色，
+     * 为 true 时给该 provider 的路由写入 `compat.supportsDeveloperRole: false`（禁用 developer 角色，
      * 退回旧版 API 兼容的 system 角色）；为 false 时**移除**该字段（而非保留不管）。
      * 仅作用于 `api === 'openai-completions'` 的路由，且只写路由级、不写模型级。
      */
     disableDeveloper: boolean
+    /**
+     * 为 true 时给该 provider 的路由写入 `compat.supportsStore: false`，使请求体不含 `store` 键；
+     * 为 false 时**移除**该字段（而非保留不管）。
+     * 宿主在该字段为 true 时发送的仍是 `store: false`，故本开关去掉的是**这个键本身**而非改它的取值——
+     * 不识 `store` 的端点（LiteLLM 代理一类）拒的是键。与 disableDeveloper 同协议、同为把宿主的乐观默认翻成保守，
+     * 仅作用于 `api === 'openai-completions'` 的路由，且只写路由级、不写模型级。
+     */
+    disableStore: boolean
 }
 
 /**

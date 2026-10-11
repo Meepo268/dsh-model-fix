@@ -30,7 +30,7 @@ import { EFFORT_LEVELS } from '@/shared/constants'
 const ALL_ON: Flags = {
     autoFill: { reasoning: true, context: true, image: true },
     allowUpdate: { reasoning: true, context: true, image: true },
-    compat: { disableDeveloper: true },
+    compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
     userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true },
@@ -48,11 +48,11 @@ export function run(): void {
     check(
         'decode 完整 v8 快照',
         stable(decodeSection({
-            'version-8': { configVersion: 8, autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: false }, compat: { disableDeveloper: false }, excludes: ['acme-gateway'] },
+            'version-8': { configVersion: 8, autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: false }, compat: { disableDeveloper: false, disableStore: false }, excludes: ['acme-gateway'] },
         })) === stable({
             autoFill: { reasoning: false, context: true, image: false },
             allowUpdate: { reasoning: true, context: false, image: false },
-            compat: { disableDeveloper: false },
+            compat: { disableDeveloper: false, disableStore: false },
             excludes: ['acme-gateway'],
             efforts: {},
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -64,7 +64,7 @@ export function run(): void {
         stable(decodeSection({ 'version-8': { autoFill: { reasoning: false }, allowUpdate: { reasoning: true } } })) === stable({
             autoFill: { reasoning: false, context: true, image: true },
             allowUpdate: { reasoning: true, context: false, image: false },
-            compat: { disableDeveloper: true },
+            compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -76,7 +76,7 @@ export function run(): void {
         stable(decodeSection({ 'version-8': { excludes: ['acme-gateway'] } })) === stable({
             autoFill: { reasoning: true, context: true, image: true },
             allowUpdate: { reasoning: false, context: false, image: false },
-            compat: { disableDeveloper: true },
+            compat: { disableDeveloper: true, disableStore: true },
             excludes: ['acme-gateway'],
             efforts: {},
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -90,7 +90,7 @@ export function run(): void {
         })) === stable({
             autoFill: { reasoning: true, context: true, image: true },
             allowUpdate: { reasoning: false, context: false, image: false },
-            compat: { disableDeveloper: true },
+            compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: { 'z-ai': { 'glm-5.2': 'high' } },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -154,7 +154,7 @@ export function run(): void {
             configVersion: 8,
             autoFill: { reasoning: true, context: true, image: true },
             allowUpdate: { reasoning: false, context: false, image: false },
-            compat: { disableDeveloper: true },
+            compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -187,9 +187,9 @@ export function run(): void {
         stable(applyGroup(mixedAutoFill, 'autoFill', !masterValue(mixedAutoFill, 'autoFill')).autoFill)
             === stable({ reasoning: true, context: true, image: true }),
     )
-    // compat 组只有一行时总控与该行的显示值一致（新增兼容性键后仍按「全开」判定）
+    // compat 组多行：部分选中显示关，全开才显示开（与 userExperience 同一「全开」判据）
     check('master compat 行为开则为开', masterValue(ALL_ON, 'compat') === true)
-    check('master compat 行为关则为关', masterValue({ ...ALL_ON, compat: { disableDeveloper: false } }, 'compat') === false)
+    check('master compat 行为关则为关', masterValue({ ...ALL_ON, compat: { disableDeveloper: false, disableStore: false } }, 'compat') === false)
     // userExperience 组多行：部分选中显示关，三项全开才显示开
     check('master userExperience 部分选中显示为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }, 'userExperience') === false)
     check('master userExperience 仅两项为开仍为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false } }, 'userExperience') === false)
@@ -214,7 +214,7 @@ export function run(): void {
     )
     check(
         'applyGroup compat 整组置关且不动其他组',
-        stable(applyGroup(DEFAULT_FLAGS, 'compat', false)) === stable({ ...DEFAULT_FLAGS, compat: { disableDeveloper: false } }),
+        stable(applyGroup(DEFAULT_FLAGS, 'compat', false)) === stable({ ...DEFAULT_FLAGS, compat: { disableDeveloper: false, disableStore: false } }),
         applyGroup(DEFAULT_FLAGS, 'compat', false),
     )
     // userExperience 组同样走总控/单格派生路径（多行组：总控整组同置）
@@ -231,7 +231,7 @@ export function run(): void {
     const flipped = toggleCell(DEFAULT_FLAGS, 'allowUpdate', 'context')
     check('toggleCell 仅翻转目标格', flipped.allowUpdate.context === true && flipped.allowUpdate.reasoning === false && flipped.autoFill === DEFAULT_FLAGS.autoFill)
     check('toggleCell 不改入参', DEFAULT_FLAGS.allowUpdate.context === false)
-    check('toggleCell compat 仅翻转该行', stable(toggleCell(DEFAULT_FLAGS, 'compat', 'disableDeveloper').compat) === stable({ disableDeveloper: false }))
+    check('toggleCell compat 仅翻转该行', stable(toggleCell(DEFAULT_FLAGS, 'compat', 'disableDeveloper').compat) === stable({ disableDeveloper: false, disableStore: true }))
     check('toggleCell userExperience 仅翻转 defaultHigh 不动其余行', stable(toggleCell(DEFAULT_FLAGS, 'userExperience', 'defaultHigh').userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false }))
     check('toggleCell userExperience 仅翻转 forgetRemoved 不动其余行', stable(toggleCell(DEFAULT_FLAGS, 'userExperience', 'forgetRemoved').userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false }))
     check('groupValue 按组取行值', groupValue(DEFAULT_FLAGS, 'compat', 'disableDeveloper') === true && groupValue(DEFAULT_FLAGS, 'allowUpdate', 'image') === false)
@@ -265,7 +265,7 @@ export function run(): void {
     check('isDirty 相同值不为脏', isDirty(DEFAULT_FLAGS, DEFAULT_FLAGS) === false)
     check('isDirty 单格不同即为脏', isDirty(toggleCell(DEFAULT_FLAGS, 'autoFill', 'image'), DEFAULT_FLAGS) === true)
     // compat 行的改动同样要标脏，否则「关闭即移除」的写回没有 UI 入口
-    check('isDirty compat 不同即为脏', isDirty({ ...DEFAULT_FLAGS, compat: { disableDeveloper: false } }, DEFAULT_FLAGS) === true)
+    check('isDirty compat 不同即为脏', isDirty({ ...DEFAULT_FLAGS, compat: { disableDeveloper: false, disableStore: false } }, DEFAULT_FLAGS) === true)
     check('isDirty compat 相同不为脏', isDirty({ ...DEFAULT_FLAGS, compat: { ...DEFAULT_FLAGS.compat } }, DEFAULT_FLAGS) === false)
     // 排除列表的增删都必须标脏（否则排除没有保存入口），内容相同则不脏
     check('isDirty 新增排除项为脏', isDirty(added, DEFAULT_FLAGS) === true)

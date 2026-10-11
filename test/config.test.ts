@@ -15,7 +15,7 @@ export function run(): void {
     const DEFAULT_STABLE = stable({
         allowUpdate: { reasoning: false, context: false, image: false },
         autoFill: { reasoning: true, context: true, image: true },
-        compat: { disableDeveloper: true },
+        compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -42,7 +42,7 @@ export function run(): void {
     check('段内无 v8 快照时降取最高可解析的 v7 快照', stable(resolveConfig({ 'version-7': v7Entry })) === stable({
         autoFill: { reasoning: true, context: false, image: false },
         allowUpdate: { reasoning: false, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -59,7 +59,7 @@ export function run(): void {
     check('取低版本（v6）快照并补 forgetRemoved 默认', stable(resolveConfig({ 'version-6': v6Entry })) === stable({
         autoFill: { reasoning: true, context: false, image: false },
         allowUpdate: { reasoning: false, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -75,7 +75,7 @@ export function run(): void {
     check('取低版本（v5）快照并补 defaultHigh 默认', stable(resolveConfig({ 'version-5': v5Entry })) === stable({
         autoFill: { reasoning: true, context: false, image: false },
         allowUpdate: { reasoning: false, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -84,7 +84,7 @@ export function run(): void {
     check('取低版本（v4）快照并补 efforts / userExperience 默认', stable(resolveConfig({ 'version-4': v5Entry })) === stable({
         autoFill: { reasoning: true, context: false, image: false },
         allowUpdate: { reasoning: false, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -99,7 +99,7 @@ export function run(): void {
     check('取低版本（v3）快照并补 excludes / efforts / userExperience 默认', stable(resolveConfig({ 'version-3': v3Entry })) === stable({
         autoFill: { reasoning: true, context: false, image: false },
         allowUpdate: { reasoning: false, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: [],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -108,7 +108,7 @@ export function run(): void {
     check('缺字段按整项默认补齐（含 image）', stable(resolveConfig({ 'version-4': { configVersion: 4, autoFill: { context: false } } })) === stable({
         allowUpdate: { reasoning: false, context: false, image: false },
         autoFill: { reasoning: true, context: false, image: true },
-        compat: { disableDeveloper: true },
+        compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -117,11 +117,11 @@ export function run(): void {
     // compat 组与 fieldRules 同严格度：整项非对象、字段非布尔都判整段快照非法
     check('compat 非对象整段回退默认', stable(resolveConfig({ 'version-4': { configVersion: 4, compat: 'x' } })) === DEFAULT_STABLE, resolveConfig({ 'version-4': { configVersion: 4, compat: 'x' } }))
     check('compat 字段非布尔整段回退默认', stable(resolveConfig({ 'version-4': { configVersion: 4, compat: { disableDeveloper: 'yes' } } })) === DEFAULT_STABLE, resolveConfig({ 'version-4': { configVersion: 4, compat: { disableDeveloper: 'yes' } } }))
-    // compat 省略 disableDeveloper 落该字段默认（true），而非判非法——与「新增键向后兼容」一致
+    // compat 省略字段落该字段默认（disableDeveloper / disableStore 均为 true），而非判非法——与「新增键向后兼容」一致
     check('compat 缺字段落该字段默认', stable(resolveConfig({ 'version-4': { configVersion: 4, compat: {} } })) === stable({
         allowUpdate: { reasoning: false, context: false, image: false },
         autoFill: { reasoning: true, context: true, image: true },
-        compat: { disableDeveloper: true },
+        compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -146,7 +146,7 @@ export function run(): void {
     check('仅更高版本降级解析保留配置', stable(resolveConfig({ 'version-9': { autoFill: { reasoning: false, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'] } })) === stable({
         autoFill: { reasoning: false, context: true, image: false },
         allowUpdate: { reasoning: false, context: false, image: false },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -158,7 +158,7 @@ export function run(): void {
     check('当前版本（v8）与更高版本并存仍取 v8', stable(resolveConfig({ 'version-9': { autoFill: { reasoning: false, context: false, image: false } }, 'version-8': v8Entry })) === stable({
         autoFill: { reasoning: false, context: true, image: false },
         allowUpdate: { reasoning: false, context: false, image: false },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false },
@@ -168,7 +168,7 @@ export function run(): void {
         stable(resolveConfig({ 'version-7': v7Entry, 'version-9': { autoFill: { reasoning: false, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'] } })) === stable({
             autoFill: { reasoning: false, context: true, image: false },
             allowUpdate: { reasoning: false, context: false, image: false },
-            compat: { disableDeveloper: false },
+            compat: { disableDeveloper: false, disableStore: true },
             excludes: ['x'],
             efforts: {},
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -180,7 +180,7 @@ export function run(): void {
     check('parseSnapshot 合法快照物化为三组布尔 + 排除列表 + 记忆 + 用户体验', stable(parseSnapshot(v7Entry)) === stable({
         autoFill: { reasoning: true, context: false, image: false },
         allowUpdate: { reasoning: false, context: false, image: true },
-        compat: { disableDeveloper: false },
+        compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
@@ -188,7 +188,7 @@ export function run(): void {
     check('parseSnapshot 省略字段落该项默认', stable(parseSnapshot({ configVersion: 4, autoFill: { context: false } })) === stable({
         allowUpdate: { reasoning: false, context: false, image: false },
         autoFill: { reasoning: true, context: false, image: true },
-        compat: { disableDeveloper: true },
+        compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },

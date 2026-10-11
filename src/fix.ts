@@ -4,7 +4,7 @@ import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { getCatalog } from '@/catalog'
 import { planProviderCompat } from '@/compat'
 import { lookup, toReasoningEfforts } from '@/lookup'
-import { DEVELOPER_COMPAT_APIS, MAX_ATTEMPTS } from '@/constants'
+import { COMPAT_APIS, MAX_ATTEMPTS } from '@/constants'
 import { API_NS, PLUGIN_NAME } from '@/shared/constants'
 import { getConfig } from '@/config'
 import { stripEmptyFields } from '@/empty'
@@ -126,10 +126,10 @@ export function planFill(
                 ops.push({ op: 'set', path: ['providers', providerId, 'models'], value: next })
             }
         }
-        // 路由级兼容性（与模型参数无关，故 models 缺失也要处理）；协议适用范围见 DEVELOPER_COMPAT_APIS
+        // 路由级兼容性（与模型参数无关，故 models 缺失也要处理）；协议适用范围见 COMPAT_APIS
         // 非目标协议（如已从 completions 切到 responses）仅做残留清理（只删不加），无论开关如何。
         if (typeof api === 'string') {
-            const effectiveCompat: CompatRules = DEVELOPER_COMPAT_APIS.has(api) ? compatRules : { disableDeveloper: false }
+            const effectiveCompat: CompatRules = COMPAT_APIS.has(api) ? compatRules : { disableDeveloper: false, disableStore: false }
             const plan = planProviderCompat(effectiveCompat, currentCompat)
             if (plan) {
                 compatChanges++
@@ -167,7 +167,7 @@ export async function fix(ctx: Context, force = false): Promise<number> {
         if (plan.ops.length === 0) return 0
         try {
             await queueTask(() => ctx.settings.mutate(API_NS, plan.ops, descriptor.revision))
-            ctx.logger.info(`${PLUGIN_NAME}: 已变更 ${plan.changes} 个模型（补充/同步推理级别、容量字段、图片模态、清理空字段）、${plan.compatChanges} 个提供方的路由 compat（developer 角色兼容），跳过 ${plan.excluded} 个已排除提供方`)
+            ctx.logger.info(`${PLUGIN_NAME}: 已变更 ${plan.changes} 个模型（补充/同步推理级别、容量字段、图片模态、清理空字段）、${plan.compatChanges} 个提供方的兼容性优化，跳过 ${plan.excluded} 个已排除提供方`)
             return plan.changes
         } catch (error) {
             if (isSettingsConflict(error) && attempt < MAX_ATTEMPTS) continue

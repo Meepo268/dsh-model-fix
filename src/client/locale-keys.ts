@@ -32,6 +32,7 @@ export type CardKey =
     | 'rowContext'
     | 'rowImage'
     | 'rowDisableDeveloper'
+    | 'rowDisableStore'
     | 'rowRememberEfforts'
     | 'rowDefaultHigh'
     | 'rowForgetRemoved'
@@ -41,6 +42,7 @@ export type CardKey =
     | 'tipContext'
     | 'tipImage'
     | 'tipDisableDeveloper'
+    | 'tipDisableStore'
     | 'tipRememberEfforts'
     | 'tipDefaultHigh'
     | 'tipForgetRemoved'
@@ -182,6 +184,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     context: 'rowContext',
     image: 'rowImage',
     disableDeveloper: 'rowDisableDeveloper',
+    disableStore: 'rowDisableStore',
     rememberEfforts: 'rowRememberEfforts',
     defaultHigh: 'rowDefaultHigh',
     forgetRemoved: 'rowForgetRemoved',
@@ -211,6 +214,7 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     context: 'tipContext',
     image: 'tipImage',
     disableDeveloper: 'tipDisableDeveloper',
+    disableStore: 'tipDisableStore',
     rememberEfforts: 'tipRememberEfforts',
     defaultHigh: 'tipDefaultHigh',
     forgetRemoved: 'tipForgetRemoved',

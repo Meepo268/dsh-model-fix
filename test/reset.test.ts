@@ -7,7 +7,7 @@ import { check, stable } from '@test/helper'
 const base: PluginConfig = {
     autoFill: { reasoning: true, context: false, image: true },
     allowUpdate: { reasoning: false, context: true, image: false },
-    compat: { disableDeveloper: true },
+    compat: { disableDeveloper: true, disableStore: true },
     excludes: ['acme-gateway'],
     efforts: {},
     userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false },

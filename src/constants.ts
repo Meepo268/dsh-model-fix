@@ -30,13 +30,14 @@ export const CACHE_FILE = join(dirname(fileURLToPath(import.meta.url)), 'models-
 export const LEVELS: ReadonlySet<string> = new Set(EFFORT_LEVELS)
 
 /**
- * compat.disableDeveloper 管辖的协议：只作用于 OpenAI Chat Completions 风格的路由（自定义端点的主流形态）。
- * 宿主也会在其他 OpenAI 系协议（如 openai-responses）消费 supportsDeveloperRole，但本插件不替它们接管该字段；
- * 对不消费该字段的协议写入更是无意义（宿主按协议 gate 静默跳过）。
+ * compat 组开关共同管辖的协议：只作用于 OpenAI Chat Completions 风格的路由（自定义端点的主流形态）。
+ * 宿主只在 `openai-completions` offer 这两个字段（`COMPLETIONS_COMPAT_GATE`，见 docs/host-api.md），其余协议的写入被宿主按协议 gate 静默跳过。
  */
-export const DEVELOPER_COMPAT_APIS = new Set(['openai-completions'])
+export const COMPAT_APIS = new Set(['openai-completions'])
 /** disableDeveloper 对应的 provider 路由 compat 字段名（开启写 false，关闭删键） */
 export const DEVELOPER_COMPAT_FIELD = 'supportsDeveloperRole'
+/** disableStore 对应的 provider 路由 compat 字段名（开启写 false，关闭删键） */
+export const STORE_COMPAT_FIELD = 'supportsStore'
 
 /** 模型名前缀 -> 官方提供方，用于跨提供方匹配同源模型 */
 export const HINTS: ReadonlyArray<readonly [string, string]> = [

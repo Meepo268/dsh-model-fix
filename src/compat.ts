@@ -4,7 +4,7 @@
  */
 
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-import { DEVELOPER_COMPAT_FIELD } from '@/constants'
+import { DEVELOPER_COMPAT_FIELD, STORE_COMPAT_FIELD } from '@/constants'
 import type { CompatRules } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 
@@ -14,16 +14,17 @@ interface CompatRule {
     key: keyof CompatRules
     /** 受该键管辖的路由 compat 字段名 */
     field: string
-    /** 该键为 true 时写入字段的值（本组规则的开关方向不一致，故逐条声明） */
+    /** 该键为 true 时写入字段的值 */
     value: boolean
 }
 
 /**
  * 规则表：新增兼容性配置在此追加一条（键名与 CONFIG_VERSION 无关，形态向后兼容）。
- * 只写路由级、不写模型级；协议 gate（DEVELOPER_COMPAT_APIS）由 fix.ts 判，本纯函数只决定写什么。
+ * 只写路由级、不写模型级；协议 gate（COMPAT_APIS）由 fix.ts 判，本纯函数只决定写什么。
  */
 const RULES: readonly CompatRule[] = [
     { key: 'disableDeveloper', field: DEVELOPER_COMPAT_FIELD, value: false },
+    { key: 'disableStore', field: STORE_COMPAT_FIELD, value: false },
 ]
 
 /** 路由 compat 的目标形态：set 覆盖整段（保留用户其余字段）/ unset 删除整段（已无字段） */

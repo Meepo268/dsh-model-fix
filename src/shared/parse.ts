@@ -19,14 +19,14 @@ import { isPlainObject } from '@/shared/types'
 export const DEFAULT_CONFIG: PluginConfig = {
     allowUpdate: { reasoning: false, context: false, image: false },
     autoFill: { reasoning: true, context: true, image: true },
-    compat: { disableDeveloper: true },
+    compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
     userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
 }
 
 /** compat 组逐字段的省略默认值 */
-const COMPAT_DEFAULTS: CompatRules = { disableDeveloper: true }
+const COMPAT_DEFAULTS: CompatRules = { disableDeveloper: true, disableStore: true }
 
 /** userExperience 组逐字段的省略默认值 */
 const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }
@@ -35,7 +35,7 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = { rememberEfforts: true, d
 export const FIELD_KEYS = ['reasoning', 'context', 'image'] as const
 
 /** 兼容性规则键（compat 组的行）；新增 compat 键在此追加，见 docs/versioning.md */
-export const COMPAT_KEYS = ['disableDeveloper'] as const
+export const COMPAT_KEYS = ['disableDeveloper', 'disableStore'] as const
 
 /** 用户体验组的行键；新增行键在此追加，见 docs/versioning.md */
 export const USER_EXPERIENCE_KEYS = ['rememberEfforts', 'defaultHigh', 'forgetRemoved', 'followParent', 'selfTune'] as const
