@@ -1,8 +1,8 @@
 # dsh-model-fix
 
-> 本插件已被 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 收录，同时可在 [dsh-market](https://github.com/dsh-market/dsh-market) 中搜索、安装。
+> 本插件已在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 收录，可在 [dsh-market](https://github.com/dsh-market/dsh-market) 中搜索、安装。
 
-DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插件：给非官方（自定义）提供方的模型自动填充推理级别（`reasoningEfforts`）、最大上下文（`contextWindow`）、输出上限（`maxTokens`）与图片模态（`input`）等参数，数据来自 [models.dev](https://models.dev)。同时，提供兼容性提升、记住推理级别等用户体验优化。
+DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插件：提供更好的模型使用体验，包括但不限于：多种方式填充模型参数、提升兼容性、记住推理级别、子智能体实时跟随模型和推理级别、AI 自主调节档位等。
 
 插件截图：
 
@@ -12,23 +12,31 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 
 ## 功能
 
-- 自动填充：模型缺失 `reasoningEfforts` / `contextWindow` / `maxTokens` / `input` 时按 models.dev 数据补全；已有配置不受影响
-- 允许更新：当 models.dev 数据更新时，插件会自动更新模型参数（已有配置也会更新）
-- 不使用`developer`角色：为所有 `api: openai-completions` 的提供方路由写入 `compat.supportsDeveloperRole: false`（不使用 `developer` 角色）；关闭该开关则移除此字段
-- 排除提供方：列出的提供方本插件完全不动（填充、更新、兼容性写入、强制更新、重置推理级别时跳过），基本等效于对它关闭插件
-- 记住推理级别：每模型独立记住上次手动选择的推理级别，切换模型时自动恢复
-- 清除记忆：关闭「记住推理级别」时，将会询问是否确认清除记忆，可在清除后不保存设置，依然可以继续记忆，但旧记忆已清除
-- 默认使用 high：切换模型时，若没有该模型的记忆，且模型提供 `high` 档位，则自动把推理级别设为 `high`
-- 忘记已删除模型：删除模型（或提供方）后，其推理级别记忆随之清除；关闭后不做任何处理，记忆原样保留
-- 跟随父智能体：**关闭**「允许 Agent 为子智能体选择模型」时生效——子智能体的提供方、模型与推理级别实时同步父智能体
-- 自主调节档位：AI 可根据任务难度自主调节推理档位
-- 强制更新：按 models.dev 当前值立即覆盖一遍
-- 重置推理级别：删除所有模型的推理级别字段（上下文窗口、输出上限、图片模态与自定义字段一律保留），需二次确认
-- 恢复备份：回退到插件启动时已存在的模型参数
+功能特点：
+
+- 可视化设置：见[可视化设置](#可视化设置)
+- 开箱即用：启动即以内置缓存填充（离线可用），缓存数据自动保持最新
+
+本插件根据实际需求，提供以下功能：
+
+- 添加了第三方模型，但是不知道推理级别、上下文窗口等参数？【自动填充】按 models.dev 数据补全，已有配置不受影响
+- 第三方模型参数更新了，却不知道怎么填？【允许更新】：自动更新模型参数（已有配置也会更新）
+- 手动给模型添加推理级别后，发现请求报错？【不使用`developer`角色】禁用`developer`角色，使用`system`角色（兼容旧版）
+- 某个提供方的模型不想被插件接管？【排除提供方】本插件完全不动（填充、更新、兼容性写入、强制更新、重置推理级别等功能跳过），基本等效于对它关闭插件
+- 切换到某个模型后，推理级别重置了，还需要手动再选择一次？【记住推理级别】每模型独立记住上次手动选择的推理级别，切换模型时自动恢复
+- 感觉推理级别记忆问题？【清除记忆】关闭「记住推理级别」时，将会询问是否确认清除记忆，可在清除后不保存设置，依然可以继续记忆，但旧记忆已清除
+- 新配置的模型也不想自己选推理级别？【默认使用 high】切换模型时，若没有该模型的记忆，且模型提供 `high` 档位，则自动把推理级别设为 `high`
+- 不想已删除的模型还残留推理级别记忆？【忘记已删除模型】删除模型（或提供方）后，其推理级别记忆随之清除；关闭后不做任何处理，记忆原样保留
+- 子智能体启动后还想切换模型与推理级别？【跟随父智能体】子智能体的提供方、模型与推理级别实时同步父智能体（**关闭**「允许 Agent 为子智能体选择模型」时生效）
+- 希望AI根据任务难度自己选择合适的推理级别？【自主调节档位】AI 可根据任务难度自主调节推理档位
+
+UI界面还提供了一些额外功能：
+
+- 强制更新：按模型缓存的当前值立即覆盖一遍
+- 重置推理级别：删除所有模型的推理级别字段（可能触发【自动填充】）
+- 恢复备份：回退到插件启动时已存在的模型参数（已删除的不会恢复，已新增的不会删除）
 - 验证模型：验证所选模型（及推理级别）是否可用
-- 探测式填充：逐个推理级别试出模型实际支持的档位；「自动写入」控制是否把结论写回
-- 可视化设置：见下文
-- 开箱即用：启动即以内置缓存填充（离线可用），数据随后自动保持最新
+- 探测式填充：**【最真实】**逐个推理级别试出模型实际支持的档位；「自动写入」控制是否把结论写回
 
 ### 可视化设置
 
@@ -86,27 +94,29 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.2`
 
 **图形界面（推荐）**：见 [可视化设置](#可视化设置)
 
-**手动编辑**（等效方式）：Web 设置界面右上角「打开配置文件 / Open configuration file」直接编辑 `settings.yaml`：
+**手动编辑**（等效方式）：Web 设置界面右上角「打开配置文件 / Open configuration file」直接编辑 `cordis.patch.yml`：
 
 ```yaml
-tikaflow-model-fix:
-  version-8:
-    autoFill:           # 自动填充缺失的字段；默认 true
-      reasoning: true
-      context: true
-      image: true
-    allowUpdate:        # 允许更新已有模型的字段；默认 false
-      reasoning: false
-      context: false
-      image: false
-    compat:             # 兼容性写入
-      disableDeveloper: true
-    excludes: []        # 排除的提供方 id 列表；默认空
-    efforts: {}         # 每模型推理级别记忆（运行时自动维护，无需手动编辑）
-    userExperience:     # 用户体验（前端行为开关），对所有提供方生效，不支持排除
-      rememberEfforts: true
-      defaultHigh: true     # 默认使用 high
-      forgetRemoved: true   # 模型/提供方被删除时随之忘记其推理级别记忆
-      followParent: false   # 跟随父智能体：仅在宿主「允许 Agent 为子智能体选择模型」关闭时生效；提供方/模型/推理级别/输出上限都跟实时随父会话
-      selfTune: false       # 档位自调：AI 可根据任务难度自主升降档
+- id: tikaflow-model-fix
+  name: dsh-model-fix
+  config:
+    version-8:
+      autoFill:           # 自动填充缺失的字段；默认 true
+        reasoning: true
+        context: true
+        image: true
+      allowUpdate:        # 允许更新已有模型的字段；默认 false
+        reasoning: false
+        context: false
+        image: false
+      compat:             # 兼容性
+        disableDeveloper: true
+      excludes: []        # 排除的提供方 id 列表
+      efforts: {}         # 每模型推理级别记忆
+      userExperience:     # 用户体验，对所有提供方生效，不支持排除
+        rememberEfforts: true
+        defaultHigh: true
+        forgetRemoved: true
+        followParent: false
+        selfTune: false
 ```
