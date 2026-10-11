@@ -15,8 +15,13 @@ import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { API_NS, PLUGIN_NS } from '@/shared/constants'
 import { setConfigSource } from '@/config'
 import { setCatalog } from '@/catalog'
+import { setHmrExecuting } from '@/host'
 import { DEFAULT_CONFIG } from '@/shared/parse'
 import { isPlainObject } from '@/shared/types'
+
+// 测试桩没有 hmr 注入（ctx.get 一律 undefined）：宣告注入已结算（值缺席），
+// queueTask 直接走降级路径，不付出有界等待（结算 latch 与信号由 setHmrExecuting 一并完成）
+setHmrExecuting(undefined)
 
 /** 单个 settings 段的内存表示 */
 interface StubSection {

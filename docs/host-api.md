@@ -56,7 +56,7 @@
 ### hmr：`executing`（私有面）
 
 - `ctx.get('hmr')` 的服务类是 `DSH/packages/boot/hmr/src/index.ts`（`super(ctx,'hmr')`），其 **private** 字段 `executing = new AsyncLocalStorage<boolean>()` 也在该文件，用途是标记「当前异步上下文正在跑一次 HMR 事务」：`runExclusive` 在事务内重入直接 reject、配置 watcher 靠 `getStore() === true` 排队、卸载时靠 `getStore()` 避免自等待。
-- `src/host.ts` 的 `queueTask` 使用模块级 `_hmrExecuting`（由 `src/index.ts` 的子 fiber `ctx.inject(['hmr'], (child) => setHmrExecuting(...))` 设置），`instanceof AsyncLocalStorage` 则 `als.exit(task)`、否则裸 `task()`。**这是私有字段、非公共 API 面**，宿主改名即静默降级（写入仍在事务上下文内跑，功能不坏但可能触发写入判定抖动）。升宿主必须复核该字段名。
+- `src/host.ts` 的 `queueTask` 使用模块级 `_hmrExecuting`（由 `src/index.ts` 的子 fiber `ctx.inject(['hmr'], (child) => setHmrExecuting(...))` 设置），`instanceof AsyncLocalStorage` 则 `als.exit(task)`、否则裸 `task()`；注入落地前首个写回会**有界等待**（模块加载起 2s 封顶）：落地即走 `als.exit`，超时（hmr 缺席等）才降级裸 `task()`、只等一次（裁决见 `decisions.md`「写回端点」）。**这是私有字段、非公共 API 面**，宿主改名即静默降级（写入仍在事务上下文内跑，功能不坏但可能触发写入判定抖动）。升宿主必须复核该字段名。
 
 ### connection：RPC channel 与验证流
 
