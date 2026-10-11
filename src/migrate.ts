@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-import { MAX_OLD_SNAPSHOTS, MIN_SUPPORTED_VERSION } from '@/constants'
+import { MAX_ATTEMPTS, MAX_OLD_SNAPSHOTS, MIN_SUPPORTED_VERSION } from '@/constants'
 import { CONFIG_VERSION, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
 import { resolveConfig } from '@/config'
 import { queueTask } from '@/host'
@@ -10,6 +10,7 @@ import type { PluginConfigSnapshot, VersionedSection } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
 import { upgradeConfig } from '@/upgrade'
+import { isSettingsConflict } from '@/writeback'
 
 /**
  * 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。
@@ -95,6 +96,10 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  *   （幂等——第二轮同值零写入即收敛），两阶段清理低版本旧快照：先清低于最低支持版本，再清低于当前版本且超出上限的 excess（高版本快照保留）
  * - 无当前版本 → 段内所有 ≥ 最低支持版本中取最高可解析快照：高版本降级解析（按当前 schema，多余键忽略、efforts 宽松保留）、
  *   低版本走升级链；均不可解析或段内无版本则视为全新用户，直接写入规范默认快照，确保后续读取必有当前版本
+ * - 写回带 `SETTINGS_CONFLICT` 限次重试：启动期自有段并非只有迁移链在写（浏览器半一连上记忆监听就可能直写 efforts、
+ *   适配器拓扑事件触发的记忆剪枝同样写），冲突即本轮迁移写回丢失（新配置项不落盘，只剩一条难以察觉的 warn）。
+ *   重试时**重读描述并重算 op**，绝不回放：按旧段算出的整段 set 若只换新 revision 回放，会盖掉并发写入者刚落的内容；
+ *   重读后重算，他方已补齐的字段让 op 自然收敛为零
  */
 export async function migrateConfig(ctx: Context, disposed: () => boolean = () => false): Promise<void> {
     // 轮询等待 describe() 含本 NS；超时/卸载即放弃，按当前生效配置继续
@@ -110,44 +115,58 @@ export async function migrateConfig(ctx: Context, disposed: () => boolean = () =
         waited += MIGRATE_POLL_MS
         descriptor = descriptorOf(ctx, PLUGIN_NS)
     }
-    const section = sectionOf(descriptor)
-    const versions = collectVersions(section)
-    if (versions.includes(CONFIG_VERSION)) {
-        const ops: SettingsPathOp[] = [...canonicalizeCurrentOp(section)]
-        if (ops.length > 0) {
-            // 区分两类重写动因，便于排查：非法（parseSnapshot 判 undefined，如用户手改坏）vs 非规范（合法但字段残缺或含多余键）
-            const onDisk = section?.[CURRENT_KEY]
-            ctx.logger.warn(!parseSnapshot(onDisk)
-                ? `${PLUGIN_NAME}: ${CURRENT_KEY} 快照非法，已按当前生效配置重写`
-                : `${PLUGIN_NAME}: ${CURRENT_KEY} 快照非规范（字段残缺或含多余键），已规范化重写`)
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        // 首轮用轮询所得描述（此刻必已注册）；冲突重试时重读，取最新 revision 与段值
+        const fence = attempt === 1 ? descriptor : descriptorOf(ctx, PLUGIN_NS)
+        if (!fence) return
+        const section = sectionOf(fence)
+        const versions = collectVersions(section)
+        let action: string | undefined
+        let ops: SettingsPathOp[]
+        if (versions.includes(CONFIG_VERSION)) {
+            ops = [...canonicalizeCurrentOp(section)]
+            if (ops.length > 0) {
+                // 区分两类重写动因，便于排查：非法（parseSnapshot 判 undefined，如用户手改坏）vs 非规范（合法但字段残缺或含多余键）
+                const onDisk = section?.[CURRENT_KEY]
+                ctx.logger.warn(!parseSnapshot(onDisk)
+                    ? `${PLUGIN_NAME}: ${CURRENT_KEY} 快照非法，已按当前生效配置重写`
+                    : `${PLUGIN_NAME}: ${CURRENT_KEY} 快照非规范（字段残缺或含多余键），已规范化重写`)
+            }
+            ops.push(...pruneOps(versions))
+        } else {
+            // 迁移源：versions 升序，从高到低取首个可解析快照——高版本降级解析、低版本走升级链，全不可解析则落默认
+            const candidates = versions.filter((v) => v >= MIN_SUPPORTED_VERSION)
+            let stored: PluginConfigSnapshot = DEFAULT_STORED
+            action = '写入默认配置'
+            let resolved = false
+            for (const v of candidates.toReversed()) {
+                const entry = section?.[versionKey(v)]
+                const parsed = parseSnapshot(entry)
+                if (!parsed) continue
+                stored = v > CONFIG_VERSION ? toStored(parsed) : upgradeConfig(entry, v)
+                action = v > CONFIG_VERSION ? `从段内 ${versionKey(v)} 快照降级解析` : `从段内 ${versionKey(v)} 快照升级`
+                resolved = true
+                break
+            }
+            if (!resolved && versions.some((v) => v > CONFIG_VERSION)) {
+                ctx.logger.warn(`${PLUGIN_NAME}: 检测到更高版本的配置快照但解析失败，已写入默认配置`)
+            }
+            ops = [
+                { op: 'set', path: [CURRENT_KEY], value: stored },
+                ...pruneOps(versions),
+            ]
         }
-        ops.push(...pruneOps(versions))
-        if (ops.length > 0) await queueTask(() => ctx.settings.mutate(PLUGIN_NS, ops, descriptor.revision))
+        if (ops.length === 0) return
+        try {
+            await queueTask(() => ctx.settings.mutate(PLUGIN_NS, ops, fence.revision))
+        } catch (error) {
+            if (isSettingsConflict(error) && attempt < MAX_ATTEMPTS) continue
+            throw error
+        }
+        if (action !== undefined) ctx.logger.info(`${PLUGIN_NAME}: ${action}，已写入 ${CURRENT_KEY} 快照`)
         return
     }
-    // 迁移源：versions 升序，从高到低取首个可解析快照——高版本降级解析、低版本走升级链，全不可解析则落默认
-    const candidates = versions.filter((v) => v >= MIN_SUPPORTED_VERSION)
-    let stored: PluginConfigSnapshot = DEFAULT_STORED
-    let action = '写入默认配置'
-    let resolved = false
-    for (const v of candidates.toReversed()) {
-        const entry = section?.[versionKey(v)]
-        const parsed = parseSnapshot(entry)
-        if (!parsed) continue
-        stored = v > CONFIG_VERSION ? toStored(parsed) : upgradeConfig(entry, v)
-        action = v > CONFIG_VERSION ? `从段内 ${versionKey(v)} 快照降级解析` : `从段内 ${versionKey(v)} 快照升级`
-        resolved = true
-        break
-    }
-    if (!resolved && versions.some((v) => v > CONFIG_VERSION)) {
-        ctx.logger.warn(`${PLUGIN_NAME}: 检测到更高版本的配置快照但解析失败，已写入默认配置`)
-    }
-    const ops: SettingsPathOp[] = [
-        { op: 'set', path: [CURRENT_KEY], value: stored },
-        ...pruneOps(versions),
-    ]
-    await queueTask( () => ctx.settings.mutate(PLUGIN_NS, ops, descriptor.revision))
-    ctx.logger.info(`${PLUGIN_NAME}: ${action}，已写入 ${CURRENT_KEY} 快照`)
+    // 不可达：循环内各路径均 return/throw，continue 仅在 attempt < MAX_ATTEMPTS 时发生；仅作类型收敛
 }
 
 /**
