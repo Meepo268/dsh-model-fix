@@ -2,7 +2,7 @@
  * 「验证模型」与「探测式填充」共用的跨半契约：探测明细、逐提供方汇报、进度帧。
  *
  * 放在共享层而非 Node 半，是因为浏览器半要解析回传的结果与进度帧——浏览器半不能反向 import Node 半
- * （`tsdown.config.ts` 的跨半纯度门禁），而复制一份类型必然随演进漂移。
+ * （`eslint.config.ts` 的跨半纯度门禁），而复制一份类型必然随演进漂移。
  * 本文件只有类型与纯谓词：零 Node 依赖、零 schemastery、零宿主值导入。
  *
  * 两个功能共用同一份形状而不另立一套：探测的请求维度与验证完全一致（同样是「模型 × 推理级别」各一次最小请求，
@@ -282,12 +282,12 @@ export type VerifyProbedFrame = Extract<VerifyProgressFrame, { type: 'probed' }>
 /** 非终帧：逐条回调的形状。`done` 帧由调用方单独接住——它带的是整轮汇总，不是可逐行展示的一条 */
 export type VerifyProgressUpdate = Exclude<VerifyProgressFrame, { type: 'done' }>
 
-/** 宿主 hmr 的 SSE 分帧格式：单行 `data: ` + 空行分隔（`.tmp-dsh/packages/client/hmr/src/index.ts`） */
+/** 宿主 hmr 的 SSE 分帧格式：单行 `data: ` + 空行分隔（`DSH/packages/boot/hmr/src/index.ts`） */
 const DATA_PREFIX = 'data: '
 
 /**
  * 把一帧编成线上文本。内容类型刻意用 `text/event-stream`：宿主的 gzip 中间件显式跳过它
- * （`host/webserver/src/index.ts`），普通内容类型可能被压缩缓冲住——一缓冲，流式就没了。
+ * （`DSH/packages/host/webserver/src/index.ts`），普通内容类型可能被压缩缓冲住——一缓冲，流式就没了。
  */
 export function encodeProgressFrame(frame: VerifyProgressFrame): string {
     return `${DATA_PREFIX}${JSON.stringify(frame)}\n\n`

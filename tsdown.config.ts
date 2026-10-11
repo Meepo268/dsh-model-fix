@@ -9,10 +9,11 @@ const CLIENT_ID = 'dsh-model-fix'
 const SRC_ALIAS = { '@': fileURLToPath(new URL('./src', import.meta.url)) }
 
 /**
- * 宿主浏览器共享模块表基线（外部包只能 require 这些 specifier，其余一律 inline）。
- * 与 harness 的 packages/client/web/src/platform.ts PLATFORM_MODULES 对齐，漂移即运行期 require 未命中。
+ * 外置 specifier 清单：宿主模块表在运行期提供的包，外置后由宿主 require 兑现；其余一律打进包内。
+ * 与宿主 `DSH/packages/client/web/src/platform.ts` 的 PLATFORM_MODULES 对齐，漂移即运行期 require 未命中。
+ * 与 `eslint.config.ts` 的 `BROWSER_HOST_BASELINE` 同源（同一张表），改动须两边同步。
  */
-const PLATFORM_MODULES = [
+const HOST_EXTERNALS = [
     'react',
     'react/jsx-runtime',
     'react-dom',
@@ -22,11 +23,12 @@ const PLATFORM_MODULES = [
     '@deepseek-ai/dsh-client-ui-slots',
     '@deepseek-ai/dsh-client-ui-primitives',
 ]
-const isBaseline = (specifier: string): boolean =>
-    (PLATFORM_MODULES as readonly string[]).includes(specifier)
+
+const isExternal = (specifier: string): boolean =>
+    (HOST_EXTERNALS as readonly string[]).includes(specifier)
 
 /**
- * 版本号的唯一来源 = package.json。浏览器半运行在浏览器里、读不到磁盘，且构建纯度门禁禁止相对导入
+ * 版本号的唯一来源 = package.json。浏览器半运行在浏览器里、读不到磁盘，且 src 内禁相对导入
  * （package.json 无法作为值导入），故在构建期读入、由 define 内联成字符串字面量 ⇒ 运行期零成本、
  * 零漂移：升版照常只改 package.json 一处，测试构建不涉及本标识（测试图只引 @/client/model 与 @/client/effort）。
  */
@@ -48,27 +50,6 @@ export default defineConfig([
         // copy 传目录条目时会把目录名一起带进 outDir（public → lib/public），故用 glob + 默认 flatten:true 逐文件落位。
         copy: [{ from: 'public/*' }],
         alias: SRC_ALIAS,
-        plugins: [
-            {
-                // 跨半纯度门禁（对称自守）：Node 半不得值依赖浏览器半（src/client）。
-                // 全部源码导入必须以 `@/` 开头（相对导入一律拒绝）；跨半共享须放 src/shared（双方都可依赖）；
-                // type-only 导入在解析前已被擦除，不受限，但 src/client 无 Node 半需消费的类型面，故 @/client 一律禁。
-                name: 'dsh-node-bundle-purity',
-                resolveId(source: string) {
-                    if (source === '@/client' || source.startsWith('@/client/')) {
-                        throw new Error(
-                            `node bundle purity: "${source}" 跨半依赖浏览器半（src/client）被禁止；跨半共享须放 src/shared`,
-                        )
-                    }
-                    if (source.startsWith('./') || source.startsWith('../')) {
-                        throw new Error(
-                            `node bundle purity: "${source}" 相对导入被禁止；src 内一律使用 "@/" 别名导入（tsconfig paths 与 tsdown alias 已同步配置）`,
-                        )
-                    }
-                    return null
-                },
-            },
-        ],
     },
     // ---------- 浏览器半：web-ui 卡片（lazy-CJS 工厂产物，格式复刻 harness clientBundle 预设） ----------
     {
@@ -93,42 +74,11 @@ export default defineConfig([
             __PLUGIN_VERSION__: JSON.stringify(PKG.version),
         },
         deps: {
-            // 基线 specifier 走宿主模块表（require），其余（react 之外的一切）一律打进包内
-            neverBundle: isBaseline,
-            alwaysBundle: (specifier: string) => !isBaseline(specifier),
+            // 外置的交给宿主 require，其余一律打进包内（浏览器半只留纯逻辑与宿主原语引用）
+            neverBundle: isExternal,
+            alwaysBundle: (specifier: string) => !isExternal(specifier),
         },
         alias: SRC_ALIAS,
-        plugins: [
-            {
-                // 跨插件纯度门禁（自守，同 harness 规则）：非基线的 @deepseek-ai/* 与越界值导入直接构建失败；
-                // type-only 导入在解析前已被擦除，不受影响。
-                // @/ 值导入只放行 @/shared/*（跨半共享层，零 Node 依赖）与 @/client/*（本半内部）；
-                // 相对导入一律拒绝（全部源码导入必须以 @/ 开头，防拖入 node:path 等 Node 依赖）。
-                // 别名键锚定 `@`（段边界匹配），不会吞掉 @deepseek-ai/* 等基线 specifier。
-                name: 'dsh-client-bundle-purity',
-                resolveId(source: string) {
-                    if (source.startsWith('@/')) {
-                        const intraClient = source === '@/client' || source.startsWith('@/client/')
-                        const crossShared = source === '@/shared' || source.startsWith('@/shared/')
-                        if (intraClient || crossShared) return null
-                        throw new Error(
-                            `client bundle purity: "${source}" 越界值导入 Node 半专属源码；`
-                            + '浏览器半 @/ 值导入只允许 @/shared/*（跨半共享模块）与 @/client/*（本半内部），其余跨半协作须以字面量/契约复制维护',
-                        )
-                    }
-                    if (source.startsWith('./') || source.startsWith('../')) {
-                        throw new Error(
-                            `client bundle purity: "${source}" 相对导入被禁止；浏览器半一律使用 "@/" 别名导入（tsconfig paths 与 tsdown alias 已同步配置）`,
-                        )
-                    }
-                    if (!source.startsWith('@deepseek-ai/') || isBaseline(source)) return null
-                    throw new Error(
-                        `client bundle purity: "${source}" 不在宿主模块表基线内；`
-                        + '跨插件只能经 cordis 服务协作（type-only 导入会被擦除、不受此限），或将其加入基线（须确认宿主 platform.ts 提供）',
-                    )
-                },
-            },
-        ],
         outputOptions: {
             entryFileNames: 'client.js',
             // 宿主 __ModuleLoader__ 的闭包工厂契约（banner/intro/footer 三段缺一不可）

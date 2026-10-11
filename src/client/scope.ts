@@ -15,7 +15,7 @@
  * 浅拷贝为宿主线面 op（SettingsPathOpView，同样直引 dsh-settings 的 /types 子路径）。
  * 唯一收敛处是 `value`：`unknown → JsonValue`，本仓写回链路的取值恒为配置段里的 JSON 值
  * （宿主 schema 与 JSON.parse 两端都管着），故只作断言而不运行时校验——浏览器半不许引宿主
- * 值导入（宿主 client 打包纯度门禁禁跨插件值导入），用不了 dsh-util-values 的 isJsonValue。
+ * 值导入（client 半纯度门禁禁跨插件值导入），用不了 dsh-util-values 的 isJsonValue。
  */
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-settings/types'

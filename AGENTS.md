@@ -26,7 +26,8 @@ Node.js（ESM）+ `@deepseek-ai/cordis`；tsdown 双配置构建到 `lib/`（Nod
 ### 导入与打包
 
 - 源码导入只用 `@/`（→`src/`）与 `@test/`（→`test/`），禁相对路径；别名须同时声明在 tsconfig `paths` 与各 tsdown 配置的 `alias`（tsdown 不读 paths），键锚定 `@` 以免吞 `@deepseek-ai/*`。
-- `tsdown.config.ts` 内置双向纯度门禁；浏览器半 externals 只放行宿主模块表基线那几项（本仓副本 `PLATFORM_MODULES`），其余一律打进包。
+- **代码合规检查一律归 lint，编译配置（`tsdown.config.ts`）只管编译、不作任何检查**。跨半纯度是三条 lint 规则（`eslint.config.ts`）：Node 半禁 `@/client` 值导入；浏览器半的 `@/` 值导入只放行 `@/shared/*` 与 `@/client/*`、其 `@deepseek-ai/*` 值导入只放行基线 `BROWSER_HOST_BASELINE`。三条只判值导入（`verbatimModuleSyntax` 配 `consistent-type-imports` 保证纯类型导入一律写 `import type`），故跨插件的类型协作不受限。
+- 宿主浏览器模块表在本仓有两份，各自只服务一个工具、**改动须同步**：`eslint.config.ts` 的 `BROWSER_HOST_BASELINE`（合规判据）与 `tsdown.config.ts` 的 `HOST_EXTERNALS`（外置给宿主 require，其余打进包内），二者同源于宿主 `DSH/packages/client/web/src/platform.ts`。
 - settings 命名空间键 = `cordis.patch.yml` 的 `id`，与浏览器半 `configForms.get(NS)`、Node 半写回 NS 共用同一字面量（`PLUGIN_NS`）。
 - `package.json` 的 `dsh.client.inject` 是**依赖包图边**（槽位所有者包），不是 cordis 服务名；服务名只写在 `src/client/index.tsx` 的 `export const inject`。声明 `dsh.client` 后缺 `lib/client.js` 会让宿主激活期聚合抛错，故 **build 必须先于安装**。
 - 宿主类型面一律 type-only 导入 devDep（构建期擦除），导入清单与理由见 [`docs/host-api.md`](docs/host-api.md)「宿主类型导入清单」。
