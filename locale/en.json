@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Model field auto-fill",
-    "description": "Auto-fills reasoning effort, context window, output limit, and image modality fields for unofficial (custom) providers, and provides user experience improvements such as compatibility enhancement and remembering reasoning effort."
+    "description": "Provides a better model experience, including but not limited to: filling model parameters in multiple ways, improving model compatibility, remembering reasoning efforts, subagents following the parent's model and reasoning effort in real time, and AI self-adjusting reasoning effort."
   }
 }
