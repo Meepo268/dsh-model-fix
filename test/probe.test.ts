@@ -443,6 +443,15 @@ export async function run(): Promise<void> {
             && declaredEffortsOf(providers, [{ provider: 'lab', model: 'n1', levels: [] }]).get(JSON.stringify(['lab', 'n1']))?.length === 0,
             [...declaredEffortsOf(providers, [{ provider: 'acme', model: 'm1', levels: [] }]).values()],
         )
+        // 补齐档位时保留已有键的线拼写（如 high:'ultra'），不为所有键重写默认值
+        const customProviders = { acme: { models: [{ id: 'mc', reasoningEfforts: { off: 'none', high: 'ultra' } }] } }
+        const customApply = planEffortApply(base, customProviders, [{ provider: 'acme', model: 'mc', levels: ['off', 'low', 'high', 'xhigh'] }], false)
+        const customWritten = customApply.modelOps[0]?.op === 'set' ? customApply.modelOps[0].value : undefined
+        check(
+            '补齐档位时保留已有线拼写（off:none 与 high:ultra 原样保留，新补的取档位名）',
+            stable(customWritten) === stable([{ id: 'mc', reasoningEfforts: { off: 'none', low: 'low', high: 'ultra', xhigh: 'xhigh' } }]),
+            customApply.modelOps,
+        )
     }
     {
         // 自有段缺失 ⇒ 无法确认排除列表 ⇒ 必须显式失败（回退默认会让 excludes 变空）

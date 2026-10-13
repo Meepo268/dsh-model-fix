@@ -60,10 +60,16 @@ function declaredLevelsOf(value: unknown): readonly string[] {
     return EFFORT_LEVELS.filter((level) => keys.has(level))
 }
 
-/** 按档位表物化 `reasoningEfforts` 的取值：`off` 为 null（不推理），其余为档位名本身（与 `toReasoningEfforts` 同形） */
-function effortsValueOf(levels: readonly string[]): Record<string, string | null> {
+/**
+ * 按档位表物化 `reasoningEfforts` 的取值：**已有键一律保留原取值**（用户的 wire 拼写属用户配置，
+ * 如 `xhigh: 'ultra'`），新补的档位取档位名本身（与 `toReasoningEfforts` 同形——off 取 null）。
+ */
+function effortsValueOf(levels: readonly string[], existing?: Record<string, unknown>): Record<string, string | null> {
     const value: Record<string, string | null> = {}
-    for (const level of levels) value[level] = level === 'off' ? null : level
+    for (const level of levels) {
+        const current = existing?.[level]
+        value[level] = typeof current === 'string' ? current : (level === 'off' ? null : level)
+    }
     return value
 }
 
@@ -125,7 +131,7 @@ export function planEffortApply(
             // 临时预声明的那七档就会留在配置里——那正是「全档没验通」的模型该回到的未声明态
             const replaced = { ...model }
             if (levels.length === 0) delete replaced[FILL_FIELD]
-            else replaced[FILL_FIELD] = effortsValueOf(levels)
+            else replaced[FILL_FIELD] = effortsValueOf(levels, isPlainObject(model[FILL_FIELD]) ? model[FILL_FIELD] as Record<string, unknown> : undefined)
             next[i] = stripEmptyFields(replaced)
         }
         if (next) modelOps.push({ op: 'set', path: ['providers', providerId, 'models'], value: next })
