@@ -127,6 +127,7 @@ export type CardKey =
     | 'probeTitle'
     | 'probeDesc'
     | 'probeQuota'
+    | 'probeOffNote'
     | 'probePlan'
     | 'probeEmpty'
     | 'probeAutoWrite'

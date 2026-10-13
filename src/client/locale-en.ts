@@ -133,6 +133,8 @@ export const en: Record<CardKey, string> = {
     probeDesc: 'Checks which reasoning levels are usable with real requests — the most reliable way; takes longer with more models.',
     probeEmpty: 'No models to probe. Add models on the Models settings page, or turn off "Ignore exclusions" and retry.',
     probeQuota: 'Probing sends real requests and may use a small amount of your quota; the result is written back to the model config.',
+    // "Usable" only means accepted: an endpoint taking the off value does not mean reasoning is really disabled
+    probeOffNote: 'A usable "off" only means the request connects — not that reasoning is actually turned off (some endpoints have a default reasoning level).',
     // The two counts map onto the two keys below: {models} is the "Probe all" scope,
     // {unfilled} is the "Probe unfilled" scope
     probePlan: '{models} model(s) in total, {unfilled} of them with no reasoning level filled in yet.',

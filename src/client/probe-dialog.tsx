@@ -104,6 +104,8 @@ export function ProbeDialog(props: ProbeDialogProps) {
                     })}</p>
                 )}
                 <p className="dsh-mf-verifyQuota">{t('probeQuota')}</p>
+                {/* off 说明：记录区里 off 的「可用」只判受理，这里先说破，免得把「能通」当成「能关」 */}
+                <p className="dsh-mf-verifyQuota">{t('probeOffNote')}</p>
                 {/* 记录区排在提示之下、开关之上，与验证弹层同序：它是「正在发生的事」，
                     提示是「这轮会做什么」，两者挨着放才读得顺；反过来就成了在两段静态说明中间夹一块滚动区域。
                     首次发起才出现——opened 帧一到即有总项数，先于此则没有任何进度可展示 */}
