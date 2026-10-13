@@ -34,6 +34,14 @@ jobs:
             exit 1
           fi
 
+      - name: Check README pins the release URL
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if ! grep -qF "releases/download/v${VERSION}/dsh-model-fix.tgz" README.md; then
+            echo "::error::README.md does not pin the tarball URL releases/download/v${VERSION}/dsh-model-fix.tgz; update the install links before releasing"
+            exit 1
+          fi
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 

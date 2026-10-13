@@ -51,24 +51,29 @@ UI界面还提供了一些额外功能：
 
 > 以下所有安装方式安装的内容、效果完全相同。
 
-### 方式一：通过插件管理页面安装（推荐）
+> [!NOTE]
+> 已有用户安装/更新其他包时报 `ERR_PNPM_TARBALL_INTEGRITY`，按以下方式恢复：
+>
+> **卸载重装**：在「插件」-->「已安装」中卸载本插件，再用方式二的固定版本链接重新安装，装到的即 README 所钉版本。
 
-在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装：
-
-```
-https://github.com/TikaFlow/dsh-model-fix/releases/latest/download/dsh-model-fix.tgz
-```
-
-### 方式二：通过插件市场安装（推荐）
+### 方式一：通过插件市场安装（推荐）
 
 > 使用 `dsh-market` 插件市场安装时无需重启 DSH 即生效。
 
 直接在插件市场搜索我的用户名：`TikaFlow`，找到「dsh-model-fix」插件，即可安装。
 
-### 方式三：通过 Release 预构建包安装
+### 方式二：通过 tarball 安装（推荐）
+
+在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装：
+
+```
+https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.29.16/dsh-model-fix.tgz
+```
+
+或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/latest/download/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.29.16/dsh-model-fix.tgz
 ```
 
 ### 方式四：通过 Git 安装（不推荐）
