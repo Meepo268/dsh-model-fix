@@ -18,8 +18,12 @@ const finishError = (code: string, status?: number): StreamChunk =>
     ({ type: 'finish', reason: { kind: 'error', failure: { code, message: '文案随便写', ...(status === undefined ? {} : { status }) } } }) as unknown as StreamChunk
 const ok = (): readonly StreamChunk[] => [BLOCK_START as unknown as StreamChunk, FINISH_STOP as unknown as StreamChunk]
 
-/** 探测的请求计划：一个模型 = 七档（与浏览器半 probeTargetsOf 同形） */
-const target = (provider: unknown, model: unknown) => ({ provider, model, efforts: [...EFFORT_LEVELS], needTest: false })
+/** 探测的请求计划：已声明 off 的模型发满七档，未声明的不发 off（与浏览器半 probeTargetsOf 同形） */
+const target = (provider: unknown, model: unknown, hasOff = false) => ({
+    provider, model,
+    efforts: hasOff ? [...EFFORT_LEVELS] : [...EFFORT_LEVELS.filter((l) => l !== 'off')],
+    needTest: false,
+})
 
 /**
  * llm 桩：按「模型@档位 -> 分片序列」应答，未登记的组合默认成功；记录调用顺序。
@@ -80,20 +84,20 @@ export async function run(): Promise<void> {
         const { llm, calls } = stub({})
         const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')] }, { onProgress: (f) => { frames.push(f) } })
         check(
-            '探测每模型发满七档（按 EFFORT_LEVELS 由低到高），opened.total 与实际发的一致',
-            calls.length === 7 && stable(calls) === stable(EFFORT_LEVELS.map((level) => `acme/m1@${level}`)),
+            '探测未声明 off 的模型发六档（按 EFFORT_LEVELS 去 off 由低到高），opened.total 与实际发的一致',
+            calls.length === 6 && stable(calls) === stable(EFFORT_LEVELS.filter((l) => l !== 'off').map((level) => `acme/m1@${level}`)),
             calls,
         )
         check(
             '帧序列为 opened → 逐条 probed → done',
             frames[0].type === 'opened' && frames.at(-1)?.type === 'done'
-            && frames.slice(1, -1).every((f) => f.type === 'probed') && frames.length === 9,
+            && frames.slice(1, -1).every((f) => f.type === 'probed') && frames.length === 8,
             frames.map((f) => f.type),
         )
         check(
-            '全可用：可用档位明细七条逐条给出，统计为 7 档 / 1 模型',
-            summary.usableEfforts.length === 7 && summary.efforts === 7 && summary.tested === 1
-            && summary.plannedEfforts === 7 && summary.unsupported === 0,
+            '全可用：可用档位明细六条逐条给出，统计为 6 档 / 1 模型',
+            summary.usableEfforts.length === 6 && summary.efforts === 6 && summary.tested === 1
+            && summary.plannedEfforts === 6 && summary.unsupported === 0,
             summary.usableEfforts,
         )
         // 预声明一次写回；七档全可用时算出的表与预声明完全一致 ⇒ 收敛零写入（幂等：反复重跑不该反复写）。
@@ -111,13 +115,13 @@ export async function run(): Promise<void> {
             backupWrites(ctx).map((c) => c.ops),
         )
         check(
-            '未填充模型被补满七档（off 取 null，其余为档位名本身）',
-            stable(effortsOf(ctx, 'acme', 'm1')) === stable({ off: null, minimal: 'minimal', low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }),
+            '未声明 off 的模型被补满六档（不含 off，其余为档位名本身）',
+            stable(effortsOf(ctx, 'acme', 'm1')) === stable({ minimal: 'minimal', low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }),
             effortsOf(ctx, 'acme', 'm1'),
         )
         check(
-            '终帧带写回统计，且对齐用户视角的那份配置：本轮只探了 m1，补满七档即新增 7 条',
-            stable(summary.fill) === stable({ models: 1, added: 7, removed: 0 }),
+            '终帧带写回统计，且对齐用户视角的那份配置：本轮只探了 m1，补满六档即新增 6 条',
+            stable(summary.fill) === stable({ models: 1, added: 6, removed: 0 }),
             summary.fill,
         )
         // 排除里的提供方：探测范围由浏览器半给，写回仍照旧尊重 excludes，故它一点没被动过
@@ -129,7 +133,7 @@ export async function run(): Promise<void> {
         const ctx = ctxOf()
         const { llm } = stub({ 'm3@low': [finishError('INVALID_REQUEST', 400)] })
         const summary = await probeAndFill(ctx as unknown as Context, llm, {
-            models: [target('acme', 'm3')],
+            models: [target('acme', 'm3', true)],
             dropUnsupported: true,
         })
         check(
@@ -148,7 +152,7 @@ export async function run(): Promise<void> {
         // 关掉剔除不支持：档位表 = 可用 ∪ 原有，low 判不支持也只记录、不动配置
         const ctx = ctxOf()
         const { llm } = stub({ 'm3@low': [finishError('INVALID_REQUEST', 400)] })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm3')] })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm3', true)] })
         check(
             '关剔除不支持：只增不减，被判不支持的 low 仍在表里',
             stable(Object.keys(effortsOf(ctx, 'acme', 'm3') as Record<string, unknown>)) === stable([...EFFORT_LEVELS])
@@ -158,21 +162,21 @@ export async function run(): Promise<void> {
     }
     {
         // 判「档位不支持」要两个条件：宿主判参数不正确 **且** 已有更低档跑通。
-        // 第一档（off）就被判参数不正确时第二个条件不满足 —— 那更可能是模型本身的问题，
-        // 判成「这一档不支持」会把一个其实能用的档位误判掉，故只记 other
+        // 第一档（minimal，未声明 off 故 off 不在计划里）就被判参数不正确时第二个条件不满足 ——
+        // 那更可能是模型本身的问题，判成「这一档不支持」会把一个其实能用的档位误判掉，故只记 other
         const ctx = ctxOf()
-        const { llm, calls } = stub({ 'm1@off': [finishError('INVALID_REQUEST', 400)] })
+        const { llm, calls } = stub({ 'm1@minimal': [finishError('INVALID_REQUEST', 400)] })
         const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')] })
         check(
-            '第一档被参数错误拒绝时不判档位不支持（无更低档作对照），且参数不正确不参与模型级短路：七档照发',
-            calls.length === 7 && summary.unsupported === 0 && summary.unsupportedEfforts.length === 0
+            '第一档被参数错误拒绝时不判档位不支持（无更低档作对照），且参数不正确不参与模型级短路：六档照发',
+            calls.length === 6 && summary.unsupported === 0 && summary.unsupportedEfforts.length === 0
             && summary.results[0].outcome === 'other',
             { calls, first: summary.results[0] },
         )
         check(
-            '只有被拒的那一档不进档位表：其余六档验通了就照补',
-            stable(Object.keys(effortsOf(ctx, 'acme', 'm1') as Record<string, unknown>)) === stable(['minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
-            && summary.fill?.added === 6,
+            '只有被拒的那一档不进档位表：其余五档验通了就照补',
+            stable(Object.keys(effortsOf(ctx, 'acme', 'm1') as Record<string, unknown>)) === stable(['low', 'medium', 'high', 'xhigh', 'max'])
+            && summary.fill?.added === 5,
             { efforts: effortsOf(ctx, 'acme', 'm1'), fill: summary.fill },
         )
     }
@@ -180,12 +184,12 @@ export async function run(): Promise<void> {
         // 一档都没验通 ⇒ 档位表算空 ⇒ 整个 reasoningEfforts 键删掉（回到未声明态，不留空壳）。
         // 顺带钉住判据：厂商侧拒绝（含上游 5xx）断不得「后续必然失败」，故七档一条不少地发完
         const ctx = ctxOf()
-        const dead = Object.fromEntries(EFFORT_LEVELS.map((level) => [`m1@${level}`, [finishError('PI_AI_ERROR')]]))
+        const dead = Object.fromEntries(EFFORT_LEVELS.filter((l) => l !== 'off').map((level) => [`m1@${level}`, [finishError('PI_AI_ERROR')]]))
         const { llm, calls } = stub(dead)
         const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')] })
         check(
             '全档没跑通时档位表算空：字段整个删掉（等同未声明，不留空壳），且厂商侧拒绝不短档位尾',
-            calls.length === 7 && effortsOf(ctx, 'acme', 'm1') === undefined && summary.usableEfforts.length === 0 && summary.fill?.models === 0,
+            calls.length === 6 && effortsOf(ctx, 'acme', 'm1') === undefined && summary.usableEfforts.length === 0 && summary.fill?.models === 0,
             { calls, efforts: effortsOf(ctx, 'acme', 'm1'), fill: summary.fill },
         )
     }
@@ -196,8 +200,8 @@ export async function run(): Promise<void> {
         const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')] })
         check(
             '限流只记这一档、继续验后面的档位，且不进不支持明细',
-            calls.length === 7 && summary.results[2].outcome === 'rate-limit' && summary.unsupported === 0
-            && stable(summary.usableEfforts.map((item) => item.effort)) === stable(['off', 'minimal', 'medium', 'high', 'xhigh', 'max']),
+            calls.length === 6 && summary.results[1].outcome === 'rate-limit' && summary.unsupported === 0
+            && stable(summary.usableEfforts.map((item) => item.effort)) === stable(['minimal', 'medium', 'high', 'xhigh', 'max']),
             { calls, usable: summary.usableEfforts },
         )
     }
@@ -205,37 +209,36 @@ export async function run(): Promise<void> {
         // 额度耗尽与档位无关：短到该模型自己的档位尾，别的模型照探
         const ctx = ctxOf()
         const frames: VerifyProgressFrame[] = []
-        const { llm, calls } = stub({ 'm1@off': [finishError('QUOTA', 429)] })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2')] }, {
+        const { llm, calls } = stub({ 'm1@minimal': [finishError('QUOTA', 429)] })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)] }, {
             onProgress: (f) => { frames.push(f) },
         })
         check(
-            '额度耗尽短到模型尾：m1 只发第一档（skipped 为该模型剩余六档），m2 照发满七档',
+            '额度耗尽短到模型尾：m1 只发第一档（skipped 为该模型剩余五档），m2 照发满七档',
             calls.length === 8 && calls.filter((c) => c.startsWith('acme/m1')).length === 1
-            && summary.probed === 8 && summary.planned === 14 && summary.providers[0].blockedBy === undefined,
+            && summary.probed === 8 && summary.planned === 13 && summary.providers[0].blockedBy === undefined,
             { calls, report: summary.providers[0] },
         )
         check(
             '被短的模型在记录区留下一条并交代还剩几条，别的提供方结论不受影响',
-            frames.filter((f) => f.type === 'probed' && f.model === 'm1' && f.skipped === 6).length === 1
+            frames.filter((f) => f.type === 'probed' && f.model === 'm1' && f.skipped === 5).length === 1
             && frames.filter((f) => f.type === 'probed' && f.model === 'm2').length === 7,
             frames.filter((f) => f.type === 'probed').map((f) => `${f.model}:${f.outcome}:${f.skipped ?? 0}`),
         )
         check(
             '额度耗尽的模型算「没跑完」：原样还原（m1 无字段），m2 照补满七档',
             effortsOf(ctx, 'acme', 'm1') === undefined
-            && stable(Object.keys(effortsOf(ctx, 'acme', 'm2') as Record<string, unknown>)) === stable([...EFFORT_LEVELS]),
-            { m1: effortsOf(ctx, 'acme', 'm1'), m2: effortsOf(ctx, 'acme', 'm2') },
+            && stable(Object.keys(effortsOf(ctx, 'acme', 'm2') as Record<string, unknown>)) === stable([...EFFORT_LEVELS]),            { m1: effortsOf(ctx, 'acme', 'm1'), m2: effortsOf(ctx, 'acme', 'm2') },
         )
     }
     {
         // provider 级失败短路整组：该组剩余条数一条都不发，被短路的模型不产生可用结论
         const ctx = ctxOf()
-        const { llm, calls } = stub({ 'm1@off': [finishError('TRANSPORT')] })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2')] })
+        const { llm, calls } = stub({ 'm1@minimal': [finishError('TRANSPORT')] })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)] })
         check(
             '端点不可达短路整组：只发第一条、skipped 为组内剩余、blockedBy 为 unreachable',
-            calls.length === 1 && summary.probed === 1 && summary.planned === 14
+            calls.length === 1 && summary.probed === 1 && summary.planned === 13
             && summary.providers[0].blockedBy === 'unreachable' && !summary.providers[0].reachable,
             { calls, report: summary.providers[0] },
         )
@@ -252,11 +255,11 @@ export async function run(): Promise<void> {
         // 本组首个请求就超时：成因在请求之外——url 不可达、端点服务中断、本地网络不通，
         // 再逐条等下去只是把同样的 30 秒乘上几十遍，故短整组（本功能没有基线，首个请求就是该模型的第一档）
         const ctx = ctxOf()
-        const { llm, calls } = stub({ 'm1@off': [finishError('TIMEOUT')] })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2')] })
+        const { llm, calls } = stub({ 'm1@minimal': [finishError('TIMEOUT')] })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)] })
         check(
             '首个请求超时短整组：只发第一条、blockedBy 记 timeout',
-            calls.length === 1 && summary.probed === 1 && summary.planned === 14
+            calls.length === 1 && summary.probed === 1 && summary.planned === 13
             // 理由记「超时」而非「不可达」，reachable 也不翻假：超时只是没等到受理，不是传输层失败的证据
             && summary.providers[0].blockedBy === 'timeout' && summary.providers[0].reachable,
             { calls, report: summary.providers[0] },
@@ -271,19 +274,19 @@ export async function run(): Promise<void> {
     {
         // 首个之后的超时：链路已经跑通过，只是这一次慢——照旧瞬态处理，不短整组也不短该模型的档位尾
         const ctx = ctxOf()
-        const { llm, calls } = stub({ 'm1@minimal': [finishError('TIMEOUT')] })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2')] })
+        const { llm, calls } = stub({ 'm1@low': [finishError('TIMEOUT')] })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)] })
         check(
-            '首个之后的超时不当不可达：整组照发满十四条，blockedBy 为空',
-            calls.length === 14 && summary.probed === 14 && summary.planned === 14
+            '首个之后的超时不当不可达：整组照发满十三条，blockedBy 为空',
+            calls.length === 13 && summary.probed === 13 && summary.planned === 13
             && summary.providers[0].blockedBy === undefined && summary.providers[0].reachable
-            && summary.usableEfforts.length === 13,
+            && summary.usableEfforts.length === 12,
             { calls, report: summary.providers[0] },
         )
         // 超时那一档算「这次没跑成」，既不算可用也不算不支持：不开剔除时档位表就是可用 ∪ 原有
         check(
-            '超时那一档不补进档位表，其余六档照补',
-            stable(Object.keys(effortsOf(ctx, 'acme', 'm1') as Record<string, unknown>)) === stable(EFFORT_LEVELS.filter((level) => level !== 'minimal')),
+            '超时那一档不补进档位表，其余五档照补',
+            stable(Object.keys(effortsOf(ctx, 'acme', 'm1') as Record<string, unknown>)) === stable(EFFORT_LEVELS.filter((level) => level !== 'off' && level !== 'low')),
             effortsOf(ctx, 'acme', 'm1'),
         )
     }
@@ -293,13 +296,13 @@ export async function run(): Promise<void> {
         const controller = new AbortController()
         const frames: VerifyProgressFrame[] = []
         const { llm } = stub({}, (index) => { if (index === 8) controller.abort() })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2')] }, {
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)] }, {
             signal: controller.signal,
             onProgress: (f) => { frames.push(f) },
         })
         check('中止时不发 done 帧', frames.every((f) => f.type !== 'done'), frames.map((f) => f.type))
         check(
-            '中止即整轮还原：连跑满七档的 m1 也回到未声明，m2 保持原有两档',
+            '中止即整轮还原：连跑满六档的 m1 也回到未声明，m2 保持原有两档',
             effortsOf(ctx, 'acme', 'm1') === undefined
             && stable(effortsOf(ctx, 'acme', 'm2')) === stable({ off: null, high: 'high' }),
             { m1: effortsOf(ctx, 'acme', 'm1'), m2: effortsOf(ctx, 'acme', 'm2') },
@@ -312,10 +315,10 @@ export async function run(): Promise<void> {
         const ctx = ctxOf()
         const frames: VerifyProgressFrame[] = []
         const { llm, calls } = stub({})
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2')], autoWrite: false }, {
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)], autoWrite: false }, {
             onProgress: (f) => { frames.push(f) },
         })
-        check('关自动写入：探测照常跑满且终帧照发', calls.length === 14 && frames.at(-1)?.type === 'done', { calls: calls.length, frames: frames.map((f) => f.type) })
+        check('关自动写入：探测照常跑满且终帧照发', calls.length === 13 && frames.at(-1)?.type === 'done', { calls: calls.length, frames: frames.map((f) => f.type) })
         check(
             '关自动写入：整轮不落结论，m1 回到未声明、m2 回到原有两档（与中止同一形态）',
             effortsOf(ctx, 'acme', 'm1') === undefined
@@ -323,8 +326,8 @@ export async function run(): Promise<void> {
             { m1: effortsOf(ctx, 'acme', 'm1'), m2: effortsOf(ctx, 'acme', 'm2') },
         )
         check(
-            '关自动写入：终帧带「可补全」假设统计（m1 全缺 +7、m2 缺五档 +5），兜底备份照存照清、还原照常写回',
-            stable(summary.fill) === stable({ models: 2, added: 12, removed: 0 })
+            '关自动写入：终帧带「可补全」假设统计（m1 全缺 +6、m2 缺五档 +5），兜底备份照存照清、还原照常写回',
+            stable(summary.fill) === stable({ models: 2, added: 11, removed: 0 })
             && backupWrites(ctx).length === 2
             && backupWrites(ctx)[0].ops[0]?.op === 'set' && backupWrites(ctx)[1].ops[0]?.op === 'unset'
             && apiWrites(ctx).length === 2,
@@ -338,7 +341,7 @@ export async function run(): Promise<void> {
         await probeAndFill(ctx as unknown as Context, llm, { models: [target('lab', 'n1')], ignoreExcludes: true })
         check(
             '忽略排除：被排除的提供方也探测并写入',
-            calls.length === 7 && stable(Object.keys(effortsOf(ctx, 'lab', 'n1') as Record<string, unknown>)) === stable([...EFFORT_LEVELS]),
+            calls.length === 6 && stable(Object.keys(effortsOf(ctx, 'lab', 'n1') as Record<string, unknown>)) === stable(EFFORT_LEVELS.filter((l) => l !== 'off')),
             { calls, efforts: effortsOf(ctx, 'lab', 'n1') },
         )
     }

@@ -201,14 +201,19 @@ export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions)
 }
 
 /**
- * 探测式填充的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档（`off` 在最前）。
+ * 探测式填充的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**
+ * （未声明 off 的模型不补 off——"能通"不等于"能关"，探测出 off 能通不代表能关闭思考）。
  *
  * `needTest` 恒假：本功能没有「不带档位的基线对照」这一步——宿主按配置里声明的档位校验，
  * 未声明的档位根本出不了网，故 Node 半会先把候选档位临时预声明进配置（见 `src/probe.ts`），
  * 预声明本身就是那次对照，逐档平推即可。
  */
 export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTarget[] {
-    return candidates.map((candidate) => ({ ...candidate, efforts: [...EFFORT_LEVELS], needTest: false }))
+    return candidates.map((candidate) => ({
+        ...candidate,
+        efforts: EFFORT_LEVELS.filter((level) => level !== 'off' || candidate.efforts.includes('off')),
+        needTest: false,
+    }))
 }
 
 /**

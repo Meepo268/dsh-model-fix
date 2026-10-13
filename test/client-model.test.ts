@@ -402,11 +402,11 @@ export function run(): void {
     )
     check('probeCandidatesOf 垃圾输入返回空', probeCandidatesOf(undefined, { excludes: [], ignoreExcludes: false, unfilledOnly: false }).length === 0)
     check(
-        'probeTargetsOf 逐模型展开全部七档且 needTest 恒假（预声明本身就是那次对照）',
+        'probeTargetsOf 已声明 off 的模型发满七档、未声明的不发 off，needTest 恒假',
         stable(probeTargetsOf(pick([], false, true)).map((t) => t.efforts)) === stable([
+            [...EFFORT_LEVELS.filter((l) => l !== 'off')],
             [...EFFORT_LEVELS],
-            [...EFFORT_LEVELS],
-            [...EFFORT_LEVELS],
+            [...EFFORT_LEVELS.filter((l) => l !== 'off')],
         ]) && probeTargetsOf(pick([], false, true)).every((t) => t.needTest === false),
         probeTargetsOf(pick([], false, true)).map((t) => t.efforts),
     )

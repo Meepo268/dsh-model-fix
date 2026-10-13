@@ -194,7 +194,9 @@ export async function declareProbeEfforts(
             targets.map((target) => {
                 // 档位表按 EFFORT_LEVELS 排序写入（不按「原有在前」）：配置里的键序是用户会看见的东西，
                 // 预声明是临时形态也不能让档位表显得杂乱；且收敛阶段按同一口径比对，键序不一致会误判成有变更
-                const merged = new Set([...(preexisting.get(targetKey(target.provider, target.model)) ?? []), ...EFFORT_LEVELS])
+                // off 不补：未声明 off 的模型不替它猜——"能通"不等于"能关"（#7）
+                const pre = preexisting.get(targetKey(target.provider, target.model)) ?? []
+                const merged = new Set([...pre, ...EFFORT_LEVELS.filter((level) => level !== 'off')])
                 return { ...target, levels: EFFORT_LEVELS.filter((level) => merged.has(level)) }
             }),
             ignoreExcludes,

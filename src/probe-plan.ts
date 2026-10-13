@@ -22,7 +22,7 @@ export interface ProviderProbeGroup {
  * 一轮请求的两条硬闸：真正会发出的**请求数**与计划里的**模型数**。
  *
  * 上限约束的是烧掉的额度，故超出即拒绝而非静默截断——截断会让用户以为「全查过了」。
- * 验证按用户勾选展开（档位累加），探测式填充按模型展开（固定 7 档/模型），量级差一个数量级，
+ * 验证按用户勾选展开（档位累加），探测式填充按模型展开（至多 7 档/模型，off 仅已声明时才探测），量级差一个数量级，
  * 故两者各给一份配额；入参校验本身共用一份实现（`planProbes`），只有上限不同。
  */
 export interface ProbeLimits {
@@ -34,7 +34,7 @@ export interface ProbeLimits {
 
 /** 验证的配额：勾选展开，请求数封顶 200（超出即拒绝，用户可减少勾选重来） */
 export const VERIFY_LIMITS: ProbeLimits = { maxProbes: 200, maxModels: Number.POSITIVE_INFINITY }
-/** 探测式填充的配额：全量展开为「模型数 × 7 档」，故模型数封顶 200（至多 1400 次最小请求） */
+/** 探测式填充的配额：全量展开为「模型数 × 至多 7 档」（off 仅当模型已声明时才探测），故模型数封顶 200（至多 1400 次最小请求） */
 export const PROBE_LIMITS: ProbeLimits = { maxProbes: 1400, maxModels: 200 }
 
 /**
