@@ -62,7 +62,7 @@ function declaredLevelsOf(value: unknown): readonly string[] {
 
 /**
  * 按档位表物化 `reasoningEfforts` 的取值：**已有键一律保留原取值**（用户的 wire 拼写属用户配置，
- * 如 `xhigh: 'ultra'`），新补的档位取档位名本身（与 `toReasoningEfforts` 同形——off 取 null）。
+ * 如 `xhigh: 'ultra'`、off 的 `none`/`off` 目录拼写），新补的档位取档位名本身（off 无既有拼写可保时取 null）。
  */
 function effortsValueOf(levels: readonly string[], existing?: Record<string, unknown>): Record<string, string | null> {
     const value: Record<string, string | null> = {}

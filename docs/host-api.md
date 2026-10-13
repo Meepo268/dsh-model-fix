@@ -45,7 +45,7 @@
 - **`INVALID_CREDENTIAL` 与 `AUTH` 是两个码**（`src/error.ts` 的注释明确区分：前者是「给了但不能用」，该改值；后者是上游鉴权失败），本仓凭据无效只认 `INVALID_CREDENTIAL` / `MISSING_CREDENTIAL`，不认 `AUTH`。
 - **`ReasoningEffortId`**：`DSH/packages/llm/llm/src/brand.ts` 里是 `Branded<'ReasoningEffortId'>`，同时有运行期工厂 `ReasoningEffortId(id)`（**不做任何校验**）。本仓**只 type-only 引用类型、用 `as ReasoningEffortId` 断言**，不引运行期构造器（值面不落运行期依赖）。
 - **档位 id 取值由适配器自定**（宿主类型面 `src/types.ts` 的 `LlmReasoningEffortInfo{ id, name, description? }` 与 `LlmModelReasoningInfo{ efforts, defaultEffort? }`）；本仓的档位名来自 models.dev 目录（`src/lookup.ts` 的 `toReasoningEfforts`），不是宿主枚举。不传 `reasoningEffort` 时宿主按 `defaultEffort` 物化（`src/index.ts` 的 `stream` 实现内）——这正是「关档位 = 不发该字段，而不是取最低档」的宿主理由。
-- **宿主按模型公告的档位本地校验显式档位，未公告即拒绝、请求不出网**：`resolveCallWithInfo(config, info)`（`DSH/packages/llm/llm/src/index.ts`）里 `info.reasoning === undefined` 时只要带 `reasoningEffort` 就抛 `UNSUPPORTED_REASONING_EFFORT`，否则该档位不在 `reasoning.efforts` 里同样抛（`requested ?? reasoning.defaultEffort` 物化后比对）。**这条决定「探测式填充」整个形态**：带档位的探测只可能落在配置里已声明的档位上，故 `src/probe.ts` 必须先把候选档位**临时预声明**进模型配置（否则七档全被本地拒绝、探测不到任何东西），并在同一轮结束时收敛写回。`info.reasoning` 来自适配器的 `resolveModel`（`resolveModelInfoFor`），每次请求现取。
+- **宿主按模型公告的档位本地校验显式档位，未公告即拒绝、请求不出网**：`resolveCallWithInfo(config, info)`（`DSH/packages/llm/llm/src/index.ts`）里 `info.reasoning === undefined` 时只要带 `reasoningEffort` 就抛 `UNSUPPORTED_REASONING_EFFORT`，否则该档位不在 `reasoning.efforts` 里同样抛（`requested ?? reasoning.defaultEffort` 物化后比对）。**这条决定「探测式填充」整个形态**：带档位的探测只可能落在配置里已声明的档位上，故 `src/probe.ts` 必须先把候选档位**临时预声明**进模型配置（否则至多七档全被本地拒绝、探测不到任何东西），并在同一轮结束时收敛写回。`info.reasoning` 来自适配器的 `resolveModel`（`resolveModelInfoFor`），每次请求现取。
 
 ### llm：模型清单面（记忆剪枝的判据）
 
