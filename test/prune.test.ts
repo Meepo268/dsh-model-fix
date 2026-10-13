@@ -110,8 +110,8 @@ export function run(): void {
     ])
     check('同 provider 多目标合并为一个 op', both.modelOps.length === 1 && both.pruned === 2, both)
     check(
-        '同 provider 多目标一次剔干净',
-        stable(acmeModels(both.modelOps)?.[0]) === stable({ id: 'm1', reasoningEfforts: { off: 1 }, contextWindow: 128000, temperature: 0.7 }),
+        '同 provider 多目标一次剔干净（仅剩 off 即空壳，一并移除）',
+        stable(acmeModels(both.modelOps)?.[0]) === stable({ id: 'm1', contextWindow: 128000, temperature: 0.7 }),
         acmeModels(both.modelOps),
     )
 
