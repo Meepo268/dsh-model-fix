@@ -78,7 +78,7 @@ function effortsValueOf(levels: readonly string[], existing?: Record<string, unk
  * 按「提供方 / 模型」把档位表整段设成 `levels`，其余模型字段与同提供方的其他模型原样保留，
  * 仅当某 provider 至少改写一个模型时才整段重建写回（零变更零 op）。
  *
- * **目标档位表为空即整个 `reasoningEfforts` 键删掉**（空对象等同未声明），
+ * **目标档位表为空或只剩 off 即整个 `reasoningEfforts` 键删掉**（两者都等同未声明），
  * 不是先写空再删：路径 op 不支持数组下标中间段，只能整段 `set`，而空壳留着会反复触发写入判定。
  * 该键连同其余空壳字段（`input` / `compat`）一律走 `stripEmptyFields` 的统一判据，不在此处另写一份。
  *
@@ -127,10 +127,9 @@ export function planEffortApply(
             }
             if (sameLevels(declaredLevelsOf(model[FILL_FIELD]), levels)) continue
             next ??= list.slice()
-            // 目标为空表时**直接删键**：把旧值原样带走的话 stripEmptyFields 判不出空壳（它只清空形态），
-            // 临时预声明的那七档就会留在配置里——那正是「全档没验通」的模型该回到的未声明态
+            // 目标为空表或只剩 off 时**直接删键**：两者都等同未声明（无可选档位），与 stripEmptyFields 空壳判据同口径
             const replaced = { ...model }
-            if (levels.length === 0) delete replaced[FILL_FIELD]
+            if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off')) delete replaced[FILL_FIELD]
             else replaced[FILL_FIELD] = effortsValueOf(levels, isPlainObject(model[FILL_FIELD]) ? model[FILL_FIELD] as Record<string, unknown> : undefined)
             next[i] = stripEmptyFields(replaced)
         }

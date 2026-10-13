@@ -86,8 +86,7 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
         mapped[level] = level === 'off' ? effort : level
     }
     const keys = Object.keys(mapped)
-    if (keys.length === 0) return
-    // 仅剩 off 表示无可选档位，等同无匹配，不填充
-    if (keys.length === 1 && keys[0] === 'off') return
+    // 空或只剩 off：无可选档位，等同无匹配，不填充（与 stripEmptyFields 的空壳判据同口径）
+    if (keys.length === 0 || (keys.length === 1 && keys[0] === 'off')) return
     return mapped
 }

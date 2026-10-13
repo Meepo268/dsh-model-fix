@@ -75,7 +75,7 @@ export function planPruneEfforts(
             if (hit === 0) continue
             pruned += hit
             next ??= models.slice()
-            // 档位剔空时 reasoningEfforts 整个键删掉（空对象等同未声明），其余空壳字段一并按统一判据清理
+            // 档位剔空或只剩 off 时 reasoningEfforts 整个键删掉（两者都等同未声明），其余空壳字段一并按统一判据清理
             next[i] = stripEmptyFields({ ...model, [PRUNE_FIELD]: kept })
         }
         if (next) modelOps.push({ op: 'set', path: ['providers', providerId, 'models'], value: next })
