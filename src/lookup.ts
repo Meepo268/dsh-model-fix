@@ -77,13 +77,13 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
     }
 }
 
-/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为实际发送拼写（仅 off 允许空值） */
+/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null） */
 export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string, string | null> | undefined {
     if (!entry) return
     const mapped: Record<string, string | null> = {}
     for (const effort of entry.efforts) {
-        const level = effort === 'none' ? 'off' : effort
-        mapped[level] = level === 'off' ? null : level
+        const level = effort === 'none' || effort === 'off' ? 'off' : effort
+        mapped[level] = level === 'off' ? effort : level
     }
     const keys = Object.keys(mapped)
     if (keys.length === 0) return

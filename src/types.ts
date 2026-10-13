@@ -26,7 +26,7 @@ export interface ModelEntry {
  * 内存索引（IndexEntry）为补全分组键的完整条目，供 lookup/fix 消费。
  */
 export interface CacheRecord {
-    /** 可选推理级别，'none' 表示可关闭推理；无可选档位时为空数组 */
+    /** 可选推理级别，'off'/'none' 为目录原值（表示可关闭推理）；无可选档位时为空数组 */
     efforts: string[]
     /** 最大上下文窗口（tokens），仅当 models.dev 提供 */
     contextWindow?: number

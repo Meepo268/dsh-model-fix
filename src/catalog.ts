@@ -65,7 +65,8 @@ function fromApiEntry(entry: unknown): ModelEntry | undefined {
 /**
  * 将 models.dev 原始 JSON 构建为分组缓存：{ provider: { model-id: 条目 } }，
  * 仅保留有可用推理级别、容量或支持图片的模型；
- * efforts 过滤为 harness 支持的取值并统一 'off' 拼写为 'none'，toggle 且无关闭标记时补 'none'。
+ * efforts 过滤为 harness 支持的取值，'off' 与 'none' 均按目录原值保留（不归一、不合成）。
+ * 目录未列关闭档（off/none）时不写入该档——"能通"不等于"能关"，不替目录猜测可关闭。
  */
 export function buildCatalog(api: Record<string, unknown> | undefined): Catalog {
     const catalog: Catalog = {}
@@ -77,15 +78,8 @@ export function buildCatalog(api: Record<string, unknown> | undefined): Catalog 
         for (const [id, entry] of Object.entries(models as Record<string, unknown>)) {
             const parsed = fromApiEntry(entry)
             if (!parsed) continue
-            const efforts = [
-                ...new Set(
-                    parsed.efforts
-                        .map((effort) => (effort === 'off' ? 'none' : effort))
-                        .filter((effort) => effort === 'none' || LEVELS.has(effort)),
-                ),
-            ]
-            if (parsed.toggle && !efforts.includes('none')) efforts.unshift('none')
-            const hasUsableReasoning = parsed.reasoning && efforts.some((effort) => effort !== 'none')
+            const efforts = [...new Set(parsed.efforts.filter((effort) => effort === 'none' || LEVELS.has(effort)))]
+            const hasUsableReasoning = parsed.reasoning && efforts.some((effort) => effort !== 'none' && effort !== 'off')
             // 仅有 none 的推理能力（无可选档位）不视为推理数据，但容量或图片支持仍可入库
             if (!hasUsableReasoning && parsed.contextWindow === undefined && parsed.maxTokens === undefined && !parsed.image) continue
             const result: CacheRecord = { efforts: hasUsableReasoning ? efforts : [] }
@@ -121,8 +115,7 @@ function indexFromCatalog(catalog: Catalog): IndexedCatalog {
 /**
  * 缓存条目结构校验（单条，嵌套于 provider→model 两层键之下）：条目来自磁盘 JSON（用户可编辑、写入可能被截断），
  * 而填充流程直接迭代 `entry.efforts`——一条坏条目会让整批填充抛错，故在入库前逐条判定。
- * 档位取值与 buildCatalog 写入口径严格一致（none ∪ LEVELS 去除 'off'——'off' 写入时已归一为 'none'，
- * 盘上出现即非法，放行会经 toReasoningEfforts 产出 value 为 'off' 的非法档位写回用户配置）；
+ * 档位取值与 buildCatalog 写入口径严格一致（none ∪ LEVELS，含 'off'——目录原值保留，不归一）；
  * 任一条非法即整份文件作废走网络重拉（坏盘自愈优先级高于坏条丢弃）。
  * 未知多余键忽略（向前兼容：比当前代码更新的缓存不应整盘作废）；
  * provider/id 键属分组与嵌套键已承担的定位信息，出现在记录本体即判非法。
@@ -130,7 +123,7 @@ function indexFromCatalog(catalog: Catalog): IndexedCatalog {
 export function isCacheRecord(value: unknown): value is CacheRecord {
     if (!isPlainObject(value)) return false
     const { efforts, contextWindow, maxTokens, image } = value as Partial<CacheRecord> & Record<string, unknown>
-    if (!Array.isArray(efforts) || !efforts.every((effort) => typeof effort === 'string' && (effort === 'none' || (LEVELS.has(effort) && effort !== 'off')))) return false
+    if (!Array.isArray(efforts) || !efforts.every((effort) => typeof effort === 'string' && (effort === 'none' || LEVELS.has(effort)))) return false
     if (contextWindow !== undefined && !isCapacity(contextWindow)) return false
     if (maxTokens !== undefined && !isCapacity(maxTokens)) return false
     if (image !== undefined && image !== true) return false

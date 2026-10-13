@@ -80,14 +80,14 @@ export async function run(): Promise<void> {
         check('填充：变更计数为 2（model-c 无目录数据）', changes === 2)
         check('填充：model-a 四字段全填', stable(models[0]) === stable({
             id: 'model-a',
-            reasoningEfforts: { off: null, low: 'low', high: 'high' },
+            reasoningEfforts: { off: 'none', low: 'low', high: 'high' },
             contextWindow: 128000,
             maxTokens: 8192,
             input: ['text', 'image'],
         }))
         check('填充：model-b 有推理与容量、无图片模态', stable(models[1]) === stable({
             id: 'model-b',
-            reasoningEfforts: { off: null, medium: 'medium' },
+            reasoningEfforts: { off: 'none', medium: 'medium' },
             contextWindow: 32000,
             maxTokens: 4096,
         }))
@@ -123,7 +123,7 @@ export async function run(): Promise<void> {
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]
-        check('allowUpdate：覆盖已有推理级别', stable(model?.reasoningEfforts) === stable({ off: null, low: 'low', high: 'high' }))
+        check('allowUpdate：覆盖已有推理级别', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }))
         check('allowUpdate：变更计数为 1', changes === 1)
     }
 
@@ -140,7 +140,7 @@ export async function run(): Promise<void> {
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context, true)
         const model = modelsOf(ctx, 'testprovider')[0]
-        check('force：单次绕过 allowUpdate 覆盖', stable(model?.reasoningEfforts) === stable({ off: null, low: 'low', high: 'high' }))
+        check('force：单次绕过 allowUpdate 覆盖', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }))
         check('force：变更计数为 1', changes === 1)
     }
 
@@ -250,7 +250,7 @@ export async function run(): Promise<void> {
         check('空 reasoningEfforts：变更计数为 1', changes === 1)
         check(
             '空 reasoningEfforts：按缺失补写填上目录档位（不被清空后留待下轮）',
-            stable(model?.reasoningEfforts) === stable({ off: null, low: 'low', high: 'high' }),
+            stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }),
             model,
         )
     }

@@ -66,9 +66,10 @@ export function run(): void {
     check('前缀命中多个 -> 无匹配', lookup(catalog({ openai: ['gpt-5-mini', 'gpt-5-nano'] }), 'openai', 'gpt-5') === undefined)
     check('完全无命中 -> undefined', lookup(catalog({ openai: ['gpt-5'] }), 'openai', 'o3') === undefined)
 
-    // ---------- toReasoningEfforts：none -> off（值 null），其余透传 ----------
-    check('efforts 映射与 none 转 off', stable(toReasoningEfforts(entry('m', ['none', 'low', 'high']))) === stable({ off: null, low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['none', 'low', 'high'])))
+    // ---------- toReasoningEfforts：none/off 映射到 off 键，保留目录原值而非 null ----------
+    check('efforts 映射与 none 转 off（保留原值 none）', stable(toReasoningEfforts(entry('m', ['none', 'low', 'high']))) === stable({ off: 'none', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['none', 'low', 'high'])))
+    check('efforts 映射与 off 保留原值', stable(toReasoningEfforts(entry('m', ['off', 'low', 'high']))) === stable({ off: 'off', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['off', 'low', 'high'])))
     check('无条目 -> undefined', toReasoningEfforts(undefined) === undefined)
     check('空档位 -> undefined', toReasoningEfforts(entry('m', [])) === undefined)
-    check('仅剩 off -> 视为无匹配', toReasoningEfforts(entry('m', ['none'])) === undefined)
+    check('仅剩 off -> 视为无匹配', toReasoningEfforts(entry('m', ['none'])) === undefined && toReasoningEfforts(entry('m', ['off'])) === undefined)
 }
