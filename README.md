@@ -1,8 +1,8 @@
 # dsh-model-fix
 
-> 本插件已在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 收录，可在 [dsh-market](https://github.com/dsh-market/dsh-market) 中搜索、安装。
-
 DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插件：提供更好的模型使用体验，包括但不限于：多种方式填充模型参数、提升模型兼容性、记住推理级别、子智能体实时跟随模型和推理级别、AI 自主调节档位等。
+
+> 本插件已在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 收录，可在 [dsh-market](https://github.com/dsh-market/dsh-market) 中搜索、安装。
 
 插件截图：
 
@@ -42,9 +42,9 @@ UI界面还提供了一些额外功能：
 ### 可视化设置
 
 - 入口：
-  - 「设置」-->「模型」-->「模型参数填充」卡片
-  - 「设置」-->「内置插件」-->「模型填充」选项卡-->「模型参数填充」卡片（此处卡片默认展开）
-  - 「插件」-->「已安装」-->「模型参数填充」详情页（此处卡片默认展开）
+  - 「设置」-->「模型」-->「模型参数填充」卡片（卡片默认收起）
+  - 「设置」-->「内置插件」-->「模型填充」选项卡-->「模型参数填充」卡片
+  - 「插件」-->「已安装」-->「模型参数填充」详情页
   - 「插件」-->「已安装」-->「模型参数填充」详情页-->「包含的组件」-->「dsh-model-fix」
 
 ## 安装
@@ -58,7 +58,7 @@ UI界面还提供了一些额外功能：
 
 ### 方式一：通过插件市场安装（推荐）
 
-> 使用 `dsh-market` 插件市场安装时无需重启 DSH 即生效。
+> 使用 `dsh-market` 插件市场安装，可方便的升级，无需卸载重装。
 
 直接在插件市场搜索我的用户名：`TikaFlow`，找到「dsh-model-fix」插件，即可安装。
 
@@ -76,9 +76,9 @@ https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.29.16/dsh-model-f
 dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.29.16/dsh-model-fix.tgz
 ```
 
-### 方式四：通过 Git 安装（不推荐）
+### 方式三：通过 Git 安装（不推荐）
 
-> 使用这种方式安装需要现场编译插件，不推荐。
+> 使用这种方式安装需要现场构建插件，不推荐。
 
 ```bash
 dsh plugin --profile web add github:TikaFlow/dsh-model-fix
