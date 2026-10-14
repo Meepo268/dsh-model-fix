@@ -70,35 +70,23 @@ function isZh(locale: string): boolean {
     return ZH_LOCALE_IDS.some((id) => locale === id || locale.startsWith(`${id}-`))
 }
 
-/**
- * 换名层的活状态位；卸载钩子只把它置回 `false`，遮蔽层本身留在服务上。
+/** 装上档位名本地化：把 `ctx.llm` 的 `resolveModelInfo` 遮成「中文界面下换名、否则直通」的一层
  *
- * 卸载**不动服务上的属性**（既不 `delete` 也不写回原函数）：遮蔽是链式的，后装插件记住的 `original`
- * 正是我们的 `wrapped`，动属性要么让原型查找落到别人的层上、要么抹掉别人的遮蔽，两者都依赖「此刻没人
- * 压在我上面」这个不成立的前提。只清状态位与别人的遮蔽彻底解耦——本层退化为直通，谁压在哪一层都不影响。
- *
- * 状态位必须在碰 ctx 之前判：判定要读 `ctx.llm` / `ctx.settings`，fiber 失活后这些属性访问会抛
- * `cannot get required service … in inactive context`（本仓在 official-filter 上实测过）。判到
- * `false` 即直通，卸载后这条路径不再碰 ctx。
+ * 卸载不动服务上的属性（遮蔽是链式的，后装插件记住的 original 正是我们的 wrapped，动属性会抹掉
+ * 别人的遮蔽）。wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store`（cordis 原生
+ * 活性信号，dispose 即 undefined）作守卫——不通过即直通 original，完全不碰 ctx。
  */
-let active = false
-
-/** 装上档位名本地化：把 `ctx.llm` 的 `resolveModelInfo` 遮成「中文界面下换名、否则直通」的一层 */
 export function installEffortNameLocale(ctx: Context): void {
     const llm = ctx.llm
     const original = llm.resolveModelInfo
     const wrapped = async (provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> => {
         const info = await original.call(llm, provider, model, signal)
-        if (active && getConfig().userExperience.localizeEfforts && isZh(localeNow(ctx))) {
+        if (ctx.fiber.store && getConfig().userExperience.localizeEfforts && isZh(localeNow(ctx))) {
             return localizeEffortNames(info)
         }
         return info
     }
-    active = true
     llm.resolveModelInfo = wrapped
-    ctx.effect(() => () => {
-        active = false
-    })
 }
 
 /** 记下浏览器半上报的探测语言（RPC 端点 `reportLocale` 的落点；进程内易失，重启后由浏览器重新上报） */

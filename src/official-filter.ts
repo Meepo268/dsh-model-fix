@@ -63,30 +63,18 @@ async function isHiddenNow(ctx: Context, provider: string): Promise<boolean> {
     return isUnconfigured(ctx, provider)
 }
 
-/**
- * 遮蔽层的活状态位；卸载钩子只把它置回 `false`，遮蔽层本身留在服务上。
+/** 装上官方提供方过滤：把 `ctx.llm` 的 `listModels` 遮成「命中隐藏即返回空清单」的一层
  *
- * 卸载**不动服务上的属性**（既不 `delete` 也不写回原函数）：遮蔽是链式的，后装插件记住的 `original`
- * 正是我们的 `wrapped`，动属性要么让原型查找落到别人的层上、要么抹掉别人的遮蔽，两者都依赖「此刻没人
- * 压在我上面」这个不成立的前提。只清状态位与别人的遮蔽彻底解耦——本层退化为直通，谁压在哪一层都不影响。
- *
- * 状态位必须在碰 ctx 之前判：判定要读 `ctx.llm` / `ctx.credentials`，fiber 失活后这两个属性访问会抛
- * `cannot get required service "llm" in inactive context`（本仓实测过）。判到 `false` 即直通，卸载后
- * 这条路径不再碰 ctx。
+ * 卸载不动服务上的属性（遮蔽是链式的，后装插件记住的 original 正是我们的 wrapped，动属性会抹掉
+ * 别人的遮蔽）。wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store`（cordis 原生
+ * 活性信号，dispose 即 undefined）作守卫——不通过即直通 original，完全不碰 ctx。
  */
-let active = false
-
-/** 装上官方提供方过滤：把 `ctx.llm` 的 `listModels` 遮成「命中隐藏即返回空清单」的一层，作用域随插件存活 */
 export function installOfficialFilter(ctx: Context): void {
     const llm = ctx.llm
     const original = llm.listModels
     const wrapped = async (provider: string): Promise<LlmModelInfo[]> => {
-        if (active && await isHiddenNow(ctx, provider)) return []
+        if (ctx.fiber.store && await isHiddenNow(ctx, provider)) return []
         return original.call(llm, provider)
     }
-    active = true
     llm.listModels = wrapped
-    ctx.effect(() => () => {
-        active = false
-    })
 }
