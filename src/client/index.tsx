@@ -25,6 +25,7 @@ import { CARD_NS } from '@/client/locale-keys'
 import { zh } from '@/client/locale-zh'
 import { makeRpcCarrier } from '@/client/rpc-carrier'
 import { applyEffortMemoryListener } from '@/client/memory-listener'
+import { applyLocalePatch } from '@/client/locale-patch'
 import { applyLocaleReporter } from '@/client/effort-name'
 import { API_NS as PI_AI_NS, PLUGIN_NAME, PLUGIN_NS as MODEL_FIX_NS } from '@/shared/constants'
 import { decodeSection } from '@/client/model'
@@ -123,4 +124,6 @@ function boot(
     applyEffortMemoryListener(ctx, scope)
     // 界面语言上报：Node 半换名依赖它补齐自动探测的盲区，见 effort-name.ts
     applyLocaleReporter(ctx)
+    // 宿主 Default 词条 patch：Scope 订阅挂进本 fiber，随卸载自动恢复原状，见 locale-patch.ts
+    applyLocalePatch(ctx, scope)
 }
