@@ -157,6 +157,8 @@ export function planFill(
  */
 export async function fix(ctx: Context, force = false): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        // 卸载后不再碰 settings（dispose 会让 inject 的服务不可取，抛 inactive context）
+        if (!ctx.fiber.store) return 0
         // 冲突重试时重读，获取最新 revision
         const descriptor = descriptorOf(ctx, API_NS)
         if (!descriptor) return 0

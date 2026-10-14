@@ -133,6 +133,7 @@ export async function updateMemory(ctx: Context): Promise<void> {
 /** 一轮剪枝（读 → 采 → 计划 → 写回）。任何一步判定「不必剪」即整轮早退 */
 async function pruneOnce(ctx: Context): Promise<void> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!ctx.fiber.store) return
         const cfg = getConfig()
         if (!cfg.userExperience.forgetRemoved) return
         const live = await collectLiveModels(ctx, Object.keys(cfg.efforts))

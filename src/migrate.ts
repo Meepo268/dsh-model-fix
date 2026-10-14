@@ -116,6 +116,7 @@ export async function migrateConfig(ctx: Context): Promise<void> {
         descriptor = descriptorOf(ctx, PLUGIN_NS)
     }
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!ctx.fiber.store) return
         // 首轮用轮询所得描述（此刻必已注册）；冲突重试时重读，取最新 revision 与段值
         const fence = attempt === 1 ? descriptor : descriptorOf(ctx, PLUGIN_NS)
         if (!fence) return

@@ -38,6 +38,7 @@ export function decodeProbeBackup(text: unknown): Record<string, unknown> | unde
 /** 写自有段（冲突重试，读回最新 revision 后重发同一组 op——备份与清除都是幂等的） */
 async function mutateOwn(ctx: Context, ops: readonly SettingsPathOp[]): Promise<void> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!ctx.fiber.store) throw new Error(`${PLUGIN_NAME}: 插件已卸载`)
         const descriptor = descriptorOf(ctx, PLUGIN_NS)
         if (!descriptor) throw new Error(`${PLUGIN_NAME}: 自有配置段 ${PLUGIN_NS} 不可读`)
         try {
@@ -76,6 +77,7 @@ export function clearProbeBackup(ctx: Context): Promise<void> {
  */
 async function restoreProviders(ctx: Context, backup: Record<string, unknown>): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!ctx.fiber.store) return 0
         const descriptor = descriptorOf(ctx, API_NS)
         const providers = providersOf(descriptor?.user)
         // 与 restoreModels 同理：读不到段时显式失败，返回 0 会被当成「本就一致」而静默吞掉真故障

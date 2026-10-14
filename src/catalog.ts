@@ -181,6 +181,7 @@ export async function fetchLatest(ctx: Context): Promise<IndexedCatalog> {
     const serialized = JSON.stringify(catalog)
     if (!indexedCache || serialized !== JSON.stringify(indexedCache.catalog)) {
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            if (!ctx.fiber.store) break
             try {
                 await writeFile(CACHE_FILE, serialized)
                 break

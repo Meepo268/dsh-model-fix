@@ -60,6 +60,7 @@ export interface ApiWritebackSpec<R extends ApiWritebackPlan> {
  */
 export async function writebackApi<R extends ApiWritebackPlan>(ctx: Context, spec: ApiWritebackSpec<R>): Promise<R> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!ctx.fiber.store) return spec.unreadableProviders()
         const descriptor = descriptorOf(ctx, API_NS)
         const revision = descriptor?.revision || 0
         const providers = providersOf(descriptor?.user)

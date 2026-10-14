@@ -41,6 +41,7 @@ export interface StubCtxOpts {
 }
 
 export interface StubCtx {
+    fiber: { store: Record<string, unknown> }
     settings: {
         describe(): Array<{ ns: string; user: Record<string, unknown>; revision: number }>
         mutate(ns: string, ops: SettingsPathOp[], revision: number): Promise<void>
@@ -84,6 +85,7 @@ export function makeStubCtx(opts: StubCtxOpts = {}): StubCtx {
     const mutateCalls: StubCtx['mutateCalls'] = []
 
     return {
+        fiber: { store: {} },
         settings: {
             describe() {
                 return [...sections.entries()].map(([ns, s]) => ({ ns, user: s.user, revision: s.revision }))
