@@ -56,15 +56,15 @@ function refillAfterOwnChange(ctx: Context): void {
 
 /** llm-pi-ai 段变更：重新填充；距上次成功拉取超过保鲜窗口（如长期不重启）时再拉取（结算后再填充一次），无常驻定时器；守卫同上。
  * 填充写回会增删模型级条目，故结算后再按全量模型列表剪一次记忆（填充本身不碰记忆）。 */
-function refillAfterApiChange(ctx: Context, disposed: () => boolean): void {
+function refillAfterApiChange(ctx: Context): void {
     if (isIgnoreAll()) return
     fix(ctx)
         .finally(() => {
-            if (disposed()) return
-            refreshIfStale(ctx, disposed)
+            if (!ctx.fiber.store) return
+            refreshIfStale(ctx)
         })
         .then(() => {
-            if (disposed()) return
+            if (!ctx.fiber.store) return
             pruneMemory(ctx)
         })
         .catch(swallowFixError)
@@ -74,10 +74,10 @@ function refillAfterApiChange(ctx: Context, disposed: () => boolean): void {
  * 自有段会留下整段兜底备份，配置里留着「声称支持七档」的半截形态。启动链末尾据此回退，
  * 回退后再补一轮 fill——否则被撤掉预声明的模型会停在未填充态，本插件的主功能就失效了。
  * 无备份时 restoreProbeBackup 直接返回 0，不做多余的写入与填充。 */
-async function recoverProbeBackup(ctx: Context, isDisposed: () => boolean): Promise<void> {
+async function recoverProbeBackup(ctx: Context): Promise<void> {
     try {
         const changed = await restoreProbeBackup(ctx)
-        if (changed > 0 && !isDisposed()) await fix(ctx)
+        if (changed > 0 && ctx.fiber.store) await fix(ctx)
     } catch (error) {
         ctx.logger.warn(`${PLUGIN_NAME}: 探测式填充的兜底回退失败（配置可能停在半截形态）：${errorText(error)}`)
     }
@@ -97,33 +97,30 @@ function readVolatile(config: unknown): unknown {
  * 与事件路径同构（fix → refreshIfStale → 拉取结算后再 fix）。每个续体前都判一次 `isDisposed`：
  * 卸载后不读缓存、不触碰已销毁上下文。
  */
-function runStartupChain(ctx: Context, isDisposed: () => boolean): void {
-    void migrateConfig(ctx, isDisposed)
+function runStartupChain(ctx: Context): void {
+    void migrateConfig(ctx)
         .catch((error: unknown) => {
-            if (isDisposed()) return
+            if (!ctx.fiber.store) return
             ctx.logger.warn(`${PLUGIN_NAME}: 配置迁移失败，使用当前生效配置继续：${errorText(error)}`)
         })
         .then(() => {
-            // 卸载后不再读缓存
-            if (isDisposed()) return
+            if (!ctx.fiber.store) return
             return readCache()
         })
         .then((cached) => {
-            if (isDisposed()) return
+            if (!ctx.fiber.store) return
             if (cached) setCatalog(cached)
             fix(ctx)
-                .then(() => recoverProbeBackup(ctx, isDisposed))
+                .then(() => recoverProbeBackup(ctx))
                 .finally(() => {
-                    if (isDisposed()) return
-                    refreshIfStale(ctx, isDisposed)
+                    if (!ctx.fiber.store) return
+                    refreshIfStale(ctx)
                 })
                 .then(() => {
-                    // 首轮剪一次记忆：此时活路由已齐（llm-pi-ai 段装载早于 apply），
-                    // 上一轮运行中被删掉的提供方/模型在此归零
-                    if (!isDisposed()) pruneMemory(ctx)
+                    if (ctx.fiber.store) pruneMemory(ctx)
                 })
                 .catch((error: unknown) => {
-                    if (isDisposed()) return
+                    if (!ctx.fiber.store) return
                     ctx.logger.warn(`${PLUGIN_NAME}: 填充失败：${errorText(error)}`)
                 })
         })
@@ -131,9 +128,6 @@ function runStartupChain(ctx: Context, isDisposed: () => boolean): void {
 
 /** 入口：单一编排体（备份 → 配置源与段变更接线 → RPC → 启动链） */
 export function apply(ctx: Context, config?: unknown): void {
-    // 插件级卸载标记：启动链与事件驱动的异步续体都据此中止，卸载后不触碰已销毁上下文
-    let disposed = false
-    const isDisposed = (): boolean => disposed
     // hmr 事务感知：子 fiber 注入 hmr 执行上下文（缺席时降级为裸 task()，不影响任何功能）
     ctx.inject(['hmr'], (child) => {
         setHmrExecuting((child.get('hmr') as { executing?: unknown } | undefined)?.executing)
@@ -146,7 +140,7 @@ export function apply(ctx: Context, config?: unknown): void {
     setConfigSource(() => resolveConfig(readVolatile(config)))
     ctx.on('settings/document-updated', (ns) => {
         if (ns === PLUGIN_NS) refillAfterOwnChange(ctx)
-        else if (ns === API_NS) refillAfterApiChange(ctx, isDisposed)
+        else if (ns === API_NS) refillAfterApiChange(ctx)
     })
     // provider 拓扑变化（adapter 注册/注销/替换、configurable-provider 目录增减）——宿主在 commit
     // 之后统一发出，故此处读到的活路由已是最新；记忆失效清理跟着它走，与会话无关故不进子 fiber
@@ -162,9 +156,8 @@ export function apply(ctx: Context, config?: unknown): void {
     // 浏览器半「强制更新 / 重置推理级别 / 恢复备份」RPC channel（结果经 ConnectionRpcResult 回传卡片）
     installRpc(ctx)
     ctx.effect(() => {
-        runStartupChain(ctx, isDisposed)
+        runStartupChain(ctx)
         return () => {
-            disposed = true
             // 取消待触发的拉取重试定时器（闭包持有 ctx，卸载后不应再触发）
             cancelRefreshRetry()
         }

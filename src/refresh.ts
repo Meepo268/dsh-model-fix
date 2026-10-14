@@ -16,13 +16,13 @@ let refreshing = false
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 
 /** 距上次成功拉取超过保鲜窗口且无在途拉取时才真正拉取（长期不重启的保鲜路径，由模型配置变更事件驱动） */
-export function refreshIfStale(ctx: Context, isDisposed: () => boolean): void {
+export function refreshIfStale(ctx: Context): void {
     const isFresh = Date.now() - lastRefreshAt < REFRESH_INTERVAL_MS
     if (refreshing || isFresh) return
-    refresh(ctx, isDisposed)
+    refresh(ctx)
 }
 
-function refresh(ctx: Context, isDisposed: () => boolean, retryCount = MAX_ATTEMPTS): void {
+function refresh(ctx: Context, retryCount = MAX_ATTEMPTS): void {
     // 单飞不变量在此兜底：任何调用点进入时若已有拉取在途就直接返回，
     // 保证同一时刻只有一个 refresh 流程——否则并发在途的响应可能后发先至、把较旧的目录覆盖回去。
     // 依赖调用方先判 refreshing 是不够的（新增调用点极易漏判），此行不可删。
@@ -33,7 +33,7 @@ function refresh(ctx: Context, isDisposed: () => boolean, retryCount = MAX_ATTEM
     refreshing = true
     fetchLatest(ctx)
         .then((indexed) => {
-            if (isDisposed()) {
+            if (!ctx.fiber.store) {
                 refreshing = false
                 return
             }
@@ -48,13 +48,13 @@ function refresh(ctx: Context, isDisposed: () => boolean, retryCount = MAX_ATTEM
                 return
             }
             fix(ctx).catch((error) => {
-                if (isDisposed()) return
+                if (!ctx.fiber.store) return
                 ctx.logger.warn(`${PLUGIN_NAME}: 填充失败：${errorText(error)}`)
             })
             refreshing = false
         })
         .catch((error) => {
-            if (isDisposed()) {
+            if (!ctx.fiber.store) {
                 refreshing = false
                 return
             }
@@ -70,13 +70,13 @@ function refresh(ctx: Context, isDisposed: () => boolean, retryCount = MAX_ATTEM
             }
             retryTimer = setTimeout(() => {
                 retryTimer = undefined
-                if (isDisposed()) {
+                if (!ctx.fiber.store) {
                     refreshing = false
                     return
                 }
                 // 重试前复位在途守卫
                 refreshing = false
-                refresh(ctx, isDisposed, retryCount)
+                refresh(ctx, retryCount)
             }, RETRY_DELAY_MS)
         })
 }

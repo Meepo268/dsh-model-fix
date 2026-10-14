@@ -101,12 +101,12 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  *   重试时**重读描述并重算 op**，绝不回放：按旧段算出的整段 set 若只换新 revision 回放，会盖掉并发写入者刚落的内容；
  *   重读后重算，他方已补齐的字段让 op 自然收敛为零
  */
-export async function migrateConfig(ctx: Context, disposed: () => boolean = () => false): Promise<void> {
+export async function migrateConfig(ctx: Context): Promise<void> {
     // 轮询等待 describe() 含本 NS；超时/卸载即放弃，按当前生效配置继续
     let descriptor = descriptorOf(ctx, PLUGIN_NS)
     let waited = 0
     while (!descriptor) {
-        if (disposed()) return
+        if (!ctx.fiber.store) return
         if (waited >= MIGRATE_WAIT_MS) {
             ctx.logger.warn(`${PLUGIN_NAME}: 等待 ${PLUGIN_NS} 命名空间注册超时（${MIGRATE_WAIT_MS}ms），跳过本次迁移/写回/清理`)
             return
