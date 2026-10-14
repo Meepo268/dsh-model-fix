@@ -16,6 +16,7 @@ import { restoreProbeBackup } from '@/probe-backup'
 import { installSubagentFollowParent } from '@/subagent'
 import { installSelfTune } from '@/self-tune'
 import { installOfficialFilter } from '@/official-filter'
+import { installEffortNameLocale } from '@/effort-name'
 
 export const name = PLUGIN_NAME
 export const inject = ['settings', 'llm', 'credentials']
@@ -156,6 +157,8 @@ export function apply(ctx: Context, config?: unknown): void {
     installSelfTune(ctx)
     // 「隐藏官方API」（按 userExperience.hideOfficial 在模型目录生成处过滤未配密钥的官方提供方；判定实时现算，无事件接线）
     installOfficialFilter(ctx)
+    // 「本地化推理级别」（按开关 + 界面语言在 resolveModelInfo 处换档位显示名；判定实时现算，无事件接线）
+    installEffortNameLocale(ctx)
     // 浏览器半「强制更新 / 重置推理级别 / 恢复备份」RPC channel（结果经 ConnectionRpcResult 回传卡片）
     installRpc(ctx)
     ctx.effect(() => {

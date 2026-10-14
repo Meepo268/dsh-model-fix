@@ -18,10 +18,10 @@ export function run(): void {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     })
     // userExperience 组的出厂默认（parseSnapshot 省略整项时物化的那份）
-    const UE_DEFAULT = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }
+    const UE_DEFAULT = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false }
     // v7 快照（段内无 v8 时的最高可解析版本）：缺 efforts / userExperience 整项，经当前 schema 解析后落各项默认
     const v7Entry = {
         configVersion: 7,
@@ -45,7 +45,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-7': v7Entry }))
     // 兼容语义：v6 无 forgetRemoved，经当前 schema 解析后落该项默认（等价于「忘记已删除模型」，即维持既有行为）
     const v6Entry = {
@@ -62,7 +62,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-6': v6Entry }))
     // 兼容语义：v5 无 defaultHigh / forgetRemoved，经当前 schema 解析后落该项默认（等价于「默认使用 high」）
     const v5Entry = {
@@ -78,7 +78,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-5': v5Entry }))
     // 兼容语义：v4 无 efforts / userExperience，经当前 schema 解析后落该项默认
     check('取低版本（v4）快照并补 efforts / userExperience 默认', stable(resolveConfig({ 'version-4': v5Entry })) === stable({
@@ -87,7 +87,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-4': v5Entry }))
     // 兼容语义：v3 无 excludes 数组，经当前 schema 解析后落该项默认（等价于「不排除任何提供方」）
     const v3Entry = {
@@ -102,7 +102,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: [],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-3': v3Entry }))
     check('布尔写法在 v4 快照中非法，回退默认', stable(resolveConfig({ 'version-4': { configVersion: 4, allowUpdate: true, autoFill: false } })) === DEFAULT_STABLE, resolveConfig({ 'version-4': { configVersion: 4, allowUpdate: true, autoFill: false } }))
     check('缺字段按整项默认补齐（含 image）', stable(resolveConfig({ 'version-4': { configVersion: 4, autoFill: { context: false } } })) === stable({
@@ -111,7 +111,7 @@ export function run(): void {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-4': { configVersion: 4, autoFill: { context: false } } }))
     check('image 非法值整项回退默认', stable(resolveConfig({ 'version-4': { configVersion: 4, autoFill: { image: 'x' } } })) === DEFAULT_STABLE, resolveConfig({ 'version-4': { configVersion: 4, autoFill: { image: 'x' } } }))
     // compat 组与 fieldRules 同严格度：整项非对象、字段非布尔都判整段快照非法
@@ -124,7 +124,7 @@ export function run(): void {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-4': { configVersion: 4, compat: {} } }))
     // excludes 与其余组同严格度：非数组、元素非字符串都判整段非法（宁可整段回默认，也不带着坏值继续写回）
     check('excludes 非数组整段回退默认', stable(resolveConfig({ 'version-4': { configVersion: 4, excludes: 'acme' } })) === DEFAULT_STABLE, resolveConfig({ 'version-4': { configVersion: 4, excludes: 'acme' } }))
@@ -138,9 +138,9 @@ export function run(): void {
     check('userExperience defaultHigh 非布尔整段回退默认', stable(resolveConfig({ 'version-7': { configVersion: 7, userExperience: { defaultHigh: 'yes' } } })) === DEFAULT_STABLE, resolveConfig({ 'version-7': { configVersion: 7, userExperience: { defaultHigh: 'yes' } } }))
     check('userExperience forgetRemoved 非布尔整段回退默认', stable(resolveConfig({ 'version-7': { configVersion: 7, userExperience: { forgetRemoved: 'yes' } } })) === DEFAULT_STABLE, resolveConfig({ 'version-7': { configVersion: 7, userExperience: { forgetRemoved: 'yes' } } }))
     check('userExperience 缺字段落该字段默认', stable(resolveConfig({ 'version-4': { configVersion: 4, userExperience: {} } })) === DEFAULT_STABLE, resolveConfig({ 'version-4': { configVersion: 4, userExperience: {} } }))
-    check('userExperience rememberEfforts false 原样生效', stable((resolveConfig({ 'version-4': { configVersion: 4, userExperience: { rememberEfforts: false } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }))
-    check('userExperience defaultHigh true 原样生效', stable((resolveConfig({ 'version-7': { configVersion: 7, userExperience: { defaultHigh: true } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }))
-    check('userExperience forgetRemoved false 原样生效', stable((resolveConfig({ 'version-7': { configVersion: 7, userExperience: { forgetRemoved: false } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true }))
+    check('userExperience rememberEfforts false 原样生效', stable((resolveConfig({ 'version-4': { configVersion: 4, userExperience: { rememberEfforts: false } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false }))
+    check('userExperience defaultHigh true 原样生效', stable((resolveConfig({ 'version-7': { configVersion: 7, userExperience: { defaultHigh: true } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false }))
+    check('userExperience forgetRemoved false 原样生效', stable((resolveConfig({ 'version-7': { configVersion: 7, userExperience: { forgetRemoved: false } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false }))
     check('低于最低支持版本（MIN_SUPPORTED_VERSION = 3）的快照被忽略回默认', stable(resolveConfig({ 'version-2': { configVersion: 2, autoFill: { reasoning: false, context: false } } })) === DEFAULT_STABLE && stable(resolveConfig({ 'version-0': { allowUpdate: true } })) === DEFAULT_STABLE, resolveConfig({ 'version-2': { configVersion: 2, autoFill: { reasoning: false, context: false } } }))
     // 降级兼容语义：无当前版本时，取段内最高版本快照按当前 schema 解析（多余键忽略、缺失字段落默认）
     check('仅更高版本降级解析保留配置', stable(resolveConfig({ 'version-9': { autoFill: { reasoning: false, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'] } })) === stable({
@@ -149,10 +149,10 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-9': { autoFill: { reasoning: false, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'] } }))
     check('仅更高版本降级解析保留 efforts 记忆', stable(resolveConfig({ 'version-9': { efforts: { 'z-ai': { 'glm-5.2': 'high' } } } }).efforts) === stable({ 'z-ai': { 'glm-5.2': 'high' } }), resolveConfig({ 'version-9': { efforts: { 'z-ai': { 'glm-5.2': 'high' } } } }).efforts)
-    check('仅更高版本降级解析保留 userExperience（含 defaultHigh 与 forgetRemoved）', stable((resolveConfig({ 'version-9': { userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true }), resolveConfig({ 'version-9': { userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false } } }))
+    check('仅更高版本降级解析保留 userExperience（含 defaultHigh 与 forgetRemoved）', stable((resolveConfig({ 'version-9': { userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false } } }) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false }), resolveConfig({ 'version-9': { userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false } } }))
     check('仅更高版本且全缺省降级得默认', stable(resolveConfig({ 'version-9': { whatever: true } })) === DEFAULT_STABLE, resolveConfig({ 'version-9': { whatever: true } }))
     // 当前版本优先于更高版本：即使更高版本先被遍历成为候选，命中当前版本即提前返回
     check('当前版本（v8）与更高版本并存仍取 v8', stable(resolveConfig({ 'version-9': { autoFill: { reasoning: false, context: false, image: false } }, 'version-8': v8Entry })) === stable({
@@ -161,7 +161,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), resolveConfig({ 'version-9': { autoFill: { reasoning: false, context: false, image: false } }, 'version-8': v8Entry }))
     // 无当前版本快照时取段内最高可解析版本（含更高版本）
     check('无 v8 快照时取段内最高的可解析版本（v9 胜过 v7）',
@@ -171,7 +171,7 @@ export function run(): void {
             compat: { disableDeveloper: false, disableStore: true },
             excludes: ['x'],
             efforts: {},
-            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
         }), resolveConfig({ 'version-7': v7Entry, 'version-9': { autoFill: { reasoning: false, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'] } }))
     check('非法快照回默认', stable(resolveConfig({ 'version-4': 'garbage' })) === DEFAULT_STABLE, resolveConfig({ 'version-4': 'garbage' }))
     check('段为数组/非对象回默认', stable(resolveConfig([])) === DEFAULT_STABLE, resolveConfig([]))
@@ -183,7 +183,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), parseSnapshot(v7Entry))
     check('parseSnapshot 省略字段落该项默认', stable(parseSnapshot({ configVersion: 4, autoFill: { context: false } })) === stable({
         allowUpdate: { reasoning: false, context: false, image: false },
@@ -191,7 +191,7 @@ export function run(): void {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: false },
     }), parseSnapshot({ configVersion: 4, autoFill: { context: false } }))
     check('parseSnapshot 拒绝垃圾/布尔写法/非对象', parseSnapshot('garbage') === undefined
         && parseSnapshot({ autoFill: true, allowUpdate: false }) === undefined
@@ -204,13 +204,13 @@ export function run(): void {
         check(`userExperience followParent 非布尔整段快照判非法（${stable(bad)}）`, parseSnapshot({ configVersion: 8, userExperience: { followParent: bad } }) === undefined, parseSnapshot({ configVersion: 8, userExperience: { followParent: bad } }))
     }
     // userExperience 的 hideOfficial 行：与该组其余行同严格度——缺省落默认（默认隐藏），非布尔判整段快照非法
-    check('userExperience hideOfficial false 原样沿用（覆盖默认的隐藏）', stable(parseSnapshot({ configVersion: 8, userExperience: { hideOfficial: false } })?.userExperience) === stable({ ...UE_DEFAULT, hideOfficial: false }), parseSnapshot({ configVersion: 8, userExperience: { hideOfficial: false } }))
+    check('userExperience hideOfficial false 原样沿用（覆盖默认的隐藏）', stable(parseSnapshot({ configVersion: 8, userExperience: { hideOfficial: false, localizeEfforts: false } })?.userExperience) === stable({ ...UE_DEFAULT, hideOfficial: false, localizeEfforts: false }), parseSnapshot({ configVersion: 8, userExperience: { hideOfficial: false, localizeEfforts: false } }))
     for (const bad of ['yes', 1, null]) {
         check(`userExperience hideOfficial 非布尔整段快照判非法（${stable(bad)}）`, parseSnapshot({ configVersion: 8, userExperience: { hideOfficial: bad } }) === undefined, parseSnapshot({ configVersion: 8, userExperience: { hideOfficial: bad } }))
     }
     // 组内未知键按忽略处理（与 compat 同口径），故旧的 effort 键不影响解析
     check('userExperience 组内未知键按忽略处理', stable(parseSnapshot({ configVersion: 8, userExperience: { effort: 'turbo' } })?.userExperience) === stable(UE_DEFAULT), parseSnapshot({ configVersion: 8, userExperience: { effort: 'turbo' } }))
-    check('v8 快照里的 followParent 经 resolveConfig 原样生效', stable(resolveConfig({ 'version-8': v8Entry }).userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true }), resolveConfig({ 'version-8': v8Entry }).userExperience)
+    check('v8 快照里的 followParent 经 resolveConfig 原样生效', stable(resolveConfig({ 'version-8': v8Entry }).userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true, localizeEfforts: false }), resolveConfig({ 'version-8': v8Entry }).userExperience)
     check('parseSnapshot 剥离 configVersion 等运行时不消费的键', Object.keys(parseSnapshot(v7Entry) ?? {}).sort().join(',') === 'allowUpdate,autoFill,compat,efforts,excludes,userExperience', parseSnapshot(v7Entry))
     // 缺省 excludes 落的是新建数组：解析结果被调用方改动不得污染 DEFAULT_CONFIG
     const materialized = parseSnapshot({ configVersion: 4 })

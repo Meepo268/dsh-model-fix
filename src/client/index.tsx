@@ -25,6 +25,7 @@ import { CARD_NS } from '@/client/locale-keys'
 import { zh } from '@/client/locale-zh'
 import { makeRpcCarrier } from '@/client/rpc-carrier'
 import { applyEffortMemoryListener } from '@/client/memory-listener'
+import { applyLocaleReporter } from '@/client/effort-name'
 import { API_NS as PI_AI_NS, PLUGIN_NAME, PLUGIN_NS as MODEL_FIX_NS } from '@/shared/constants'
 import { decodeSection } from '@/client/model'
 import type { Flags } from '@/client/model'
@@ -120,4 +121,6 @@ function boot(
 
     // 每模型推理级别记忆的运行时监听（订阅会话投影、自动设级别）见 memory-listener.ts
     applyEffortMemoryListener(ctx, scope)
+    // 界面语言上报：Node 半换名依赖它补齐自动探测的盲区，见 effort-name.ts
+    applyLocaleReporter(ctx)
 }

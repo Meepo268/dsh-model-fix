@@ -4,6 +4,7 @@ import { run as runClientModel } from '@test/client-model.test'
 import { run as runCompat } from '@test/compat.test'
 import { run as runConfig } from '@test/config.test'
 import { run as runEffort } from '@test/effort.test'
+import { run as runEffortName } from '@test/effort-name.test'
 import { run as runEmpty } from '@test/empty.test'
 import { run as runFix } from '@test/fix.test'
 import { run as runGuard } from '@test/guard.test'
@@ -33,6 +34,8 @@ section('config.test.ts')
 runConfig()
 section('effort.test.ts')
 runEffort()
+section('effort-name.test.ts')
+runEffortName()
 section('empty.test.ts')
 runEmpty()
 section('guard.test.ts')

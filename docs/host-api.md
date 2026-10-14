@@ -194,6 +194,19 @@
 - **`credentialRef(value: string): CredentialRef`**（同文件，**值导入**）：把裸字符串品牌化成 `CredentialRef`；名称不在语法内（POSIX shell 标识符）即**抛 `TypeError`** ⇒ 调用前必须先过 **`isCredentialRefName(value): boolean`**（同文件值导出的预检、不抛）。本仓对语法外的引用名一律**放行不隐藏**（判不准时不猜、不报错），与宿主目录面同口径。
 - **官方适配器的默认引用名**：`llm-deepseek-api-key` 的 `Config.apiKeyEnv` 默认 `"DEEPSEEK_API_KEY"`（该包 `lib/index.js`，volatile），解析时 `config.apiKeyEnv ?? "DEEPSEEK_API_KEY"` ⇒ 该提供方配置段未显式写 `apiKeyEnv` 时适配器实际读的就是这个默认名，故本仓判定在段缺该字段时回退同名常量（`DEFAULT_OFFICIAL_API_KEY_ENV`），保证判定与适配器实际行为一致。
 
+### llm：`resolveModelInfo` 是档位显示名的唯一出口（本地化的落点）
+
+- **换名落点**：`ctx.llm.resolveModelInfo(provider, model, signal?)` 的返回里，`reasoning.efforts[].name` 是档位显示名**唯一**出现的地方——`buildModelCatalog`（`DSH/packages/api/session-controller/src/catalog.ts`）逐 provider 先 `listModels`（只有模型 id/name，**没有档位**）再 `resolveModelInfo`，把返回里的 `efforts[].name` 原样搬进目录载荷；宿主 UI 菜单/触发器标题与 subagent 的 list-models 工具也都取这个名字。⇒ 遮这一处即全链覆盖，与 `official-filter` 遮 `listModels` 同一对象（`LlmRuntime` 实例）、同一形态（公开实例方法，赋值遮蔽已验证）。
+- **消费者影响面（已逐一核实）**：session-reference / compaction-basic / ACP / MCP-client 只取返回里的 `context` 与 `inputModalities`，**不读名字**，换名对它们零影响；唯二读 `efforts[].name` 的是目录链路（目标效果）与 `tool-subagent` 的 list-models 工具（拼进给 AI 的文本）——**后者意味着开关开启时 AI 看到的档位名也是中文**，此为本方案已明示的取舍。
+- **`defaultEffort` 不可翻译**：它是档位 id（不是名字），且 `LlmRuntime` 校验它必须落在 `efforts[].id` 集合内（不合法即抛 `INVALID_MODEL_REASONING`）——翻译即破坏校验与线上值。UI 显示默认档位走「id → 对应档位 name」，那个 name 已被换掉，显示链路自然覆盖。
+- **名字的来路**：适配器按档位 id 现算（`llm-pi-ai` 的 `resolveModel` 用 `id` 首字母大写），配置侧只有 id、没有可写的名字字段；宿主词典刻意不本地化档位名（社区讨论 deepseek-harness#6117 亦确认此行为并建议按稳定 id 键控翻译）。故词表键取宿主同一表达式（首字母大写形式），id 非全小写（如 `HIGH`）的档位宿主显示 `HIGH`、不落七键、原样透传。
+- **`normalizeModelInfo` 只校验/分离不改名**：返回对象是宿主新建的（每次调用新造），换名产出新对象不会改动入参。
+
+### locale：Node 侧的界面语言判定（换名的开关条件）
+
+- **偏好落盘**：宿主 locale 插件把显式语言选择存在宿主 settings 文档的 `locale` 段 `preference` 字段（`LOCALE_SETTINGS_NAMESPACE = 'locale'` / `LOCALE_PREFERENCE_FIELD = 'preference'`，`DSH/packages/client/locale/src/locale-settings.ts`）。schema 里它是 `volatile()`——**volatile 是配置 schema 的必写形式，与是否落盘无关**（本仓自有配置字段同样全 volatile）；该字段随 settings 文档持久保存，Node 侧经 `descriptorOf` / `sectionOf` 直读（与「隐藏官方API」读密钥段同一走法）。
+- **自动探测的盲区**：`locale` 服务只在浏览器半提供，Node 侧读不到浏览器探测结果。用户未显式选择语言时 `preference` 缺省，此时由浏览器半启动时经本仓 RPC 端点 `reportLocale` 上报探测语言（`src/client/effort-name.ts` → `src/effort-name.ts` 的 `reportLocale`，进程内易失、重启后浏览器重新上报）；两路皆空回退 `en`（不换名）。
+
 ### 模块装载：`window.__ModuleLoader__` 与 `dsh.client.inject`
 
 - **契约**（`DSH/packages/client/modules/src/index.ts`）：`ClientModuleLoaderTarget{ mode: 'queue'|'live'; pendingQueue; load(registration): void; create(options): ClientModuleSystem }`；`ClientModuleCreateOptions{ boot; staticModules; loadBundle? }`。
@@ -228,11 +241,11 @@
 | `@deepseek-ai/dsh-client-connection` | `ConnectionRpcResult` | type-only | `src/client/rpc-carrier.ts`、`src/client/card.tsx`（读写回结果信封） |
 | `@deepseek-ai/dsh-client-ui-slots` | `TranslateNS` + 合并（`LocaleNamespaceMap` 纳入 `CARD_NS`） | type-only | `TranslateNS`：`src/client/card.tsx` `src/client/tile.tsx` `src/client/card-meta.tsx` `src/client/verify-dialog.tsx` `src/client/probe-dialog.tsx`；合并：`src/client/locale-keys.ts`（`declare module` 扩充 `LocaleNamespaceMap`） |
 | `@deepseek-ai/dsh-api-session-controller/client` | 合并（`ctx.sessions`） | 合并 | `src/client/memory-listener.ts` |
-| `@deepseek-ai/dsh-api-session-controller/types` | `ModelSelection`、`ModelSelectionProjection`、`ModelProviderGroup` | type-only | `src/client/memory-listener.ts`、`src/client/effort.ts` |
+| `@deepseek-ai/dsh-api-session-controller/types` | `ModelSelection`、`ModelSelectionProjection`、`ModelProviderGroup`、`ModelCatalog` | type-only | `src/client/memory-listener.ts`、`src/client/effort.ts`、`src/client/effort-name.ts`（目录载荷，`test/effort-name.test.ts` 亦直引） |
 | `@deepseek-ai/dsh-client-ui-model-selection/client` | `ModelDirectory` | type-only | `src/client/memory-listener.ts` |
 | `@deepseek-ai/dsh-session/types` | `SessionId` | type-only | `src/client/memory-listener.ts`、`src/subagent.ts`、`test/subagent.test.ts`（**只引 `/types` 子路径**：包根会把 Node 侧 `SessionStore` 的 `ctx.sessions` 增补带进来，见下方契约复制条目） |
 | `@deepseek-ai/dsh-client-ui-renderer/client` | 合并（`ctx.slots`） | 合并 | `src/client/index.tsx` |
-| `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx` |
+| `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts` |
 | `@deepseek-ai/dsh-client-ui-settings-models/client` | 合并（slot key `settings.models.footer`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-ui-plugin-manager/client` | 合并（slot key `plugins.bundle.config` / `plugins.row.config`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-llm` | `LlmCallConfig` / `LlmCallConfigAdapterDefaults` / `ReasoningEffortId`（**必须包根**：`/types` 子路径不含 `LlmCallConfig`） | type-only | `src/subagent.ts` |
@@ -302,3 +315,4 @@
 - 复核 `SettingsPathOpView` 的两份宿主声明（`DSH/packages/settings/settings` 的 `/types` 与 `@deepseek-ai/dsh-api-remotes/client`）仍同形——`src/client/scope.ts` 的转发以其中一份为准，另一份若改形（或宿主将来把 `dsh-api-remotes` 列为 devDep）应改为直接引真正的那份。
 - 复核档位自调注入面的四件事：`tools.register` 的 definition 形状（必填 `description`、`execute(args, exec)` 的 `exec.agent` 可缺）与 `systemPrompt.section({ name, order, text })` 是否仍同形；宿主 `SECTION_ORDERS` 是否仍把 MCP 放 3100 / SDK 工具放 5000（本插件 `order: 3200` 的落位依据）；`selectModel` 是否仍是失败抛 `RemoteError`、`session/agent-busy` / `session/model-unavailable` 两码未变；`resolveModelInfo` 返回的 `reasoning.efforts[].id` / `defaultEffort` 形状未变。
 - 复核「隐藏官方API」依赖的三条宿主行为：`llm.listModels` 是否仍是**原型方法**（改成箭头函数类字段则实例遮蔽失效、功能静默失效且无报错）；`buildModelCatalog` 是否仍滤掉模型数为 0 的组（不滤则空清单的组仍会出现在 UI 上）；`credentials.describe` 与 `credentialRef` / `isCredentialRefName` 的签名与抛错面未变（`CredentialRef` 语法收紧会让原先合法的引用名被判非法，本仓当前按放行处理，故只是少隐藏而非报错）。
+- 复核「本地化推理级别」依赖的四条宿主行为：宿主 UI 是否仍经 `ctx.remote.session` 的嵌套取面调 `modelCatalog`（本仓取面走的就是这条路；若宿主改走别的对象，换名层又会静默失效——判据是调用探针，见 `docs/decisions.md`）；远程方法是否仍装成**可配置访问器**（改成数据属性则 `defineProperty` 换名会抛）；「方法先于依赖方装载」的同步窗口是否仍在（取不到 descriptor 时本仓直接不装，功能静默失效）；档位显示名是否仍由适配器按 id 现算、UI 仍原样取 `efforts[].name`（若宿主改为自带本地化词条或提供渲染插槽，本仓这层即可撤掉）。

@@ -1,6 +1,6 @@
 /**
- * Connection RPC 端点（前后端通信通道）：forceUpdate / resetModels / restoreModels / pruneEfforts 四个写回端点，
- * 共用同一守卫做互斥；验证与探测式填充的进度各开一条 `connection.fetch` 的 exact 路由。
+ * Connection RPC 端点（前后端通信通道）：forceUpdate / resetModels / restoreModels / pruneEfforts 四个写回端点
+ * 与 reportLocale 语言上报端点，写回共用同一守卫做互斥；验证与探测式填充的进度各开一条 `connection.fetch` 的 exact 路由。
  *
  * 设计裁决（守卫互斥、两条进度流、各写回端点语义）见 docs/decisions.md「写回端点」与「验证」。
  * 路由由本插件自注册而不走宿主 `connection.rpc.handle`：后者在**服务自己的 ctx** 上求值 `owner.webServer`，
@@ -18,6 +18,7 @@ import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
 import { fix } from '@/fix'
+import { ENDPOINT_REPORT_LOCALE, reportLocale } from '@/effort-name'
 import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
 import { parsePruneTargets, pruneUnsupportedEfforts } from '@/prune'
 import { probeAndFill } from '@/probe'
@@ -119,6 +120,11 @@ export function installRpc(ctx: Context): void {
                             },
                         }
                     }
+                }
+                if (endpoint === ENDPOINT_REPORT_LOCALE) {
+                    // 浏览器半启动时上报探测语言（Node 侧没有 locale 服务，见 effort-name.ts 的语言解析）
+                    reportLocale(payload)
+                    return { ok: true, value: {} }
                 }
                 return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }
             }

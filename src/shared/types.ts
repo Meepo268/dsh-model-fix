@@ -96,6 +96,13 @@ export interface UserExperienceRules {
      * 默认 true（即默认隐藏；配了官方密钥即自动照常显示）。
      */
     hideOfficial: boolean
+    /**
+     * 本地化推理级别名：为 true 时把推理档位的显示名换成中文（关 / 高 等）——档位名由宿主适配器按
+     * 档位 id 现算（首字母大写）并随模型信息下发，本插件在 Node 半遮蔽 `ctx.llm.resolveModelInfo`
+     * 换名（见 `src/effort-name.ts`），UI 菜单与 AI 的 list-models 工具同受影响。
+     * 只换显示名，档位 id 与 `defaultEffort` 原样保留（它们是发往模型的线上值）。默认 false。
+     */
+    localizeEfforts: boolean
 }
 
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */
