@@ -1,5 +1,5 @@
 // src/probe.ts 与 src/fill.ts 用例：预声明 → 逐档探测 → 收敛写回的整条链（档位不支持的两条件判据、
-// 与档位无关的失败短到模型尾而「参数不正确」不短、provider 级短路（含本组首个请求超时即短整组）、未跑完即还原、关自动写入整轮还原、剔除不支持、忽略排除、帧序列与终帧里的写回统计）
+// 与档位无关的失败（额度耗尽，及本功能自有的限流）短到模型尾而「参数不正确」不短、provider 级短路（含本组首个请求超时即短整组）、未跑完即还原、关自动写入整轮还原、剔除不支持、忽略排除、帧序列与终帧里的写回统计）
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
@@ -194,15 +194,32 @@ export async function run(): Promise<void> {
         )
     }
     {
-        // 瞬态（限流 / 超时）只否定这一次：不判不支持、也不短后续档位
+        // 限流是本功能自有的模型级短路（瞬态里唯一短的）：限流不分档位，同窗内同 key 换档照样 429，
+        // 而没跑满的模型整轮还原（档位表不动、无误杀），短到模型尾只省请求；超时仍不短
         const ctx = ctxOf()
+        const frames: VerifyProgressFrame[] = []
         const { llm, calls } = stub({ 'm1@low': [finishError('RATE_LIMIT', 429)] })
-        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')] })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1'), target('acme', 'm2', true)] }, {
+            onProgress: (f) => { frames.push(f) },
+        })
         check(
-            '限流只记这一档、继续验后面的档位，且不进不支持明细',
-            calls.length === 6 && summary.results[1].outcome === 'rate-limit' && summary.unsupported === 0
-            && stable(summary.usableEfforts.map((item) => item.effort)) === stable(['minimal', 'medium', 'high', 'xhigh', 'max']),
-            { calls, usable: summary.usableEfforts },
+            '限流短到模型尾：m1 只发到第二档（skipped 为该模型剩余四档），m2 照发满七档',
+            calls.length === 9 && calls.filter((c) => c.startsWith('acme/m1')).length === 2
+            && summary.probed === 9 && summary.planned === 13 && summary.providers[0].blockedBy === undefined,
+            { calls, report: summary.providers[0] },
+        )
+        check(
+            '限流只否定这一档：不判不支持、不进不支持明细，记录区留下该模型一条并交代还剩几条',
+            summary.results[1].outcome === 'rate-limit' && summary.unsupported === 0
+            && frames.filter((f) => f.type === 'probed' && f.model === 'm1' && f.skipped === 4).length === 1
+            && frames.filter((f) => f.type === 'probed' && f.model === 'm2').length === 7,
+            { results: summary.results, frames: frames.filter((f) => f.type === 'probed').map((f) => `${f.model}:${f.outcome}:${f.skipped ?? 0}`) },
+        )
+        check(
+            '被限流短路的模型算「没跑完」：原样还原（m1 无字段），m2 照补满七档',
+            effortsOf(ctx, 'acme', 'm1') === undefined
+            && stable(Object.keys(effortsOf(ctx, 'acme', 'm2') as Record<string, unknown>)) === stable([...EFFORT_LEVELS]),
+            { m1: effortsOf(ctx, 'acme', 'm1'), m2: effortsOf(ctx, 'acme', 'm2') },
         )
     }
     {

@@ -108,7 +108,9 @@ export function providerBlockReason(outcome: ProbeOutcome, firstRequest: boolean
  *   换个档位可能就通；判「只否定这一档」还要求宿主判为 `INVALID_REQUEST` **且**该功能自己的对照
  *   成立（验证拿不带档位的基线，探测式填充拿同模型已跑通的更低档，见 `isEffortRejection`），
  *   两者凑齐才落「档位不支持」，那种结论本就不该短后面的档位。
- * - **限流与超时**：只否定了这一次，重试同一模型只是白烧额度。
+ * - **限流与超时**：只否定了这一次，重试同一模型只是白烧额度。（例外：探测式填充把**限流**
+ *   追加为自己的模型级短路——限流不分档位，被短模型整轮还原档位表、无误杀，只省请求；
+ *   超时两边都不短。见 `src/probe.ts` 的 `runProbeGroup` 与 docs/decisions.md「探测式填充」。）
  */
 export function shouldSkipModelTail(outcome: ProbeOutcome, failure: VerifyFailureFacts | undefined): boolean {
     return failure !== undefined && outcome === 'quota'

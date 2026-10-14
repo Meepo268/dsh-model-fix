@@ -29,7 +29,7 @@ function targetKey(provider: string, model: string): string {
     return JSON.stringify([provider, model])
 }
 
-/** 顺序跑完一组的探测请求（组内零并发）：逐档各发一次，provider 级失败（含首个请求超时）短整组、其余按共用判据短到模型尾 */
+/** 顺序跑完一组的探测请求（组内零并发）：逐档各发一次，provider 级失败（含首个请求超时）短整组、其余按共用判据（额度耗尽）加本功能自有的限流短到模型尾 */
 const runProbeGroup: GroupRunner = async (
     llm: Pick<LlmRuntime, 'stream'>,
     group: ProviderProbeGroup,
@@ -69,8 +69,10 @@ const runProbeGroup: GroupRunner = async (
         if (blockReason !== undefined) {
             blockedBy = blockReason
             skipped = group.probes.length - index - 1
-        } else if (shouldSkipModelTail(outcome, verdict.failure)) {
-            // 只剩额度耗尽够格：与档位无关且必然复现，故不必再为该模型的其余档位烧额度
+        } else if (shouldSkipModelTail(outcome, verdict.failure) || outcome === 'rate-limit') {
+            // 额度耗尽共用判据：与档位无关且必然复现。限流是本功能自有的追加判据：限流不分档位，
+            // 同一把 key 在同一限流窗口里换档只会同样 429，而没跑满的模型本就会被整轮还原
+            // （档位表不动、无误杀），短到模型尾只是省下白烧的请求；超时仍不作判据（见 probe-verdict.ts）
             skipped = sameModelTail(group.probes, index)
         }
         if (skipped > 0) index += skipped
