@@ -396,7 +396,7 @@ export async function run(): Promise<void> {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: ['lab'],
         efforts: {},
-        userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false },
     }
     const providers = {
         acme: {

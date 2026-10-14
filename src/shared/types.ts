@@ -89,6 +89,13 @@ export interface UserExperienceRules {
      * 为 false 时卸载全部注入。默认 false（即不注入，行为与没装本插件一致）。
      */
     selfTune: boolean
+    /**
+     * 隐藏官方 API：为 true 时，名单内（见 `src/official-filter.ts`）未配置密钥的官方提供方
+     * 在 UI 模型选择列表里不显示——拦截宿主目录生成时该提供方的模型清单（`ctx.llm.listModels`）返回空，
+     * 宿主随即把模型数为 0 的组从目录里滤掉。判定与「设置→模型」小红点同口径。
+     * 默认 true（即默认隐藏；配了官方密钥即自动照常显示）。
+     */
+    hideOfficial: boolean
 }
 
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */

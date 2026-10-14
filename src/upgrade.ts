@@ -358,13 +358,20 @@ const V8_FOLLOW_PARENT_DEFAULT = false
 const V8_SELF_TUNE_DEFAULT = false
 
 /**
+ * userExperience.hideOfficial 的台阶默认值：与 followParent / selfTune 同批在 v8 形态内落地（同组新增键不递增
+ * CONFIG_VERSION，见 docs/versioning.md），升级到 v8 时一并落默认（true，即未配置密钥时过滤），与出厂默认一致。
+ * 同样写字面量而不引用 `DEFAULT_CONFIG`——台阶产物形态必须恒定。
+ */
+const V8_HIDE_OFFICIAL_DEFAULT = true
+
+/**
  * compat.disableStore 的台阶默认值：v7 无该键，升级到 v8 时落默认（true，与 v8 出厂默认一致）。
  * 与 userExperience 两项同批在 v8 形态内落地（同组新增键不递增 CONFIG_VERSION，见 docs/versioning.md）；
  * 同样写字面量而不引用 `DEFAULT_CONFIG`——台阶产物形态必须恒定。
  */
 const V8_DISABLE_STORE_DEFAULT = true
 
-/** 升到 v8（当前版本）：低于 v8 的输入先由 upgradeTo7 逐级接力到 v7，再按 v7 冻结 schema 解析（非法整体回退 v7 默认），新增 userExperience.followParent / selfTune 与 compat.disableStore 并落默认；efforts 经 parseEfforts 宽松保留 */
+/** 升到 v8（当前版本）：低于 v8 的输入先由 upgradeTo7 逐级接力到 v7，再按 v7 冻结 schema 解析（非法整体回退 v7 默认），新增 userExperience.followParent / selfTune / hideOfficial 与 compat.disableStore 并落默认；efforts 经 parseEfforts 宽松保留 */
 function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot {
     const v7 = fromVersion < 7 ? upgradeTo7(config, fromVersion) : config
     let parsed: Omit<V7PluginConfigSnapshot, 'configVersion' | 'efforts'>
@@ -393,6 +400,7 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
             ...parsed.userExperience,
             followParent: V8_FOLLOW_PARENT_DEFAULT,
             selfTune: V8_SELF_TUNE_DEFAULT,
+            hideOfficial: V8_HIDE_OFFICIAL_DEFAULT,
         },
     }
 }

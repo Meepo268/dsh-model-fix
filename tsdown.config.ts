@@ -22,6 +22,7 @@ const HOST_EXTERNALS = [
     '@deepseek-ai/dsh-client-store',
     '@deepseek-ai/dsh-client-ui-slots',
     '@deepseek-ai/dsh-client-ui-primitives',
+    '@deepseek-ai/dsh-credentials',
 ]
 
 const isExternal = (specifier: string): boolean =>
@@ -50,6 +51,10 @@ export default defineConfig([
         // copy 传目录条目时会把目录名一起带进 outDir（public → lib/public），故用 glob + 默认 flatten:true 逐文件落位。
         copy: [{ from: 'public/*' }],
         alias: SRC_ALIAS,
+        // Node 半同样外置宿主模块：tsdown 默认只外置 dependencies/peerDependencies，devDependencies 会被内联
+        deps: {
+            neverBundle: isExternal,
+        },
     },
     // ---------- 浏览器半：web-ui 卡片（lazy-CJS 工厂产物，格式复刻 harness clientBundle 预设） ----------
     {

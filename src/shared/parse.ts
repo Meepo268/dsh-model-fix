@@ -22,14 +22,14 @@ export const DEFAULT_CONFIG: PluginConfig = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
-    userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+    userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
 }
 
 /** compat 组逐字段的省略默认值 */
 const COMPAT_DEFAULTS: CompatRules = { disableDeveloper: true, disableStore: true }
 
 /** userExperience 组逐字段的省略默认值 */
-const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }
+const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }
 
 /** 模型参数行对应的字段键（自动填充 / 允许更新两组的行，渲染顺序与总控共用） */
 export const FIELD_KEYS = ['reasoning', 'context', 'image'] as const
@@ -38,7 +38,7 @@ export const FIELD_KEYS = ['reasoning', 'context', 'image'] as const
 export const COMPAT_KEYS = ['disableDeveloper', 'disableStore'] as const
 
 /** 用户体验组的行键；新增行键在此追加，见 docs/versioning.md */
-export const USER_EXPERIENCE_KEYS = ['rememberEfforts', 'defaultHigh', 'forgetRemoved', 'followParent', 'selfTune'] as const
+export const USER_EXPERIENCE_KEYS = ['rememberEfforts', 'defaultHigh', 'forgetRemoved', 'followParent', 'selfTune', 'hideOfficial'] as const
 
 /** 解析版本快照键 version-N；非法返回 undefined。严格匹配规范键（重建键名需与实际键一致，禁宽泛归一） */
 export function parseVersion(key: string): number | undefined {

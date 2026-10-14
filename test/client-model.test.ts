@@ -33,7 +33,7 @@ const ALL_ON: Flags = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
-    userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true },
+    userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true, hideOfficial: true },
 }
 
 /** 带两个排除项的配置（排除列表用例的基准，其中 acme-gateway 在 providerIds 里命中） */
@@ -55,7 +55,7 @@ export function run(): void {
             compat: { disableDeveloper: false, disableStore: false },
             excludes: ['acme-gateway'],
             efforts: {},
-            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
         }),
     )
     // ---------- v8 缺 excludes 整项落默认（向后兼容语义） ----------
@@ -67,7 +67,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
         }),
     )
     // ---------- v8 缺 compat 整项落默认（v3 时代就有的兼容语义，升级后不变） ----------
@@ -79,7 +79,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: ['acme-gateway'],
             efforts: {},
-            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
         }),
     )
     // ---------- v8 带 efforts 正常解析 ----------
@@ -93,14 +93,14 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
         }),
     )
     // ---------- userExperience：缺整项落默认、字段原样生效、字段缺省落默认 ----------
     check('decode 缺 userExperience 落默认', stable(decodeSection({ 'version-8': {} })) === stable(DEFAULT_FLAGS))
-    check('decode userExperience rememberEfforts false 原样生效', stable(decodeSection({ 'version-8': { userExperience: { rememberEfforts: false } } })) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false } }))
-    check('decode userExperience defaultHigh true 原样生效', stable(decodeSection({ 'version-8': { userExperience: { defaultHigh: true } } })) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false } }))
-    check('decode userExperience forgetRemoved false 原样生效', stable(decodeSection({ 'version-8': { userExperience: { forgetRemoved: false, followParent: false } } })) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }))
+    check('decode userExperience rememberEfforts false 原样生效', stable(decodeSection({ 'version-8': { userExperience: { rememberEfforts: false } } })) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true } }))
+    check('decode userExperience defaultHigh true 原样生效', stable(decodeSection({ 'version-8': { userExperience: { defaultHigh: true } } })) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true } }))
+    check('decode userExperience forgetRemoved false 原样生效', stable(decodeSection({ 'version-8': { userExperience: { forgetRemoved: false, followParent: false } } })) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true } }))
     check('decode userExperience 缺字段落默认', stable(decodeSection({ 'version-8': { userExperience: {} } })) === stable(DEFAULT_FLAGS))
     // ---------- userExperience 非对象 / 字段非布尔 => 整段快照非法（镜像 Node 侧 schema） ----------
     check('decode userExperience 非对象回退默认', stable(decodeSection({ 'version-8': { userExperience: 'x' } })) === stable(DEFAULT_FLAGS))
@@ -157,7 +157,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+            userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
         }),
         toStored(DEFAULT_FLAGS),
     )
@@ -168,13 +168,13 @@ export function run(): void {
     // 带 efforts 的往返一致
     check('snapshot -> decode 往返含 efforts', stable(decodeSection({ [VERSION_KEY]: toStored(WITH_EFFORTS) })) === stable(WITH_EFFORTS))
     // 带 userExperience false 的往返一致（关掉记住推理级别的存取回路）
-    const WITHOUT_REMEMBER: Flags = { ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false } }
+    const WITHOUT_REMEMBER: Flags = { ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false } }
     check('snapshot -> decode 往返含 userExperience false', stable(decodeSection({ [VERSION_KEY]: toStored(WITHOUT_REMEMBER) })) === stable(WITHOUT_REMEMBER))
     // 带 defaultHigh false 的往返一致（默认已是 true，往返用例改守护显式关闭）
-    const WITHOUT_DEFAULT_HIGH: Flags = { ...ALL_ON, userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false } }
+    const WITHOUT_DEFAULT_HIGH: Flags = { ...ALL_ON, userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false } }
     check('snapshot -> decode 往返含 defaultHigh false', stable(decodeSection({ [VERSION_KEY]: toStored(WITHOUT_DEFAULT_HIGH) })) === stable(WITHOUT_DEFAULT_HIGH))
     // 带 forgetRemoved false 的往返一致（关掉「忘记已删除模型」的存取回路）
-    const WITHOUT_FORGET: Flags = { ...ALL_ON, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }
+    const WITHOUT_FORGET: Flags = { ...ALL_ON, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false } }
     check('snapshot -> decode 往返含 forgetRemoved false', stable(decodeSection({ [VERSION_KEY]: toStored(WITHOUT_FORGET) })) === stable(WITHOUT_FORGET))
     // ---------- 组总控显示：全开才开，部分选中显示关（判据 every，与验证弹层分组「全选」同口径） ----------
     check('master 全开为开', masterValue(ALL_ON, 'autoFill') === true)
@@ -191,9 +191,9 @@ export function run(): void {
     check('master compat 行为开则为开', masterValue(ALL_ON, 'compat') === true)
     check('master compat 行为关则为关', masterValue({ ...ALL_ON, compat: { disableDeveloper: false, disableStore: false } }, 'compat') === false)
     // userExperience 组多行：部分选中显示关，三项全开才显示开
-    check('master userExperience 部分选中显示为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }, 'userExperience') === false)
-    check('master userExperience 仅两项为开仍为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false } }, 'userExperience') === false)
-    check('master userExperience 全关则关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false } }, 'userExperience') === false)
+    check('master userExperience 部分选中显示为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false } }, 'userExperience') === false)
+    check('master userExperience 仅两项为开仍为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false } }, 'userExperience') === false)
+    check('master userExperience 全关则关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false } }, 'userExperience') === false)
     check('master userExperience 全开则开', masterValue(ALL_ON, 'userExperience') === true)
     // ---------- 总控点击：整组同置取反值（只作用于布尔组，排除列表不得被牵连） ----------
     check(
@@ -220,11 +220,11 @@ export function run(): void {
     // userExperience 组同样走总控/单格派生路径（多行组：总控整组同置）
     check(
         'applyGroup userExperience 整组置关',
-        stable(applyGroup(DEFAULT_FLAGS, 'userExperience', false)) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false } }),
+        stable(applyGroup(DEFAULT_FLAGS, 'userExperience', false)) === stable({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false } }),
     )
     check(
         'applyGroup userExperience 整组置开',
-        stable(applyGroup({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false } }, 'userExperience', true)) === stable(ALL_ON),
+        stable(applyGroup({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false } }, 'userExperience', true)) === stable(ALL_ON),
     )
     check('applyGroup 不改入参', DEFAULT_FLAGS.autoFill.reasoning === true && DEFAULT_FLAGS.compat.disableDeveloper === true)
     // ---------- 单格翻转不改其他格、不改入参 ----------
@@ -232,8 +232,8 @@ export function run(): void {
     check('toggleCell 仅翻转目标格', flipped.allowUpdate.context === true && flipped.allowUpdate.reasoning === false && flipped.autoFill === DEFAULT_FLAGS.autoFill)
     check('toggleCell 不改入参', DEFAULT_FLAGS.allowUpdate.context === false)
     check('toggleCell compat 仅翻转该行', stable(toggleCell(DEFAULT_FLAGS, 'compat', 'disableDeveloper').compat) === stable({ disableDeveloper: false, disableStore: true }))
-    check('toggleCell userExperience 仅翻转 defaultHigh 不动其余行', stable(toggleCell(DEFAULT_FLAGS, 'userExperience', 'defaultHigh').userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false }))
-    check('toggleCell userExperience 仅翻转 forgetRemoved 不动其余行', stable(toggleCell(DEFAULT_FLAGS, 'userExperience', 'forgetRemoved').userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false }))
+    check('toggleCell userExperience 仅翻转 defaultHigh 不动其余行', stable(toggleCell(DEFAULT_FLAGS, 'userExperience', 'defaultHigh').userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }))
+    check('toggleCell userExperience 仅翻转 forgetRemoved 不动其余行', stable(toggleCell(DEFAULT_FLAGS, 'userExperience', 'forgetRemoved').userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true }))
     check('groupValue 按组取行值', groupValue(DEFAULT_FLAGS, 'compat', 'disableDeveloper') === true && groupValue(DEFAULT_FLAGS, 'allowUpdate', 'image') === false)
     // ---------- 排除项 id 合法性（与宿主 provider route id 同一规则） ----------
     for (const ok of ['acme-gateway', 'a', 'a1', 'openai-compatible', 'lab-7']) {
@@ -274,9 +274,9 @@ export function run(): void {
     // 顺序敏感是有意取舍：草稿只由已存值经增删派生，故不存在"换顺序即脏"的误报路径
     check('isDirty 排除列表换序视为脏', isDirty({ ...withTwo, excludes: ['lab-7', 'acme-gateway'] }, withTwo) === true)
     // userExperience 是用户配置（区别于 efforts 记忆）：改动要标脏，等值不脏
-    check('isDirty userExperience rememberEfforts 不同即为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false } }, DEFAULT_FLAGS) === true)
-    check('isDirty userExperience forgetRemoved 不同即为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false } }, DEFAULT_FLAGS) === true)
-    check('isDirty userExperience defaultHigh 不同即为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false } }, DEFAULT_FLAGS) === true)
+    check('isDirty userExperience rememberEfforts 不同即为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false } }, DEFAULT_FLAGS) === true)
+    check('isDirty userExperience forgetRemoved 不同即为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false } }, DEFAULT_FLAGS) === true)
+    check('isDirty userExperience defaultHigh 不同即为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false } }, DEFAULT_FLAGS) === true)
     check('isDirty userExperience 等值不为脏', isDirty({ ...DEFAULT_FLAGS, userExperience: { ...DEFAULT_FLAGS.userExperience } }, DEFAULT_FLAGS) === false)
     // efforts 的变化不标脏（运行时记忆，非用户配置，不应触发"未保存更改"）
     check('isDirty efforts 变化不标脏', isDirty({ ...DEFAULT_FLAGS, efforts: { a: { m: 'high' } } }, DEFAULT_FLAGS) === false)

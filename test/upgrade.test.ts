@@ -9,7 +9,7 @@ export function run(): void {
     const COMPAT = { disableDeveloper: true, disableStore: true }
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
-    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }
+    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }
 
     // ---------- v3 → v8：三组布尔与 compat 原样沿用，补 excludes（v4 起）、efforts/userExperience（v5 起）、defaultHigh（v6 起）、forgetRemoved（v7 起）、followParent / selfTune / disableStore 默认（v8 起） ----------
     const v3Stored = {
@@ -93,11 +93,11 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
     }), upgradeConfig(v5Stored, 5))
     // v5 输入的 userExperience 经 v5 冻结 schema 解析：缺 rememberEfforts 落 v5 默认 true，非布尔回 v5 默认（不牵连其他组）
-    check('v5 输入 userExperience 缺字段落 v5 默认', stable((upgradeConfig({ ...v5Stored, userExperience: {} }, 5) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }), upgradeConfig({ ...v5Stored, userExperience: {} }, 5))
-    check('v5 输入 userExperience 非布尔回 v5 默认再补 defaultHigh / forgetRemoved', stable((upgradeConfig({ ...v5Stored, userExperience: { rememberEfforts: 'yes' } }, 5) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }), upgradeConfig({ ...v5Stored, userExperience: { rememberEfforts: 'yes' } }, 5))
+    check('v5 输入 userExperience 缺字段落 v5 默认', stable((upgradeConfig({ ...v5Stored, userExperience: {} }, 5) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }), upgradeConfig({ ...v5Stored, userExperience: {} }, 5))
+    check('v5 输入 userExperience 非布尔回 v5 默认再补 defaultHigh / forgetRemoved', stable((upgradeConfig({ ...v5Stored, userExperience: { rememberEfforts: 'yes' } }, 5) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }), upgradeConfig({ ...v5Stored, userExperience: { rememberEfforts: 'yes' } }, 5))
     // v5 输入的 efforts 宽松保留：坏结构只回落 {}，不拖垮整段配置
     check('v5 输入 efforts 坏结构回落空但保留其余字段', stable(upgradeConfig({ ...v5Stored, efforts: 'bad' }, 5)) === stable({
         configVersion: 8,
@@ -106,7 +106,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
     }), upgradeConfig({ ...v5Stored, efforts: 'bad' }, 5))
     check('v5 垃圾输入回 v5 默认再补 defaultHigh / forgetRemoved', stable(upgradeConfig('garbage', 5)) === stable({
         configVersion: 8,
@@ -137,11 +137,11 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
     }), upgradeConfig(v6Stored, 6))
     // v6 输入的 userExperience 经 v6 冻结 schema 解析：缺字段落 v6 默认，非布尔回 v6 默认（不牵连其他组）
-    check('v6 输入 userExperience 缺字段落 v6 默认', stable((upgradeConfig({ ...v6Stored, userExperience: {} }, 6) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }), upgradeConfig({ ...v6Stored, userExperience: {} }, 6))
-    check('v6 输入 userExperience defaultHigh 非布尔回 v6 默认再补 forgetRemoved', stable((upgradeConfig({ ...v6Stored, userExperience: { rememberEfforts: true, defaultHigh: 'yes' } }, 6) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false }), upgradeConfig({ ...v6Stored, userExperience: { rememberEfforts: true, defaultHigh: 'yes' } }, 6))
+    check('v6 输入 userExperience 缺字段落 v6 默认', stable((upgradeConfig({ ...v6Stored, userExperience: {} }, 6) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }), upgradeConfig({ ...v6Stored, userExperience: {} }, 6))
+    check('v6 输入 userExperience defaultHigh 非布尔回 v6 默认再补 forgetRemoved', stable((upgradeConfig({ ...v6Stored, userExperience: { rememberEfforts: true, defaultHigh: 'yes' } }, 6) as { userExperience: { rememberEfforts: boolean; defaultHigh: boolean; forgetRemoved: boolean; followParent: boolean } }).userExperience) === stable({ rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true }), upgradeConfig({ ...v6Stored, userExperience: { rememberEfforts: true, defaultHigh: 'yes' } }, 6))
     // v6 输入的 efforts 宽松保留：坏结构只回落 {}，不拖垮整段配置
     check('v6 输入 efforts 坏结构回落空但保留其余字段', stable(upgradeConfig({ ...v6Stored, efforts: 'bad' }, 6)) === stable({
         configVersion: 8,
@@ -150,7 +150,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true },
     }), upgradeConfig({ ...v6Stored, efforts: 'bad' }, 6))
     check('v6 垃圾输入回 v6 默认再补 forgetRemoved', stable(upgradeConfig('garbage', 6)) === stable({
         configVersion: 8,
@@ -181,7 +181,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true },
     }), upgradeConfig(v7Stored, 7))
     check('v7 垃圾输入回 v7 默认再补 followParent 默认', stable(upgradeConfig('garbage', 7)) === stable({
         configVersion: 8,
@@ -203,7 +203,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true },
     }), upgradeConfig({ ...v7Stored, efforts: 'bad' }, 7))
 
     // ---------- 台阶接力的参数化守护：fromVersion 全档 × 合法/非法 efforts，守护台阶冻结形态与 efforts 宽松保留语义 ----------

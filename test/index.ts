@@ -10,6 +10,7 @@ import { run as runGuard } from '@test/guard.test'
 import { run as runLookup } from '@test/lookup.test'
 import { run as runMemory } from '@test/memory.test'
 import { run as runMigrate } from '@test/migrate.test'
+import { run as runOfficialFilter } from '@test/official-filter.test'
 import { run as runUpgrade } from '@test/upgrade.test'
 import { run as runPrune } from '@test/prune.test'
 import { run as runProbe } from '@test/probe.test'
@@ -44,6 +45,8 @@ section('migrate.test.ts')
 runMigrate()
 section('upgrade.test.ts')
 runUpgrade()
+section('official-filter.test.ts')
+runOfficialFilter()
 section('prune.test.ts')
 runPrune()
 section('reset.test.ts')

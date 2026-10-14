@@ -15,9 +15,10 @@ import { captureBackup } from '@/restore'
 import { restoreProbeBackup } from '@/probe-backup'
 import { installSubagentFollowParent } from '@/subagent'
 import { installSelfTune } from '@/self-tune'
+import { installOfficialFilter } from '@/official-filter'
 
 export const name = PLUGIN_NAME
-export const inject = ['settings', 'llm']
+export const inject = ['settings', 'llm', 'credentials']
 
 /**
  * 宿主 Config schema 面：宽松任意值（「比当前代码更新的版本快照」也能通过注册校验）+
@@ -153,6 +154,8 @@ export function apply(ctx: Context, config?: unknown): void {
     installSubagentFollowParent(ctx)
     // 「让 AI 自主调节档位」（按 userExperience.selfTune 装/卸两枚工具与提示词段；设置热更跟随下方事件）
     installSelfTune(ctx)
+    // 「隐藏官方API」（按 userExperience.hideOfficial 在模型目录生成处过滤未配密钥的官方提供方；判定实时现算，无事件接线）
+    installOfficialFilter(ctx)
     // 浏览器半「强制更新 / 重置推理级别 / 恢复备份」RPC channel（结果经 ConnectionRpcResult 回传卡片）
     installRpc(ctx)
     ctx.effect(() => {
