@@ -12,13 +12,17 @@ import type { ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/ds
 // ctx.llm 服务面声明合并（仅 type-only，不引运行期依赖；LLM 服务是插件 inject 依赖，装载即在）
 import type {} from '@deepseek-ai/dsh-llm'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
-import { PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE } from '@/shared/constants'
+import {
+    ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_REPORT_LOCALE,
+    ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
+    PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE,
+} from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
 import { fix } from '@/fix'
-import { ENDPOINT_REPORT_LOCALE, reportLocale } from '@/effort-name'
+import { reportLocale } from '@/effort-name'
 import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
 import { parsePruneTargets, pruneUnsupportedEfforts } from '@/prune'
 import { probeAndFill } from '@/probe'
@@ -31,20 +35,64 @@ import type { EndpointHandler } from '@/rpc-route'
 /** 一轮执行的入口：载荷 → 进度帧 → 终帧。验证与探测式填充同型，只有执行器与措辞不同 */
 type ProgressRunner = (payload: unknown, options: ProbeRunOptions) => Promise<VerifySummary>
 
-/** 卡片「强制更新」按钮调用的 endpoint 名 */
-const ENDPOINT_FORCE_UPDATE = 'forceUpdate'
-/** 卡片「重置推理级别」按钮调用的 endpoint 名 */
-const ENDPOINT_RESET_MODELS = 'resetModels'
-/** 卡片「恢复备份」按钮调用的 endpoint 名 */
-const ENDPOINT_RESTORE_MODELS = 'restoreModels'
-/** 剔除不被支持的推理级别时调用的 endpoint 名（由验证结果确认框发起，携带档位明细） */
-const ENDPOINT_PRUNE_EFFORTS = 'pruneEfforts'
-
 /** 守卫已开（另一写回在途）时的统一拒绝结果 */
 const writeInProgress = (): ConnectionRpcResult<unknown> => ({
     ok: false,
     error: { code: 'model-fix/write-in-progress', message: '另一操作进行中，请稍后重试', details: {} },
 })
+
+/** 强制更新：置守卫 → fix → 解守卫；fix 内部已告警，此处转 RPC 失败结果 */
+async function handleForceUpdate(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    startIgnoreAll()
+    try {
+        return { ok: true, value: { changed: await fix(ctx, true) } }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/force-update-failed', message: errorText(error), details: {} } }
+    } finally {
+        endIgnoreAll()
+    }
+}
+
+/** 重置推理级别：守卫已开即拒 */
+async function handleResetModels(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    try {
+        return { ok: true, value: { changed: await resetModels(ctx) } }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/reset-models-failed', message: errorText(error), details: {} } }
+    }
+}
+
+/** 恢复备份：守卫已开即拒 */
+async function handleRestoreModels(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    try {
+        return { ok: true, value: { changed: await restoreModels(ctx) } }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/restore-models-failed', message: errorText(error), details: {} } }
+    }
+}
+
+/** 剔除不被支持的推理级别：守卫已开即拒；载荷非法（targets 解析失败）返回 invalid 结果 */
+async function handlePruneEfforts(ctx: Context, payload: unknown): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    const targets = parsePruneTargets(payload)
+    if (targets === undefined) {
+        return { ok: false, error: { code: 'model-fix/prune-efforts-invalid', message: '剔除请求不合法（提供方 / 模型 / 推理级别缺失或越界）', details: {} } }
+    }
+    try {
+        return { ok: true, value: { pruned: await pruneUnsupportedEfforts(ctx, targets) } }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/prune-efforts-failed', message: errorText(error), details: {} } }
+    }
+}
+
+/** 浏览器半启动时上报探测语言：Node 侧没有 locale 服务，见 effort-name.ts 的语言解析 */
+function handleReportLocale(payload: unknown): ConnectionRpcResult<unknown> {
+    reportLocale(payload)
+    return { ok: true, value: {} }
+}
 
 /** 注册一个 channel（四个端点）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
@@ -57,76 +105,15 @@ export function installRpc(ctx: Context): void {
             const channel = `/${PLUGIN_NS}`
             // 强制更新与恢复备份各按整份配置重算、不读载荷；重置也不读，但剔除要按调用方给的档位明细动手
             const handler: EndpointHandler = async (endpoint, payload) => {
-                if (endpoint === ENDPOINT_FORCE_UPDATE) {
-                    // 重置/恢复写回期间拒绝：填充会把刚回退掉的字段重新写回，与写回语义冲突
-                    if (isIgnoreAll()) return writeInProgress()
-                    // 自身在途同样置守卫：fix 含 await 与冲突重试，不置位的话该窗口内 reset/restore/
-                    // forceUpdate 入口查得 false 可进入，两批 mutate 并发互踩。
-                    // 置位先于 await 同步完成，finally 解除；守卫是单飞标志，不能收进 fix 自身
-                    // （事件链也调 fix，嵌套置位的内层 finally 会提前解除外层守卫）
-                    startIgnoreAll()
-                    try {
-                        return { ok: true, value: { changed: await fix(ctx, true) } }
-                    } catch (error) {
-                        // fix 内部已告警；此处转成 RPC 失败结果回传前端展示
-                        return {
-                            ok: false,
-                            error: {
-                                code: 'model-fix/force-update-failed',
-                                message: errorText(error),
-                                details: {},
-                            },
-                        }
-                    } finally {
-                        endIgnoreAll()
-                    }
+                switch (endpoint) {
+                    case ENDPOINT_FORCE_UPDATE: return handleForceUpdate(ctx)
+                    case ENDPOINT_RESET_MODELS: return handleResetModels(ctx)
+                    case ENDPOINT_RESTORE_MODELS: return handleRestoreModels(ctx)
+                    case ENDPOINT_PRUNE_EFFORTS: return handlePruneEfforts(ctx, payload)
+                    case ENDPOINT_REPORT_LOCALE: return handleReportLocale(payload)
+                    default:
+                        return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }
                 }
-                if (endpoint === ENDPOINT_RESET_MODELS || endpoint === ENDPOINT_RESTORE_MODELS) {
-                    // 两个写回端点互斥：守卫已开时第二个写回的 finally 会提前解除守卫，故一律拒绝
-                    if (isIgnoreAll()) return writeInProgress()
-                    try {
-                        const changed = endpoint === ENDPOINT_RESET_MODELS ? await resetModels(ctx) : await restoreModels(ctx)
-                        return { ok: true, value: { changed } }
-                    } catch (error) {
-                        return {
-                            ok: false,
-                            error: {
-                                code: endpoint === ENDPOINT_RESET_MODELS ? 'model-fix/reset-models-failed' : 'model-fix/restore-models-failed',
-                                message: errorText(error),
-                                details: {},
-                            },
-                        }
-                    }
-                }
-                if (endpoint === ENDPOINT_PRUNE_EFFORTS) {
-                    // 剔除也是写回：守卫已开（另一写回在途）即拒，否则两个 finally 抢着解守卫
-                    if (isIgnoreAll()) return writeInProgress()
-                    const targets = parsePruneTargets(payload)
-                    if (targets === undefined) {
-                        return {
-                            ok: false,
-                            error: { code: 'model-fix/prune-efforts-invalid', message: '剔除请求不合法（提供方 / 模型 / 推理级别缺失或越界）', details: {} },
-                        }
-                    }
-                    try {
-                        return { ok: true, value: { pruned: await pruneUnsupportedEfforts(ctx, targets) } }
-                    } catch (error) {
-                        return {
-                            ok: false,
-                            error: {
-                                code: 'model-fix/prune-efforts-failed',
-                                message: errorText(error),
-                                details: {},
-                            },
-                        }
-                    }
-                }
-                if (endpoint === ENDPOINT_REPORT_LOCALE) {
-                    // 浏览器半启动时上报探测语言（Node 侧没有 locale 服务，见 effort-name.ts 的语言解析）
-                    reportLocale(payload)
-                    return { ok: true, value: {} }
-                }
-                return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }
             }
             const disposeChannel = webServer.register({ kind: 'prefix', path: channel, handler: createChannelRoute(connection, channel, handler) })
             // 两条进度流走 connection.fetch 的 exact 路由而非 channel：它们要的是一个持续多帧的响应，

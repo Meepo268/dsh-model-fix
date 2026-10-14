@@ -13,10 +13,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // ctx.connection 服务面（ClientConnectionRpc）
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import { PLUGIN_NS } from '@/shared/constants'
-
-/** Node 半的 locale 上报端点名（与 `src/effort-name.ts` 的 `ENDPOINT_REPORT_LOCALE` 同字面量） */
-const ENDPOINT_REPORT_LOCALE = 'reportLocale'
+import { PLUGIN_NS, ENDPOINT_REPORT_LOCALE } from '@/shared/constants'
 
 /**
  * 启动时把界面语言上报给 Node 半：子 fiber 声明 `locale` + `connection`，两者装载即上报一次。

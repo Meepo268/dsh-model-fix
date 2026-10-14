@@ -53,3 +53,19 @@ export const CONFIG_VERSION = 8
 
 /** 版本快照键前缀，段内键形如 version-N */
 export const VERSION_PREFIX = 'version-'
+
+/**
+ * RPC channel 的端点名常量：跨 Node 半（注册分发）与浏览器半（发起调用）共享，
+ * 统一放 shared 层避免两端写同一个裸字符串（一端改漏另一端 runtime 报 unknown-endpoint）。
+ */
+
+/** 卡片「强制更新」按钮调用的 endpoint 名 */
+export const ENDPOINT_FORCE_UPDATE = 'forceUpdate'
+/** 卡片「重置推理级别」按钮调用的 endpoint 名 */
+export const ENDPOINT_RESET_MODELS = 'resetModels'
+/** 卡片「恢复备份」按钮调用的 endpoint 名 */
+export const ENDPOINT_RESTORE_MODELS = 'restoreModels'
+/** 剔除不被支持的推理级别时调用的 endpoint 名（由验证结果确认框发起，携带档位明细） */
+export const ENDPOINT_PRUNE_EFFORTS = 'pruneEfforts'
+/** 浏览器半启动时上报探测语言的 endpoint 名（Node 侧没有 locale 服务，见 effort-name.ts 的语言解析） */
+export const ENDPOINT_REPORT_LOCALE = 'reportLocale'

@@ -108,5 +108,3 @@ export function reportLocale(locale: unknown): void {
     reportedLocale = locale
 }
 
-/** RPC 端点名：浏览器半启动时上报探测语言 */
-export const ENDPOINT_REPORT_LOCALE = 'reportLocale'

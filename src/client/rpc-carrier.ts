@@ -9,7 +9,10 @@
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 // channel RPC 的结果信封
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
-import { PROBE_STREAM_URL, PLUGIN_NS as MODEL_FIX_NS, VERIFY_STREAM_URL } from '@/shared/constants'
+import {
+    ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
+    PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL,
+} from '@/shared/constants'
 import { decodeProgressFrame } from '@/shared/verify-progress'
 import type { UnsupportedEffort, VerifyProgressUpdate, VerifySummary } from '@/shared/verify-progress'
 import type { VerifyTarget } from '@/client/model'
@@ -50,13 +53,14 @@ export interface RpcCarrier {
  * @param rpc - 宿主 connection 服务的 client RPC 面（由调用方在子 fiber 内取用后传入）
  */
 export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
-    const forceUpdate = () => rpc.call(`/${MODEL_FIX_NS}`, 'forceUpdate', {})
-    const resetModels = () => rpc.call(`/${MODEL_FIX_NS}`, 'resetModels', {})
-    const restoreModels = () => rpc.call(`/${MODEL_FIX_NS}`, 'restoreModels', {})
+    const channel = `/${PLUGIN_NS}`
+    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {})
+    const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {})
+    const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {})
     // 剔除不被支持的推理级别：走 Node 半而非浏览器半直写，因为这条写回必须经事件流守卫，
     // 而守卫是 Node 半的模块级标志，浏览器半跨不过半纯度门禁
     const pruneEfforts = (targets: readonly UnsupportedEffort[]) =>
-        rpc.call(`/${MODEL_FIX_NS}`, 'pruneEfforts', { targets })
+        rpc.call(channel, ENDPOINT_PRUNE_EFFORTS, { targets })
     /**
      * 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
      *
