@@ -73,6 +73,8 @@ export function VerifyDialog(props: VerifyDialogProps) {
     const [tab, setTab] = useState<VerifyTab>('models')
     // 每次开窗都回「模型列表」：关窗已丢弃上一轮的勾选与记录（见卡片 closeVerify），落在空记录页只会让人以为记录还在
     useEffect(() => { if (props.open) setTab('models') }, [props.open])
+    // running 期间等 total>0（TerminalBlock 可渲染）再切记录页，避免先看到空态闪烁
+    useEffect(() => { if (props.running && props.total > 0) setTab('records') }, [props.running, props.total])
     // 按提供方归组渲染：候选本就是「提供方内聚」的录入顺序，取相邻同提供方成组即可，无需再分桶
     const groups = useMemo<VerifyGroup[]>(() => {
         const grouped: { provider: string; models: VerifyCandidate[] }[] = []
@@ -135,9 +137,9 @@ export function VerifyDialog(props: VerifyDialogProps) {
                             className="dsh-mf-warn"
                             disabled={props.idle && props.picked.size === 0}
                             onClick={() => {
-                                // 发跑即切到记录页：进度只落在那一页，用户不该先在列表上白找一趟
+                                // 发跑由 useEffect 自动跳记录页（等首条记录数据到达再跳）
                                 if (props.running) props.onStop()
-                                else { setTab('records'); props.onRun() }
+                                else props.onRun()
                             }}
                         >
                             {/* 在途指示：宿主 Button 自身即 inline-flex + gap，指示器直接作首个子节点；
