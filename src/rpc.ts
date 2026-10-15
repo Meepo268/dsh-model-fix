@@ -19,7 +19,7 @@ import {
 } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import { encodeProgressFrame } from '@/shared/verify-progress'
-import type { VerifySummary } from '@/shared/verify-progress'
+import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
 import { fix } from '@/fix'
 import { reportLocale } from '@/effort-name'
@@ -153,8 +153,11 @@ export function installRpc(ctx: Context): void {
  *
  * `needsIdleGuard` 只给会写配置的那条流用：它与写回端点共用事件流守卫做互斥，
  * 故入口先查守卫，已开即拒（409，文案即给前端展示，故不是裸状态码）。
+ *
+ * 执行器抛错（入参非法、超配额、中途异常）时收于 `failed` 终帧，把 `errorText` 的原因交给消费方；
+ * 客户端已中止则不发——用户点停止不是失败，消费方据「流结束却无终帧」判中止。
  */
-function progressStreamFetch(
+export function progressStreamFetch(
     run: ProgressRunner,
     label: string,
     needsIdleGuard = false,
@@ -179,20 +182,21 @@ function progressStreamFetch(
                         // 客户端已断开，控制器随之失效；无可挽回，也不必上报
                     }
                 }
+                const push = (frame: VerifyProgressFrame): void => {
+                    try {
+                        controller.enqueue(encoder.encode(encodeProgressFrame(frame)))
+                    } catch {
+                        // 同上：流已不可写。执行器随即随 signal 停下，不会再压更多帧
+                    }
+                }
                 run(payload, {
                     // 客户端断开时 request.signal 会中止，据此让执行循环早停——
                     // 这一轮是即用即弃的诊断，用户已经不在之后继续跑等于白烧他的额度
                     signal: request.signal,
-                    onProgress: (frame) => {
-                        try {
-                            controller.enqueue(encoder.encode(encodeProgressFrame(frame)))
-                        } catch {
-                            // 同上：流已不可写。执行器随即随 signal 停下，不会再压更多帧
-                        }
-                    },
+                    onProgress: push,
                 }).then(settle, (error: unknown) => {
-                    // 入参非法之类跑不到一帧的情形：只收尾，消费方见「流结束却没等到 done」即知没跑完
                     console.error(`[${PLUGIN_NAME}] ${label}流异常终止`, error)
+                    if (!request.signal.aborted) push({ type: 'failed', message: errorText(error) })
                     settle()
                 })
             },

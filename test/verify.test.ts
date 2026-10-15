@@ -709,4 +709,11 @@ export async function run(): Promise<void> {
         stable(decodeProgressFrame('data: {"type":"probed","provider":"a","model":"m","outcome":"usable","done":1,"total":1}'))
         === stable({ type: 'probed', provider: 'a', model: 'm', outcome: 'usable', done: 1, total: 1 }),
     )
+    // failed 终帧承载「整轮没能开跑」的真实原因，文案缺失即无信息可展示，故判非法
+    check(
+        'decodeProgressFrame 接受 failed 并原样带出文案',
+        stable(decodeProgressFrame('data: {"type":"failed","message":"超出上限"}')) === stable({ type: 'failed', message: '超出上限' }),
+    )
+    check('decodeProgressFrame 拒无文案的 failed', decodeProgressFrame('data: {"type":"failed"}') === undefined
+        && decodeProgressFrame('data: {"type":"failed","message":1}') === undefined)
 }

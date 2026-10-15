@@ -27,7 +27,7 @@ export interface RpcCarrier {
     restoreModels: () => Promise<ConnectionRpcResult<unknown>>
     /** 剔除不被支持的推理级别：入参是验证明细给出的「提供方 / 模型 / 档位」清单；返回实际剔掉的档位条数 */
     pruneEfforts: (targets: readonly UnsupportedEffort[]) => Promise<ConnectionRpcResult<unknown>>
-    /** 验证模型：走进度流端点，对「模型 × 推理级别」各发一次最小请求（`needTest` 的模型另发一次不计数的探测作对照），逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined */
+    /** 验证模型：走进度流端点，对「模型 × 推理级别」各发一次最小请求（`needTest` 的模型另发一次不计数的探测作对照），逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined，没能开跑或中途异常则抛错 */
     verifyModels: (
         models: readonly VerifyTarget[],
         onFrame: (frame: VerifyProgressUpdate) => void,
@@ -37,7 +37,7 @@ export interface RpcCarrier {
      * 探测式填充：走进度流端点，Node 半先把候选档位临时预声明进配置、再对每个模型逐档各发一次最小请求，
      * 跑完按「自动写入」开关收敛写回或整轮还原；终帧的 `summary.fill` 一律带收敛结论的增删统计
      * （关闭时是「可补全」的假设统计）。三个开关须与 Node 半的两次写回同值。被中止（停止 / 关窗 / 断连）
-     * 回 undefined——中止不发终帧，且未跑完的模型一律还原成预声明之前的形态。
+     * 回 undefined——中止不发终帧，且未跑完的模型一律还原成预声明之前的形态；没能开跑或中途异常则抛错。
      */
     probeEfforts: (
         models: readonly VerifyTarget[],
@@ -68,7 +68,9 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
      * 非 2xx 时优先用响应体文案（Node 半两条流都会给一句中文原因，如「另一操作进行中」），
      * 裸状态码对用户无意义。
      *
-     * @returns 整轮汇总；被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败
+     * @returns 整轮汇总；被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败。
+     *   收于 `failed` 终帧时抛错，文案取 Node 半给的 `message`——裸报「已停止」会把
+     *   「勾选超出上限」这类原因整个吞掉
      */
     const streamSummary = async (
         url: string,
@@ -91,6 +93,7 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
             const decoder = new TextDecoder()
             let buffer = ''
             let summary: VerifySummary | undefined
+            let failure: string | undefined
             for (;;) {
                 const { done, value } = await reader.read()
                 // 解码走 stream 模式：多字节字符可能横跨两个分片边界
@@ -103,10 +106,12 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
                     cut = buffer.indexOf('\n\n')
                     if (frame === undefined) continue
                     if (frame.type === 'done') summary = frame.summary
+                    else if (frame.type === 'failed') failure = frame.message
                     else onFrame(frame)
                 }
                 if (done) break
             }
+            if (failure !== undefined) throw new Error(failure)
             return summary
         } catch (error) {
             if (signal.aborted) return undefined

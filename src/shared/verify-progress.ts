@@ -247,9 +247,9 @@ export interface VerifySummary {
 
 /**
  * 一次验证运行的进度帧判别联合。投递顺序即帧顺序：先是唯一一条 `opened`，
- * 随后每完成一条探测发一条 `probed`，最后收于唯一一条 `done`。
+ * 随后每完成一条探测发一条 `probed`，最后收于唯一一条终帧（`done` 或 `failed`）。
  *
- * 中途被中止（用户点停止、关窗、连接断开）时**不发 `done`**——收到流自然结束却没等到 `done`，
+ * 中途被中止（用户点停止、关窗、连接断开）时**不发终帧**——收到流自然结束却没等到终帧，
  * 消费方即知这轮没跑完，据此决定是保留进度还是标错误。
  *
  * 刻意不加的字段：`seq`（单条连接天然保序，编号是为可重放观察者准备的）、`elapsedMs`
@@ -275,12 +275,19 @@ export type VerifyProgressFrame =
     }
     /** 终帧：整轮跑完，`summary` 承载完整结论 */
     | { type: 'done'; summary: VerifySummary }
+    /**
+     * 终帧：整轮没能开跑（入参非法、超配额等）或执行中途异常，`message` 是 Node 半给出的中文原因。
+     *
+     * 与「中止」的区别：中止**没有**终帧（消费方据「流结束却无终帧」判中止），而这条是明确的失败，
+     * 消费方须原样展示 `message`——裸报「已停止」会把「勾选超出上限」这类原因整个吞掉。
+     */
+    | { type: 'failed'; message: string }
 
 /** 单条探测结果帧；消费方逐条格式化展示，故单列一个名字 */
 export type VerifyProbedFrame = Extract<VerifyProgressFrame, { type: 'probed' }>
 
-/** 非终帧：逐条回调的形状。`done` 帧由调用方单独接住——它带的是整轮汇总，不是可逐行展示的一条 */
-export type VerifyProgressUpdate = Exclude<VerifyProgressFrame, { type: 'done' }>
+/** 非终帧：逐条回调的形状。两个终帧（`done` / `failed`）由调用方单独接住——它们带的是整轮结局，不是可逐行展示的一条 */
+export type VerifyProgressUpdate = Exclude<VerifyProgressFrame, { type: 'done' | 'failed' }>
 
 /** 宿主 hmr 的 SSE 分帧格式：单行 `data: ` + 空行分隔（`DSH/packages/boot/hmr/src/index.ts`） */
 const DATA_PREFIX = 'data: '
@@ -321,6 +328,8 @@ function isProgressFrame(value: unknown): value is VerifyProgressFrame {
             // skipped 仅在该结论短路了后续请求时出现
             && (value.skipped === undefined || typeof value.skipped === 'number')
     }
+    // failed 帧只校验消费方会读的那个字段：整轮结局的原因要原样展示，文案缺失即无信息可用
+    if (value.type === 'failed') return typeof value.message === 'string'
     // done 帧只校验消费方会读的四个计数（收尾那行文案要用）；其余字段（逐提供方汇报与明细）此刻还没人用
     return value.type === 'done' && isPlainObject(value.summary)
         && typeof value.summary.tested === 'number' && typeof value.summary.models === 'number'
