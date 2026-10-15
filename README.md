@@ -35,7 +35,8 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 - 子智能体启动后还想切换模型与推理级别？【跟随父智能体】子智能体的提供方、模型与推理级别实时同步父智能体（**关闭**「允许 Agent 为子智能体选择模型」时生效）
 - 希望AI根据任务难度自己选择合适的推理级别？【自主调节档位】AI 可根据任务难度自主调节推理档位
 - 没配官方 API 密钥，模型选择器里却挂着一组用不了的官方模型？【隐藏官方API】官方 API 未配置密钥时不在模型选择器中显示
-- 推理级别的名字看着别扭？【本地化推理级别】模型选择器里的推理级别按界面语言显示名称（默认开启，格式如「最大 · Max」，方便对照对应哪个档位）
+- 推理级别的名字看着别扭？【本地化推理级别】模型选择器里的推理级别按界面语言显示名称
+- 推理级别翻译后对不上原名称？【显示原档位名】在本地化推理级别时，还显示原档位名（如「最大 · Max」），方便对照。
 
 UI界面还提供了一些额外功能：
 
@@ -54,6 +55,7 @@ UI界面还提供了一些额外功能：
   - 「设置」-->「内置插件」-->「模型填充」选项卡-->「模型参数填充」卡片
   - 「插件」-->「已安装」-->「模型参数填充」详情页
   - 「插件」-->「已安装」-->「模型参数填充」详情页-->「包含的组件」-->「dsh-model-fix」
+  - 「输入框」-->「工具栏」-->「模型优化」入口
 
 ## 安装
 
@@ -75,13 +77,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```
-https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.30.8/dsh-model-fix.tgz
+https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.31.9/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.30.8/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.31.9/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
@@ -134,4 +136,12 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         forgetRemoved: true
         followParent: false
         selfTune: false
+        hideOfficial: true
+        localizeEfforts: true
+        showOriginalEfforts: true
+      behavior:           # 界面显示与行为
+        showInModels: true
+        showInBuiltinPlugins: true
+        showInComposer: true
+        showFollowStatus: true
 ```
