@@ -712,7 +712,7 @@ export function Card(props: CardProps) {
                         onToggle={() => { onTileToggle(tile) }}
                         onMaster={() => { onMaster(tile) }}
                         onCell={(key) => { onCell(tile, key) }}
-                        // 「插件管理」是回入口，恒可见且不可关，故作恒定展示行而非配置项
+                        // 「插件管理」是回入口，恒可见且不可关（故不绑配置键，见 tile.tsx 的 lockedRow）
                         lockedRow={tile === 'behavior' ? { label: 'rowShowInPluginManager', tip: 'tipShowInPluginManager' } : undefined}
                     />
                 ))}

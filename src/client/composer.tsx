@@ -1,18 +1,22 @@
 /**
- * 输入框工具行（conversation.input.left）的两枚 chip：
- * · 「模型优化」—— 常驻弱化态入口，点开弹层面板（宿主 Modal 原语的 headless 形态：卡片即唯一可见层，
- *   面板几何与滚动见 card-styles.ts 的 .dsh-mf-composerDialog）
- * · 「跟随」状态灯 —— 常驻，随 `followingActive(flags, hostEnabled)` 在「亮绿（生效中）/灰（未生效）」间切换；
- *   点击即 toggle 开关；写入失败（只读 / memory 模式 / 拒绝）时保持原态 + 琥珀色 + 原生 title 提示原因
+ * 输入框工具行（conversation.input.left）的两枚 chip，各占一个席位条目：
+ * · 「模型优化」（`ComposerEntry`）—— 常驻弱化态入口，点开弹层面板（宿主 Modal 原语的 headless 形态：
+ *   卡片即唯一可见层，面板几何与滚动见 card-styles.ts 的 .dsh-mf-composerDialog）
+ * · 「跟随」状态灯（`FollowLamp`）—— 常驻，随 `followingActive(flags, hostEnabled)` 在「亮绿（生效中）/灰
+ *   （未生效）」间切换；点击即 toggle 开关；写入失败（只读 / memory 模式 / 拒绝）时保持原态 + 琥珀色 +
+ *   原生 title 提示原因
  *
- * 两枚 chip 的配色/几何/状态分色语义详见 card-styles.ts 里 `.dsh-mf-composerChip` 系列注释。
+ * 宿主 list 席位按 `id` 记账（`id` 唯一、`id` 不同可并存），故两枚 chip 各注册一条、各受自己的
+ * `behavior` 开关支配。渲染点只有一个（`InputBar` 的 `.tools` 内 `renderSlot('conversation.input.left')`
+ * 一次画出全部条目），两者间距即宿主的 `.tools { gap: 12px }`。
+ *
+ * 配色/几何/状态分色语义详见 card-styles.ts 里 `.dsh-mf-composerChip` 系列注释。
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { VERSION_KEY, behaviorVisible, followingActive, type Flags } from '@/client/model'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { VERSION_KEY, followingActive, type Flags } from '@/client/model'
 import { ensureStyles } from '@/client/card-styles'
 import { Card, type CardProps } from '@/client/card'
 import type { DecodedScope } from '@/client/scope'
@@ -34,11 +38,11 @@ export function decodeHostModelSelection(raw: unknown): HostModelSelectionView {
     return { enabled: raw !== null && typeof raw === 'object' && (raw as { enabled?: unknown }).enabled === true }
 }
 
-/** composer.tsx 独有的 props（插槽自带的 PropsRuntime 被我们忽略，scope/cardProps 由闭包传入） */
+/** 两枚 chip 各自需要的入参（插槽自带的 PropsRuntime / PropsLocale 由渲染器注入，不在此声明） */
 export interface ComposerProps {
     scope: DecodedScope<Flags>
     hostModelScope: DecodedScope<HostModelSelectionView>
-    /** 宿主 llm-pi-ai 命名空间：只给 Modal 内的 Card 消费（与四席同一份） */
+    /** 宿主 llm-pi-ai 命名空间：只给弹层内的 Card 消费（与其余席同一份） */
     providersScope: DecodedScope<readonly unknown[]>
     /** 卡片入参（复用 Card 的 RpcCarrier 部分，不包含 t/scope/providersScope——这三个由插槽 t 与闭包 scope/providersScope 提供） */
     cardProps: Omit<CardProps, 't' | 'scope' | 'providersScope'>
@@ -47,10 +51,56 @@ export interface ComposerProps {
 /** 插槽 props 类型面：PropsRuntime<'conversation.input.left'> & PropsLocale<CARD_NS>（无 owner props） */
 type SlotProps = PropsRuntime<'conversation.input.left'> & PropsLocale<'settings.modelFix'>
 
-export function ComposerChips(props: SlotProps & ComposerProps): ReactNode {
-    const { t, scope, hostModelScope, cardProps } = props
+/**
+ * 「模型优化」入口 chip：点开弹层面板，承载完整配置卡。
+ *
+ * 显隐由 `behavior.showInComposer` 决定（装卸在 visibility.ts），本组件只管点开后的弹层。
+ */
+export function ComposerEntry(props: SlotProps & ComposerProps): ReactNode {
+    const { t, scope, cardProps } = props
+    const [open, setOpen] = useState(false)
 
     // 幂等注入样式：Card 可能还没渲染过（用户从没点开配置页），但 chip 已经常驻输入框里了
+    useEffect(() => { ensureStyles() }, [])
+
+    return (
+        <>
+            <button
+                type="button"
+                className="dsh-mf-composerChip"
+                data-state="muted"
+                title={t('chipModelOptTitle')}
+                onClick={() => { setOpen(true) }}
+            >
+                {t('chipModelOpt')}
+            </button>
+            {open && (
+                // headless：卡片直接作 children，不套宿主的标题栏/关闭钮/content/body 一层
+                <Modal
+                    open={open}
+                    onClose={() => { setOpen(false) }}
+                    title={t('title')}
+                    headless
+                    className="dsh-mf-composerDialog"
+                >
+                    <div className="dsh-mf-composerBody">
+                        {/* defaultOpen：弹层内一进来就见全貌；collapsible={false}：面板尺寸固定可滚动，折叠会脱钩 */}
+                        <Card {...cardProps} t={t} scope={scope} providersScope={props.providersScope} defaultOpen collapsible={false} />
+                    </div>
+                </Modal>
+            )}
+        </>
+    )
+}
+
+/**
+ * 「跟随」状态灯：亮绿＝子智能体跟随父智能体正在生效，灰＝未生效；点击即 toggle `userExperience.followParent`。
+ *
+ * 显隐由 `behavior.showFollowStatus` 决定（装卸在 visibility.ts）。
+ */
+export function FollowLamp(props: SlotProps & ComposerProps): ReactNode {
+    const { t, scope, hostModelScope } = props
+
     useEffect(() => { ensureStyles() }, [])
 
     // 两个 scope 的快照（useSyncExternalStore 在浏览器端可直接把 getSnapshot 当作 fallback，SSR 兜底不会触发）
@@ -62,19 +112,15 @@ export function ComposerChips(props: SlotProps & ComposerProps): ReactNode {
     const hostEnabled = snapHost.status === 'ready' ? snapHost.value?.enabled : undefined
     const active = flags !== undefined && followingActive(flags, hostEnabled)
 
-    // Modal 开/关
-    const [openCard, setOpenCard] = useState(false)
-
-    // 上一次切换写入是否失败：失败时 chip 压过亮/灰态走琥珀色（followState 取 'fail'）
+    // 上一次切换写入是否失败：失败时压过亮/灰态走琥珀色（followState 取 'fail'）
     const [chipFail, setChipFail] = useState(false)
-
     // 写入中锁（防连点）
-    const [busyFollowing, setBusyFollowing] = useState(false)
+    const [busy, setBusy] = useState(false)
 
-    const onToggleFollow = useCallback(async () => {
+    const onToggle = useCallback(async () => {
         if (!snapFlags.writable || snapFlags.status !== 'ready' || flags === undefined) return
-        if (busyFollowing) return
-        setBusyFollowing(true)
+        if (busy) return
+        setBusy(true)
         const target = !flags.userExperience.followParent
         try {
             const ok = await scope.mutate([{
@@ -92,61 +138,26 @@ export function ComposerChips(props: SlotProps & ComposerProps): ReactNode {
         } catch {
             setChipFail(true)
         } finally {
-            setBusyFollowing(false)
+            setBusy(false)
         }
-    }, [scope, snapFlags, flags, busyFollowing])
+    }, [scope, snapFlags, flags, busy])
 
-    // —— 两枚 chip 的状态计算 ——
-    // 模型优化：恒弱化态；跟随：失败态优先（最醒目），否则按 active 判亮/灰
-    const followState: ChipState = chipFail ? 'fail' : (active ? 'on' : 'muted')
-    const disabled = !snapFlags.writable || snapFlags.status !== 'ready' || busyFollowing
+    const state: ChipState = chipFail ? 'fail' : (active ? 'on' : 'muted')
     // 原生 title 随态切换：失败原因 / 关闭提示 / 开启提示
-    const followTitle = chipFail
+    const title = chipFail
         ? t('chipFollowFail')
         : active ? t('chipFollowOnTitle') : t('chipFollowOffTitle')
-    // 「跟随」状态灯是工具栏内的二级显隐：工具栏整席的装卸由 visibility.ts 负责，这里只管挂上之后这一枚显不显示
-    const showFollow = behaviorVisible(flags, 'showFollowStatus')
 
     return (
-        <>
-            <span className="dsh-mf-chips">
-                <button
-                    type="button"
-                    className="dsh-mf-composerChip"
-                    data-state="muted"
-                    title={t('chipModelOptTitle')}
-                    onClick={() => { setOpenCard(true) }}
-                >
-                    {t('chipModelOpt')}
-                </button>
-                {showFollow ? (
-                    <button
-                        type="button"
-                        className="dsh-mf-composerChip"
-                        data-state={followState}
-                        title={followTitle}
-                        disabled={disabled}
-                        onClick={onToggleFollow}
-                    >
-                        {active ? t('chipFollowOn') : t('chipFollowOff')}
-                    </button>
-                ) : null}
-            </span>
-            {openCard && (
-                // headless：卡片直接作 children，不套宿主的标题栏/关闭钮/content/body 一层
-                <Modal
-                    open={openCard}
-                    onClose={() => { setOpenCard(false) }}
-                    title={t('title')}
-                    headless
-                    className="dsh-mf-composerDialog"
-                >
-                    <div className="dsh-mf-composerBody">
-                        {/* defaultOpen：弹层内一进来就见全貌；collapsible={false}：面板尺寸固定可滚动，折叠会脱钩 */}
-                        <Card {...cardProps} t={t} scope={scope} providersScope={props.providersScope} defaultOpen collapsible={false} />
-                    </div>
-                </Modal>
-            )}
-        </>
+        <button
+            type="button"
+            className="dsh-mf-composerChip"
+            data-state={state}
+            title={title}
+            disabled={!snapFlags.writable || snapFlags.status !== 'ready' || busy}
+            onClick={onToggle}
+        >
+            {active ? t('chipFollowOn') : t('chipFollowOff')}
+        </button>
     )
 }

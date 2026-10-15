@@ -215,7 +215,6 @@ const STYLE_TEXT = [
     // 面板内的卡片去掉自身描边与底色，透出面板的 --dsw-alias-bg-layer-2，
     // 与设置面板的内容列同观感（那边 .nav/.content 亦无 own fill，面板底色透出）
     '.dsh-mf-composerBody>.dsh-mf-card{border-color:transparent;background:transparent}',
-    '.dsh-mf-chips{display:inline-flex;align-items:center;gap:12px}',
     '.dsh-mf-composerChip{display:inline-flex;align-items:center;gap:4px;min-width:34px;height:28px;padding:0 8px;border:none;border-radius:var(--dsw-radius-sm);font-size:13px;font-weight:500;line-height:20px;cursor:pointer}',
     '.dsh-mf-composerChip:focus-visible{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline:none}',
     '.dsh-mf-composerChip:disabled{cursor:default;opacity:.6}',

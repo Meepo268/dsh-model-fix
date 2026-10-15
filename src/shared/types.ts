@@ -122,9 +122,9 @@ export interface BehaviorRules {
     showInModels: boolean
     /** 在「设置 → 内置插件」显示配置选项卡；关闭即卸载该席位的注册 */
     showInBuiltinPlugins: boolean
-    /** 在对话框工具栏显示入口 chip；关闭即卸载该席位的注册 */
+    /** 在对话框工具栏显示「模型优化」入口 chip；关闭即卸载该条目 */
     showInComposer: boolean
-    /** 工具栏上显示「跟随」状态灯；仅在 showInComposer 开着时生效（工具栏整体不可见时无从单独显示） */
+    /** 在对话框工具栏显示「跟随」状态灯；关闭即卸载该条目 */
     showFollowStatus: boolean
 }
 
