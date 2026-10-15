@@ -18,10 +18,12 @@ function nameOf(info: Parameters<typeof localizeEffortNames>[0], index: number):
 
 /** 执行本文件的全部用例 */
 export function run(): void {
-    // 词表与共享层档位表同源：键集逐项相等（编译期已保证无缺漏，此处钉住「不多不少」）
-    check('词表键集与 EFFORT_LEVELS 同源（宿主口径）',
-        stable(Object.keys(EFFORT_NAMES_ZH).sort()) === stable(EFFORT_LEVELS.map(hostForm).sort()), Object.keys(EFFORT_NAMES_ZH))
-    check('词表七档各有中文名', stable(Object.values(EFFORT_NAMES_ZH)) === stable(['关', '极低', '低', '中', '高', '极高', '最大']), EFFORT_NAMES_ZH)
+    // 词表与共享层档位表同源：前七键逐项相等（编译期已保证无缺漏），外加 Default（宿主伪菜单项）
+    const expectedKeys = [...EFFORT_LEVELS.map(hostForm), 'Default']
+    check('词表键集与 EFFORT_LEVELS 同源（宿主口径）+ Default',
+        stable(Object.keys(EFFORT_NAMES_ZH).sort()) === stable(expectedKeys.sort()), Object.keys(EFFORT_NAMES_ZH))
+    check('词表七档 + Default 各有中文名',
+        stable(Object.values(EFFORT_NAMES_ZH)) === stable(['关', '极低', '低', '中', '高', '极高', '最大', '默认']), EFFORT_NAMES_ZH)
 
     // 命中即换名；id 一律不动
     const hit = localizeEffortNames(infoOf([{ id: 'off', name: 'Off' }, { id: 'high', name: 'High' }]))

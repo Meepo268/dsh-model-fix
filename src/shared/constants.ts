@@ -38,7 +38,7 @@ export const EFFORT_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'
  * 推理级别中文名：键取宿主算显示名的同一形式（id 首字母大写，Node 半换名时用同一表达式查表），
  * 于是与本仓对宿主 UI 呈现的英文逐字对得上。Node 半换名见 `src/effort-name.ts`。
  */
-export const EFFORT_NAMES_ZH: Readonly<Record<Capitalize<(typeof EFFORT_LEVELS)[number]>, string>> = {
+export const EFFORT_NAMES_ZH: Readonly<Record<string, string>> = {
     Off: '关',
     Minimal: '极低',
     Low: '低',
@@ -46,6 +46,7 @@ export const EFFORT_NAMES_ZH: Readonly<Record<Capitalize<(typeof EFFORT_LEVELS)[
     High: '高',
     Xhigh: '极高',
     Max: '最大',
+    Default: '默认',
 }
 
 /** 当前代码支持的配置版本（新 NS 内的快照版本）；配置 schema 变化时递增，并在 upgrade.ts 中追加升级步骤 */

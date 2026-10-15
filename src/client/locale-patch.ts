@@ -17,6 +17,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { Flags } from '@/client/model'
 import type { DecodedScope } from '@/client/scope'
+import { EFFORT_NAMES_ZH } from '@/shared/constants'
 
 /** 宿主内部结构的 hack 接口：只列我们实际要碰的属性，其余假装不存在 */
 interface LocaleRuntimeHack {
@@ -33,9 +34,9 @@ const TARGET_KEY = 'effort.providerDefault'
 /** LocaleRuntime.localeKey() 是 toLowerCase，直接用小写 'zh' */
 const ZH_LOWER = 'zh'
 
-/** 宿主 locales.ts 里 zh 词典的原始值（和 en 一样写的 'Default'） */
+/** 宿主 locales.ts 里 zh 词典的原始值（和 en 一样写的 'Default'）；中文译名取自共享词表，与 EFFORT_NAMES_ZH 同源 */
 const ORIGINAL = 'Default'
-const LOCALIZED = '默认'
+const LOCALIZED = EFFORT_NAMES_ZH[ORIGINAL]
 
 /**
  * 设置 zh 词典里目标词条的值；值未变时跳过 publish（revision 保持不变，已挂载的 outlet
