@@ -19,7 +19,7 @@ import { TIP_MAX_WIDTH } from '@/client/card-styles'
 
 /** 瓦片 chevron：宿主 ui-primitives 导出的描边 chevron 图标 */
 const CHEVRON_DOWN = primitives.IconChevronDownOutlineRegular
-const { Switch, Tag, StateDot, Tooltip, IconInfoOutlineRegular, IconTrashOutlineRegular } = primitives
+const { Pill, Switch, Tag, StateDot, Tooltip, IconInfoOutlineRegular, IconTrashOutlineRegular } = primitives
 
 /** 瓦片文案函数：与卡片 props 的 t 同型，同为 slots.register 的 locale 席位合成注入 */
 type TileTranslate = TranslateNS<'settings.modelFix'>
@@ -27,9 +27,12 @@ type TileTranslate = TranslateNS<'settings.modelFix'>
 /** 瓦片渲染顺序：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 */
 export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience']
 
-/** 配置组瓦片（官方「插件列表」项卡同款）：summary 为组名 + 整组开关 + 折叠箭头，展开体为组释义 + 子开关行
- * （每行标题旁带一个说明键，气泡给该设置项释义）；
- * 整行可点由 .dsh-mf-itemToggle 覆盖层承担（无 button 嵌套），可访问名用 aria-labelledby 指向可见标题。 */
+/** Pill 组阈值：组内行键数 ≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
+const PILL_THRESHOLD = 5
+
+/** 配置组瓦片：summary 为组名 + 整组开关 + 折叠箭头，展开体为组释义 + 子开关行；
+ * 整行可点由 .dsh-mf-itemToggle 覆盖层承担（无 button 嵌套），可访问名用 aria-labelledby 指向可见标题。
+ * 组内行数 ≥ PILL_THRESHOLD 时，子开关改渲染为 Pill 胶囊组（flex-wrap 换行、Tooltip 悬浮说明）。 */
 export function GroupTile(props: {
     group: Group
     t: TileTranslate
@@ -43,6 +46,7 @@ export function GroupTile(props: {
     const { group, t, open } = props
     const id = `dsh-mf-item-${group}`
     const title = t(COLUMN_KEYS[group])
+    const usePills = GROUP_KEYS[group].length >= PILL_THRESHOLD
     return (
         <div className="dsh-mf-item" role="group" data-open={open ? 'true' : undefined} aria-labelledby={`${id}-title`}>
             <div className="dsh-mf-itemHead">
@@ -69,15 +73,36 @@ export function GroupTile(props: {
             {open ? (
                 <div className="dsh-mf-itemBody" id={`${id}-body`}>
                     <p className="dsh-mf-itemHint">{t(HINT_KEYS[group])}</p>
-                    {GROUP_KEYS[group].map((key) => {
+                    {usePills ? (
+                        <div className="dsh-mf-pillGroup" role="group" aria-label={`${title} ${t('masterAll')}`}>
+                            {GROUP_KEYS[group].map((key) => {
+                                const tip = t(TIP_KEYS[key])
+                                const rowLabel = t(ROW_KEYS[key])
+                                const active = groupValue(props.flags, group, key)
+                                return (
+                                    <Tooltip key={key} label={tip} side="top" maxWidth={TIP_MAX_WIDTH} portal>
+                                        {/* 宿主 Pill 不 forwardRef，Tooltip.cloneElement 注入的 ref 无法到达其内部 button；span 承接 ref 锚点，纯样式容器 */}
+                                        <span>
+                                            <Pill
+                                                active={active}
+                                                aria-pressed={active}
+                                                disabled={props.disabled}
+                                                onClick={() => { props.onCell(key) }}
+                                            >
+                                                {rowLabel}
+                                            </Pill>
+                                        </span>
+                                    </Tooltip>
+                                )
+                            })}
+                        </div>
+                    ) : GROUP_KEYS[group].map((key) => {
                         const tip = t(TIP_KEYS[key])
                         return (
                             <div key={key} className="dsh-mf-itemRow">
                                 <span className="dsh-mf-itemLabelGroup">
                                     <span className="dsh-mf-itemLabel">{t(ROW_KEYS[key])}</span>
-                                    {/* 设置项释义用宿主 Tooltip 原语（悬停 / 键盘聚焦起气泡），锚点形态照官方 settings-form
-                                     * 的 .helpButton（信息图标键）。portal 必需：瓦片 overflow:hidden 加上 box-shadow 构成的
-                                     * 层叠上下文会把定位于锚点的气泡裁掉，气泡须挂到 body 上才不被行内裁剪 */}
+                                    {/* 设置项释义用宿主 Tooltip 原语（锚点形态照官方 settings-form .helpButton 的信息图标键）。portal 必需：瓦片 overflow:hidden 加上 box-shadow 构成的层叠上下文会把气泡裁掉 */}
                                     <Tooltip label={tip} side="right" maxWidth={TIP_MAX_WIDTH} portal>
                                         <button type="button" className="dsh-mf-help" aria-label={tip}>
                                             <IconInfoOutlineRegular size={12} />

@@ -71,6 +71,9 @@ const STYLE_TEXT = [
     '.dsh-mf-itemBody{border-top:0.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));padding:10px 14px 12px;display:grid;gap:6px;background:var(--dsw-alias-bg-module-platform,#f5f6f7)}',
     '.dsh-mf-itemHint{margin:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-tertiary,#81858c)}',
     '.dsh-mf-itemRow{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;line-height:1.5;color:var(--dsw-alias-label-primary,#0f1115)}',
+    // Pill 组容器：组内行数 ≥ 5 时，Switch 行整体替换为 Pill 胶囊矩阵（flex-wrap 自动换行，gap 与宿主 Pill 24px 高度同档）
+    '.dsh-mf-pillGroup{display:flex;flex-wrap:wrap;gap:6px}',
+
     // 行内标签组：照官方 settings-form .labelGroup（inline-flex、gap 4px、min-width:0）；标签过长时换行（裁定同瓦片标题），
     // align-items:center 让说明键与换行后的整块文案居中对齐
     '.dsh-mf-itemLabelGroup{display:inline-flex;align-items:center;gap:4px;min-width:0}',
