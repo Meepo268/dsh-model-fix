@@ -5,7 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { check, stable } from '@test/helper'
 import { installSelfTune } from '@/self-tune'
 import { setConfigSource } from '@/config'
-import { DEFAULT_CONFIG } from '@/shared/parse'
+import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import type { PluginConfig } from '@/shared/types'
 import { PLUGIN_NS } from '@/shared/constants'
 

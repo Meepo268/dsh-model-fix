@@ -34,7 +34,7 @@ export interface FieldRules {
 
 /**
  * 兼容性规则：每条对应宿主 provider 路由 compat 下的一个字段。
- * 同组新增键对既有形态只是「多一个可选字段」，向后兼容，因此不需要递增 CONFIG_VERSION。
+ * 同组新增键对既有形态只是「多一个可选字段」，向后兼容，因此不需要递增 CONFIG_VERSION（升级版本只因真不兼容，见 docs/versioning.md）。
  */
 export interface CompatRules {
     /**

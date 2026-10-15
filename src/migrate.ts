@@ -1,11 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-import { MAX_ATTEMPTS, MAX_OLD_SNAPSHOTS, MIN_SUPPORTED_VERSION } from '@/constants'
-import { CONFIG_VERSION, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
+import { MAX_ATTEMPTS } from '@/constants'
+import { PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
+import { CONFIG_VERSION, DEFAULT_CONFIG, MAX_OLD_SNAPSHOTS, MIN_SUPPORTED_VERSION, parseSnapshot, parseVersion, toStored, versionKey } from '@/shared/config-schema'
 import { resolveConfig } from '@/config'
 import { queueTask } from '@/host'
-import { DEFAULT_CONFIG, parseSnapshot, parseVersion, toStored, versionKey } from '@/shared/parse'
 import type { PluginConfigSnapshot, VersionedSection } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
@@ -16,11 +16,11 @@ import { isSettingsConflict } from '@/writeback'
  * 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。
  *
  * 与升级链的两条分工——本文件只处理**当前版本**与**段内多版本共存**，
- * 「把某个旧版本升上来」交给 `src/upgrade.ts` 的冻结台阶链（这里只在选迁移源时调它）；
- * 本文件与升级链共用的落盘口都在当前版本键 `CURRENT_KEY` 上，物化函数单一来源在 `src/shared/parse.ts` 的 `toStored`。
+ * 「把某个旧版本升上来」交给 `src/upgrade.ts` 的冻结台阶链（这里只在选迁移源时调它）。
+ * 本文件与升级链共用的落盘口都在当前版本键 `CURRENT_KEY` 上，物化函数单一来源在 `src/shared/config-schema.ts` 的 `toStored`。
  */
 
-/** 全新用户的规范默认快照（与升级链对空输入的结果一致，由 test 守护）；物化函数单一来源在 src/shared/parse.ts 的 `toStored` */
+/** 全新用户的规范默认快照（与升级链对空输入的结果一致，由 test 守护）；物化函数单一来源在 src/shared/config-schema.ts 的 `toStored` */
 export const DEFAULT_STORED: PluginConfigSnapshot = toStored(DEFAULT_CONFIG)
 
 /** 当前版本的快照键（当前为 `version-8`，N 取 `CONFIG_VERSION`），全文件的规范化/迁移/自愈写回共用 */

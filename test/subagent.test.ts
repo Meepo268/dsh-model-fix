@@ -5,7 +5,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { check, stable } from '@test/helper'
 import { installSubagentFollowParent } from '@/subagent'
 import { setConfigSource } from '@/config'
-import { DEFAULT_CONFIG } from '@/shared/parse'
+import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import type { PluginConfig, UserExperienceRules } from '@/shared/types'
 
 /**

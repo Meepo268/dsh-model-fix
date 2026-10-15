@@ -2,14 +2,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EFFORT_LEVELS } from '@/shared/constants'
 
-/** 最低支持（可升级读取）的版本；低于此值的版本快照视为已失效（运行时不读取、迁移时清理） */
-export const MIN_SUPPORTED_VERSION = 3
-/**
- * 低于当前版本的旧快照保留上限，超出在启动时从最低版本清理（等于或高于当前版本的快照始终保留，供无损回退）。
- * 取 1 ⇒ 段内低于当前版本的快照合计最多留 1 个，其余从最低版本起淘汰。
- */
-export const MAX_OLD_SNAPSHOTS = 1
-
 /** models.dev 容量字段对"无限/未公布"的哨兵建模值，视为无数据 */
 export const CAPACITY_UNLIMITED = 99_999_999
 

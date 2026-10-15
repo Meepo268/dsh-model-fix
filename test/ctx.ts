@@ -16,7 +16,7 @@ import { API_NS, PLUGIN_NS } from '@/shared/constants'
 import { setConfigSource } from '@/config'
 import { setCatalog } from '@/catalog'
 import { setHmrExecuting } from '@/host'
-import { DEFAULT_CONFIG } from '@/shared/parse'
+import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import { isPlainObject } from '@/shared/types'
 
 // 测试桩没有 hmr 注入（ctx.get 一律 undefined）：宣告注入已结算（值缺席），

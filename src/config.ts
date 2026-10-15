@@ -1,8 +1,6 @@
-import { MIN_SUPPORTED_VERSION } from '@/constants'
-import { CONFIG_VERSION } from '@/shared/constants'
+import { CONFIG_VERSION, MIN_SUPPORTED_VERSION, DEFAULT_CONFIG, parseSnapshot, parseVersion } from '@/shared/config-schema'
 import type { PluginConfig } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
-import { DEFAULT_CONFIG, parseSnapshot, parseVersion } from '@/shared/parse'
 
 /**
  * 从版本快照段解析运行时配置：优先当前版本；否则取所有版本中 ≥ 最低支持的最高可解析快照

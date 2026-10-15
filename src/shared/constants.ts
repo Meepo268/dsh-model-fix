@@ -56,12 +56,6 @@ export const EFFORT_NAMES_ZH: Readonly<Record<string, string>> = {
  */
 export const EFFORT_NAME_SEP = ' · '
 
-/** 当前代码支持的配置版本（新 NS 内的快照版本）；配置 schema 变化时递增，并在 upgrade.ts 中追加升级步骤 */
-export const CONFIG_VERSION = 8
-
-/** 版本快照键前缀，段内键形如 version-N */
-export const VERSION_PREFIX = 'version-'
-
 /**
  * RPC channel 的端点名常量：跨 Node 半（注册分发）与浏览器半（发起调用）共享，
  * 统一放 shared 层避免两端写同一个裸字符串（一端改漏另一端 runtime 报 unknown-endpoint）。

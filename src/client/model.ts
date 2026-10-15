@@ -8,8 +8,8 @@
 
 import type { PluginConfig } from '@/shared/types'
 import { isPlainObject, providersOf } from '@/shared/types'
-import { CONFIG_VERSION, EFFORT_LEVELS } from '@/shared/constants'
-import { DEFAULT_CONFIG, FIELD_KEYS, COMPAT_KEYS, USER_EXPERIENCE_KEYS, parseSnapshot, versionKey } from '@/shared/parse'
+import { EFFORT_LEVELS } from '@/shared/constants'
+import { CONFIG_VERSION, DEFAULT_CONFIG, FIELD_KEYS, COMPAT_KEYS, USER_EXPERIENCE_KEYS, parseSnapshot, versionKey } from '@/shared/config-schema'
 
 /** 版本快照键 */
 export const VERSION_KEY = versionKey(CONFIG_VERSION)

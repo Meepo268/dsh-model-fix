@@ -227,7 +227,7 @@
 | 宿主模块 | 导入符号 | 形式 | 使用处 |
 | --- | --- | --- | --- |
 | `@deepseek-ai/cordis` | `Context` / `Context as ClientContext` | type-only | Node 半各模块；`src/client/index.tsx`、`src/client/memory-listener.ts`、`src/client/rpc-carrier.ts` |
-| `@deepseek-ai/schemastery` | 默认导出 `z` | **值导入** | `src/index.ts`（`Config`）、`src/upgrade.ts`（冻结升级台阶链的 v3–v7 schema） |
+| `@deepseek-ai/schemastery` | 默认导出 `z` | **值导入** | `src/index.ts`（`Config`）、`src/upgrade.ts`（v7 冻结 schema） |
 | `@deepseek-ai/dsh-settings` | `SettingsPathOp`、`SettingsDescriptor` | type-only | `SettingsPathOp`：`src/fix.ts` `src/migrate.ts` `src/reset.ts` `src/restore.ts` `src/prune.ts` `src/fill.ts` `src/writeback.ts` `src/client/scope.ts`；`SettingsDescriptor`：`src/section.ts`（节读取收口，替掉各处 `describe().find`） |
 | `@deepseek-ai/dsh-settings/types` | `SettingsPathOpView` | type-only | `src/client/scope.ts`（浏览器半写回 op 的目标形态，见下方「mutate 入参形态」条目）；**只引 `/types` 子路径**，该符号包根未导出 |
 | `@deepseek-ai/dsh-util-values` | `deepEqualJson`（值）、`JsonValue`（type-only） | **值导入** + type-only | `deepEqualJson`：`src/fix.ts` `src/migrate.ts` `src/compat.ts` `src/restore.ts`；`JsonValue`：`src/client/scope.ts` |

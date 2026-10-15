@@ -19,7 +19,7 @@ interface CompatRule {
 }
 
 /**
- * 规则表：新增兼容性配置在此追加一条（键名与 CONFIG_VERSION 无关，形态向后兼容）。
+ * 规则表：新增兼容性配置在此追加一条（同组新增键向后兼容，形态不推动 CONFIG_VERSION 递增）。
  * 只写路由级、不写模型级；协议 gate（COMPAT_APIS）由 fix.ts 判，本纯函数只决定写什么。
  */
 const RULES: readonly CompatRule[] = [

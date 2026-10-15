@@ -1,7 +1,7 @@
 /** src/client/model.ts 纯映射层用例：解码（只读 version-8，非法/缺失回默认）、组总控/单格语义、排除列表增删与命中判定、脏检测、快照规范化、验证候选拍取、目标收敛与分组全选、探测式填充候选（未填充判据 / 忽略排除）与七档展开 */
 
 import { check, stable } from '@test/helper'
-import { DEFAULT_CONFIG as DEFAULT_FLAGS, toStored } from '@/shared/parse'
+import { DEFAULT_CONFIG as DEFAULT_FLAGS, toStored } from '@/shared/config-schema'
 import {
     EXCLUDE_ID_PATTERN,
     VERSION_KEY,

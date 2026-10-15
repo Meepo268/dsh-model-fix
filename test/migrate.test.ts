@@ -1,8 +1,7 @@
 // migrate.ts 纯函数测试：DEFAULT_STORED / toStored / 规范化重写的语义不变性 / pruneOps 清理规则 / canonicalizeCurrentOp 规范化 / excludes 去重 op
 import { DEFAULT_STORED, canonicalizeCurrentOp, dedupeExcludesOp, pruneOps } from '@/migrate'
 import { resolveConfig } from '@/config'
-import { parseEfforts, toStored, versionKey } from '@/shared/parse'
-import { CONFIG_VERSION } from '@/shared/constants'
+import { CONFIG_VERSION, parseEfforts, toStored, versionKey } from '@/shared/config-schema'
 import { check, stable } from '@test/helper'
 
 /** 执行本文件的全部用例 */
@@ -41,14 +40,14 @@ export function run(): void {
     check('DEFAULT_STORED 的 configVersion 为当前版本', DEFAULT_STORED.configVersion === CONFIG_VERSION, DEFAULT_STORED)
 
     // 自愈重写（migrateConfig 中当前版本快照非法时的动作）：重写目标取「当前生效值」，故重写前后
-    // 行为必须一致；有可用旧快照时沿用其语义，绝不把段内仍可用的快照静默抹成默认
-    const brokenV7WithV5 = {
-        'version-7': { autoFill: 'garbage' },
-        'version-5': { configVersion: 5, autoFill: { reasoning: false, context: false, image: true }, allowUpdate: { reasoning: true, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, userExperience: { rememberEfforts: false } },
+    // 行为必须一致；有可用旧快照（>= MIN_SUPPORTED_VERSION）时沿用其语义，绝不把段内仍可用的快照静默抹成默认
+    const brokenV8WithV7 = {
+        'version-8': { autoFill: 'garbage' },
+        'version-7': { autoFill: { reasoning: false, context: false, image: true }, allowUpdate: { reasoning: true, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true } },
     }
-    const healed = { 'version-7': toStored(resolveConfig(brokenV7WithV5)) }
-    check('自愈后生效配置不变', stable(resolveConfig(healed)) === stable(resolveConfig(brokenV7WithV5)), { healed, before: resolveConfig(brokenV7WithV5) })
-    check('自愈沿用可用旧快照语义（未落默认，保留 efforts 记忆与 userExperience 现值并补 defaultHigh / forgetRemoved）', stable(resolveConfig(healed)) === stable({
+    const healed = { 'version-8': toStored(resolveConfig(brokenV8WithV7)) }
+    check('自愈后生效配置不变', stable(resolveConfig(healed)) === stable(resolveConfig(brokenV8WithV7)), { healed, before: resolveConfig(brokenV8WithV7) })
+    check('自愈沿用可用旧快照语义（未落默认，保留 efforts 记忆与 userExperience 现值并补 disableStore 与 followParent / selfTune / hideOfficial / localizeEfforts / showOriginalEfforts 默认）', stable(resolveConfig(healed)) === stable({
         autoFill: { reasoning: false, context: false, image: true },
         allowUpdate: { reasoning: true, context: true, image: false },
         compat: { disableDeveloper: false, disableStore: true },
@@ -79,14 +78,17 @@ export function run(): void {
 
     // pruneOps：两阶段清理——先淘汰低于最低支持版本（Phase A），再淘汰低于当前版本且超出保留上限的 excess（Phase B）；
     // 等于/高于当前版本永不清理
-    check('当前与高版本不参与清理', pruneOps([7, 8, 9, 10]).length === 0, pruneOps([7, 8, 9, 10]))
-    check('低于最低支持版本的快照由 Phase A 清理', stable(pruneOps([1, 2, 3, 4, 5, 6])) === stable([
-        { op: 'unset', path: ['version-1'] }, { op: 'unset', path: ['version-2'] }, { op: 'unset', path: ['version-3'] }, { op: 'unset', path: ['version-4'] }, { op: 'unset', path: ['version-5'] },
+    check('当前与高版本不参与清理', pruneOps([8, 9, 10]).length === 0, pruneOps([8, 9, 10]))
+    check('低于最低支持版本的快照由 Phase A 清理（MIN_SUPPORTED_VERSION = 7）', stable(pruneOps([1, 2, 3, 4, 5, 6])) === stable([
+        { op: 'unset', path: ['version-1'] }, { op: 'unset', path: ['version-2'] }, { op: 'unset', path: ['version-3'] }, { op: 'unset', path: ['version-4'] }, { op: 'unset', path: ['version-5'] }, { op: 'unset', path: ['version-6'] },
     ]), pruneOps([1, 2, 3, 4, 5, 6]))
-    check('olds 超限淘汰最低（<=当前版本共保留 2 个）', stable(pruneOps([3, 4, 5, 6])) === stable([
-        { op: 'unset', path: ['version-3'] }, { op: 'unset', path: ['version-4'] }, { op: 'unset', path: ['version-5'] },
-    ]), pruneOps([3, 4, 5, 6]))
-    check('olds 未超限不清理', pruneOps([3]).length === 0, pruneOps([3]))
+    check('Phase B 清理 olds 超限（v7 是最低支持，等于 MIN_SUPPORTED_VERSION 时 olds 超限淘汰最低）', stable(pruneOps([7])) === stable([]) && stable(pruneOps([7])) === stable(pruneOps([7])))
+    // MIN=7, current=8, maxOld=1：olds=[7]（仅一个，未超限）
+    check('olds 未超限不清理（v7 唯一 old）', pruneOps([7]).length === 0, pruneOps([7]))
+    // MIN=4（覆盖默认），olds=[4,5,6] 超限 3-1=2，淘汰最低 2 个
+    check('覆写 minSupported 时 olds 超限淘汰最低', stable(pruneOps([4, 5, 6], 8, 4, 1)) === stable([
+        { op: 'unset', path: ['version-4'] }, { op: 'unset', path: ['version-5'] },
+    ]), pruneOps([4, 5, 6], 8, 4, 1))
     check('Phase A 清理低于最低支持版本', stable(pruneOps([1, 2, 3, 4], 6, 4, 3)) === stable([
         { op: 'unset', path: ['version-1'] }, { op: 'unset', path: ['version-2'] }, { op: 'unset', path: ['version-3'] },
     ]), pruneOps([1, 2, 3, 4], 6, 4, 3))

@@ -65,7 +65,7 @@ import type { RpcCarrier } from '@/client/rpc-carrier'
 import { errorText } from '@/shared/errors'
 import { isProviderBlocking } from '@/shared/verify-progress'
 import type { UnsupportedEffort, ProbeOutcome, VerifyProbedFrame } from '@/shared/verify-progress'
-import { DEFAULT_CONFIG, toStored } from '@/shared/parse'
+import { DEFAULT_CONFIG, toStored } from '@/shared/config-schema'
 
 /** 瓦片 chevron：宿主 ui-primitives 导出的描边 chevron 图标 */
 const CHEVRON_DOWN = primitives.IconChevronDownOutlineRegular

@@ -22,7 +22,7 @@ import type { ModelSelection, ModelSelectionProjection } from '@deepseek-ai/dsh-
 import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 // SessionId 品牌 id（sessions / modelDirectories 服务的键类型）
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { DEFAULT_CONFIG } from '@/shared/parse'
+import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import { VERSION_KEY } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { applyEffort, classifyTransition, sameSelection } from '@/client/effort'
