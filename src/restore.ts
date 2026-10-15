@@ -39,13 +39,14 @@ export function captureBackup(ctx: Context): void {
 }
 
 /**
- * 恢复计划（纯函数，零 ctx 依赖可单测）——交集语义：
- * 只恢复「备份与当前都存在」的 provider 内的「备份与当前都存在」的 model；
- * 被整删的 provider、被删的 model、启动后新增的 provider/model 一律跳过（不复活、不覆盖新增）。
- * 对该 provider 重建 models 数组：交集的 model 用备份值（深拷贝后按 `stripEmptyFields` 清掉空壳字段，
- * 空壳在 harness 语义上等同未声明，带回来只是把脏值原样复刻），当前独有 model 原样保留。
+ * 恢复计划（纯函数，零 ctx 依赖可单测）：
+ * 对「备份与当前都存在」的 provider，回退其共有 model，并把该 provider 下被删掉的 model 复活；
+ * 被整删的 provider（其 api-key 随之没了）与启动后新增的 provider 一律跳过（不复活 provider、不覆盖新增）。
+ * 对该 provider 重建 models 数组：共有 model 用备份值（深拷贝后按 `stripEmptyFields` 清掉空壳字段，
+ * 空壳在 harness 语义上等同未声明，带回来只是把脏值原样复刻），当前独有 model 原样保留，
+ * 备份独有 model 按备份原序追加到末尾。当前 provider 的 `models` 键缺失视为「模型被删光」，按空数组处理。
  * 仅当重建结果与该 provider 当前 models 有差异才产出整段 set op（零变更零 op）。
- * 返回 { modelOps, changed }，changed 为被恢复（交集 model 中被改写）的模型数。
+ * 返回 { modelOps, changed }，changed 为被回退（值不同于当前）与被复活的模型数。
  */
 export function planRestore(
     backupProviders: Record<string, unknown> | undefined,
@@ -59,8 +60,12 @@ export function planRestore(
         const currentProvider = currentProviders[providerId]
         if (!isPlainObject(currentProvider)) continue
         const backupModels = backupProvider.models
-        const currentModels = currentProvider.models
-        if (!Array.isArray(backupModels) || !Array.isArray(currentModels)) continue
+        if (!Array.isArray(backupModels)) continue
+        // 当前 models 键缺失或为 null＝模型被删光，按空数组处理（可全部复活）；
+        // 非数组的其他值（损坏）维持跳过，与备份侧同一口径
+        const rawCurrentModels = currentProvider.models
+        if (rawCurrentModels !== undefined && rawCurrentModels !== null && !Array.isArray(rawCurrentModels)) continue
+        const currentModels: Record<string, unknown>[] = Array.isArray(rawCurrentModels) ? rawCurrentModels : []
         // 交集 model id -> 备份值；当前独有 model id -> 原样保留
         const backupById = new Map<string, Record<string, unknown>>()
         for (const m of backupModels) {
@@ -73,23 +78,34 @@ export function planRestore(
             // 清理后与当前值相同即视为「无可恢复」，不产出 op（零变更零 op）
             return hit === undefined ? m : stripEmptyFields(structuredClone(hit))
         })
-        // 逐个比较（判据取 @deepseek-ai/dsh-util-values 的 deepEqualJson）：
-        // 仅当有交集 model 的值被改写才产出 op，changed 计被恢复（值不同于当前）的模型数
+        // 复活：备份有而当前没有的 model，provider 仍在即恢复，按备份原序追加到末尾。
+        // 遍历 backupById 而非 backupModels：与回退共用同一份备份值，否则同一 model 可能被写成两个取值
+        const presentIds = new Set<string>()
+        for (const m of restored) {
+            if (isPlainObject(m) && m.id !== undefined && m.id !== null) presentIds.add(String(m.id))
+        }
+        for (const [id, hit] of backupById) {
+            if (presentIds.has(id)) continue
+            presentIds.add(id)
+            restored.push(stripEmptyFields(structuredClone(hit)))
+        }
+        // 逐个比较（判据取 @deepseek-ai/dsh-util-values 的 deepEqualJson）：值被改写或有 model 被复活才产出 op
         let touched = 0
         for (let i = 0; i < currentModels.length; i++) {
             if (!deepEqualJson(currentModels[i], restored[i])) touched++
         }
-        if (touched === 0) continue
+        const revived = restored.length - currentModels.length
+        if (touched === 0 && revived === 0) continue
         modelOps.push({ op: 'set', path: ['providers', providerId, 'models'], value: restored })
-        changed += touched
+        changed += touched + revived
     }
     return { modelOps, changed }
 }
 
 /**
- * 恢复备份：把各共有 provider 中共有 model 回退到启动时备份值（交集语义，见 planRestore）。
+ * 恢复备份：把各共有 provider 的模型回退到启动时备份值，并复活其下被删的 model（语义见 planRestore）。
  * 事件流守卫全程打开，写回触发的 settings/document-updated 事件被入口判定拦下，不会反向触发填充。
- * 返回被恢复的模型数；写失败先告警再抛出，由调用方转 RPC 失败结果。
+ * 返回被回退与被复活的模型数；写失败先告警再抛出，由调用方转 RPC 失败结果。
  */
 export async function restoreModels(ctx: Context): Promise<number> {
     // 备份缺失（启动时捕获失败）必须显式失败：返回 0 会被前端显示成「已恢复 0 个模型」，

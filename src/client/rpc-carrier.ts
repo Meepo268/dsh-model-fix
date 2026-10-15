@@ -23,7 +23,7 @@ export interface RpcCarrier {
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
     /** 重置推理级别 RPC：仅剔除模型上的 reasoningEfforts（最大上下文 / 输出上限 / 图片模态可在模型页自行设置，不清除；excludes 命中跳过），配置段原样保留；返回受影响的模型数 */
     resetModels: () => Promise<ConnectionRpcResult<unknown>>
-    /** 恢复备份 RPC：回退启动时备份（交集 provider+model）到当前配置；返回被恢复的模型数 */
+    /** 恢复备份 RPC：回退启动时备份到当前配置（共有 provider 的共有 model 回退，其下被删的 model 复活）；返回被恢复与复活的模型数 */
     restoreModels: () => Promise<ConnectionRpcResult<unknown>>
     /** 剔除不被支持的推理级别：入参是验证明细给出的「提供方 / 模型 / 档位」清单；返回实际剔掉的档位条数 */
     pruneEfforts: (targets: readonly UnsupportedEffort[]) => Promise<ConnectionRpcResult<unknown>>

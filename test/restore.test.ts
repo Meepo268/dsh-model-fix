@@ -1,4 +1,4 @@
-// restore.ts 纯函数测试：providersOf 收窄、恢复计划（交集语义：备份与当前都存在的 provider+model 才恢复）
+// restore.ts 纯函数测试：providersOf 收窄、恢复计划（共有 provider 的共有 model 回退 + 该 provider 下被删 model 复活）
 import { planRestore } from '@/restore'
 import { providersOf } from '@/shared/types'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
@@ -35,7 +35,7 @@ export function run(): void {
     const restoredA = modelsValueOf(plan.modelOps, 'providers.a.models')
 
     check('共有 provider 产出整段 set op', restoredA !== undefined)
-    check('交集 model 恢复为备份值', restoredA !== undefined
+    check('共有 model 回退为备份值', restoredA !== undefined
         && restoredA[0] !== undefined
         && restoredA[0]!.name === 'A1'
         && restoredA[0]!.contextWindow === 1000
@@ -44,14 +44,53 @@ export function run(): void {
         && restoredA.length === 3
         && restoredA[2] !== undefined
         && restoredA[2]!.newModel === true)
-    check('交集中值未变的 model 内容保持不变', restoredA !== undefined
+    check('共有 model 中值未变者内容保持不变', restoredA !== undefined
         && restoredA[1] !== undefined
         && restoredA[1]!.id === 'a2'
         && restoredA[1]!.name === 'A2')
-    check('备份中被删除的 provider 不产出 op（不复活）',
+    check('备份中被删除的 provider 不产出 op（其下 model 不复活）',
         plan.modelOps.every((op) => op.path.join('.') !== 'providers.gone.models'))
     check('启动后新增的 provider 不产出 op', plan.modelOps.every((op) => op.path.join('.') !== 'providers.b.models'))
     check('changed 计数 = 被恢复（值被改写）的模型数', plan.changed === 1)
+
+    // 复活：备份有、当前没有的 model，provider 仍在即按备份原序追加到末尾
+    const reviveBackup = { p: { models: [
+        { id: 'm1', name: 'M1' },
+        { id: 'm2', name: 'M2', compat: {}, input: [] },
+    ] } }
+    const reviveCurrent = { p: { models: [
+        { id: 'm1', name: 'M1-filled', contextWindow: 2000 },
+        { id: 'm3', newModel: true },
+    ] } }
+    const revivePlan = planRestore(reviveBackup, reviveCurrent)
+    const revivedModels = modelsValueOf(revivePlan.modelOps, 'providers.p.models')
+    check(
+        '共有 model 回退、当前独有保留、被删 model 复活追加到末尾（复活同样清空壳）',
+        stable(revivedModels) === stable([
+            { id: 'm1', name: 'M1' },
+            { id: 'm3', newModel: true },
+            { id: 'm2', name: 'M2' },
+        ]),
+        revivedModels,
+    )
+    check('changed 计数含被复活的模型', revivePlan.changed === 2)
+
+    // models 键被整体删掉（模型删光）：视为删光而非「无 models 声明」，备份里的模型全部复活
+    const emptiedPlan = planRestore(
+        { p: { models: [{ id: 'm1' }, { id: 'm2' }] } },
+        { p: { api: 'openai-completions' } },
+    )
+    check(
+        'models 键缺失时全部复活',
+        stable(modelsValueOf(emptiedPlan.modelOps, 'providers.p.models')) === stable([{ id: 'm1' }, { id: 'm2' }]),
+    )
+    check('models 键缺失时 changed 计全部复活数', emptiedPlan.changed === 2)
+
+    // 当前侧 models 损坏成非数组（非 null）：跳过，不按删光处理
+    check('当前侧 models 非数组（非 null）跳过', (() => {
+        const p = planRestore({ p: { models: [{ id: 'm1' }] } }, { p: { models: { x: 1 } } })
+        return p.modelOps.length === 0 && p.changed === 0
+    })())
 
     // 备份与当前完全一致：零变更零 op
     const sameCurrent = structuredClone(backup.providers)

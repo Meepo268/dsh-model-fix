@@ -15,7 +15,7 @@ function ctxOf(withBackup: unknown = 'ok') {
                     models: [
                         // 预声明把七档写进来了，实际探测前只有 off+high
                         { id: 'm1', reasoningEfforts: { off: null, minimal: 'minimal', low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' } },
-                        // 探测期间用户新加的模型：交集语义不该动它
+                        // 探测期间用户新加的模型：回退口径不该动它
                         { id: 'm9', reasoningEfforts: { off: null } },
                     ],
                 },
@@ -125,7 +125,7 @@ export async function run(): Promise<void> {
         )
         const providers = ctx.userOf(API_NS).providers as Record<string, unknown>
         check(
-            '交集语义：探测期间新增的 m9 原样保留；备份里有的 dropped 与当前有的 gone 都各归各位（一个不复活、一个不删除）',
+            '回退口径：探测期间新增的 m9 原样保留；被删的 dropped provider 不复活，仍在的 gone provider 原样保留',
             stable(effortsOf(ctx, 'm9')) === stable({ off: null })
             && providers.dropped === undefined
             && stable(providers.gone) === stable({ models: [{ id: 'x' }] }),
