@@ -2,6 +2,10 @@
 
 DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插件：提供更好的模型使用体验，包括但不限于：多种方式填充模型参数、提升模型兼容性、记住推理级别、子智能体实时跟随模型和推理级别、AI 自主调节档位等。
 
+> [!IMPORTANT]
+> 如果觉得好用，请给个星哦~
+> 你的支持是我继续开发的动力！也能让别人更容易找到这个插件。
+
 > 本插件已在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 收录，可在 [dsh-market](https://github.com/dsh-market/dsh-market) 中搜索、安装。
 
 插件截图：
@@ -92,7 +96,7 @@ dsh plugin --profile web add github:TikaFlow/dsh-model-fix
 
 ### 支持范围
 
-DSH `0.1.7-rc.2` ~ `0.2.1-alpha.2`
+DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
 
 ## 使用说明
 
