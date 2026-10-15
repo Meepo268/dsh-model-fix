@@ -46,6 +46,16 @@ export function run(): void {
     const partial = localizeEffortNames(infoOf([{ id: 'ultra', name: 'Ultra' }, { id: 'high', name: 'High' }]))
     check('表外 id 原样透传', nameOf(partial, 0) === 'Ultra' && nameOf(partial, 1) === '高', partial.reasoning?.efforts)
 
+    // showOriginal：中文名后追加「 · 」与原档位名（原样取宿主给的 name，不重算）
+    const both = localizeEffortNames(infoOf([{ id: 'max', name: 'Max' }, { id: 'off', name: 'Off' }]), true)
+    check('showOriginal 输出「中文 · 原档位」', nameOf(both, 0) === '最大 · Max' && nameOf(both, 1) === '关 · Off', both.reasoning?.efforts)
+    check('showOriginal 不动 id', stable(both.reasoning?.efforts) === stable([{ id: 'max', name: '最大 · Max' }, { id: 'off', name: '关 · Off' }]), both.reasoning?.efforts)
+    check('showOriginal 省略时等价于不追加', nameOf(localizeEffortNames(infoOf([{ id: 'max', name: 'Max' }])), 0) === '最大', undefined)
+
+    // showOriginal 下表外 id 仍原样透传（不套「中文 · 」格式）
+    const partialBoth = localizeEffortNames(infoOf([{ id: 'ultra', name: 'Ultra' }]), true)
+    check('showOriginal 下表外 id 原样透传', nameOf(partialBoth, 0) === 'Ultra', partialBoth.reasoning?.efforts)
+
     // 非全小写 id：宿主自己的显示名就不是已知七键（如 `HIGH` 显示 `HIGH`）→ 原样透传，不猜
     const oddCase = localizeEffortNames(infoOf([{ id: 'HIGH', name: 'HIGH' }, { id: 'hIgH', name: 'hIgH' }]))
     check('非小写 id 原样透传', nameOf(oddCase, 0) === 'HIGH' && nameOf(oddCase, 1) === 'hIgH', oddCase.reasoning?.efforts)

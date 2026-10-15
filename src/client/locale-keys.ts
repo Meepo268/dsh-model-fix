@@ -40,6 +40,7 @@ export type CardKey =
     | 'rowSelfTuneEffort'
     | 'rowHideOfficial'
     | 'rowLocalizeEfforts'
+    | 'rowShowOriginalEfforts'
     | 'tipReasoning'
     | 'tipContext'
     | 'tipImage'
@@ -52,6 +53,7 @@ export type CardKey =
     | 'tipSelfTuneEffort'
     | 'tipHideOfficial'
     | 'tipLocalizeEfforts'
+    | 'tipShowOriginalEfforts'
     | 'excludePlaceholder'
     | 'excludeAdd'
     | 'excludeInvalid'
@@ -197,6 +199,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     selfTune: 'rowSelfTuneEffort',
     hideOfficial: 'rowHideOfficial',
     localizeEfforts: 'rowLocalizeEfforts',
+    showOriginalEfforts: 'rowShowOriginalEfforts',
 }
 
 /** 配置组（瓦片）标题键映射 */
@@ -229,4 +232,5 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     selfTune: 'tipSelfTuneEffort',
     hideOfficial: 'tipHideOfficial',
     localizeEfforts: 'tipLocalizeEfforts',
+    showOriginalEfforts: 'tipShowOriginalEfforts',
 }

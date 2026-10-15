@@ -1,5 +1,6 @@
 /**
- * 「本地化推理级别」的 Node 半实现：开关开启时把 `resolveModelInfo` 返回里的档位显示名换成中文。
+ * 「本地化推理级别」的 Node 半实现：开关开启时把 `resolveModelInfo` 返回里的档位显示名换成中文，
+ * 可选地在中文名后追加原档位名（`最大 · Max` 格式，`showOriginalEfforts` 开关）。
  *
  * 落点依据：宿主目录的唯一生成链路是 `modelCatalog` 远程 → `buildModelCatalog` → 逐 provider
  * `ctx.llm.listModels` + `ctx.llm.resolveModelInfo`——档位显示名只在 `resolveModelInfo` 的返回里
@@ -20,7 +21,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 // ctx.settings 服务面声明合并（type-only；settings 是宿主基础服务，装载即在）
 import type {} from '@deepseek-ai/dsh-settings'
-import { EFFORT_NAMES_ZH } from '@/shared/constants'
+import { EFFORT_NAMES_ZH, EFFORT_NAME_SEP } from '@/shared/constants'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
 import { getConfig } from '@/config'
@@ -35,20 +36,26 @@ const ZH_LOCALE_IDS: readonly string[] = ['zh']
 /** RPC 上报的最近一次浏览器探测语言；`undefined` 表示浏览器侧尚未上报过 */
 let reportedLocale: string | undefined
 
+/** 按档位 id 查表的键形式（宿主显示名口径：id 首字母大写） */
+function zhKeyOf(id: string): string { return id.charAt(0).toUpperCase() + id.slice(1) }
+
 /**
  * 按档位 id 换掉 `efforts[].name`：命中换名产出新数组，一档未命中则原样返回入参（不造新对象）。
  * @param info - `resolveModelInfo` 的返回
+ * @param showOriginal - 为 true 时中文名后追加 `原档位名`（`最大 · Max` 格式）
  * @returns 换名后的信息（其余字段与入参同一引用）
  */
-export function localizeEffortNames(info: LlmResolvedModelInfo): LlmResolvedModelInfo {
+export function localizeEffortNames(info: LlmResolvedModelInfo, showOriginal = false): LlmResolvedModelInfo {
     const reasoning = info.reasoning
     if (reasoning === undefined) return info
     let renamed = false
     const efforts = reasoning.efforts.map((effort) => {
-        const name = EFFORT_NAMES_ZH[effort.id.charAt(0).toUpperCase() + effort.id.slice(1) as keyof typeof EFFORT_NAMES_ZH]
-        if (name === undefined || name === effort.name) return effort
+        const zh = EFFORT_NAMES_ZH[zhKeyOf(effort.id)]
+        if (zh === undefined) return effort
+        const localized = showOriginal ? `${zh}${EFFORT_NAME_SEP}${effort.name}` : zh
+        if (localized === effort.name) return effort
         renamed = true
-        return { ...effort, name }
+        return { ...effort, name: localized }
     })
     if (!renamed) return info
     return { ...info, reasoning: { ...reasoning, efforts } }
@@ -82,7 +89,7 @@ export function installEffortNameLocale(ctx: Context): void {
     const wrapped = async (provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> => {
         const info = await original.call(llm, provider, model, signal)
         if (ctx.fiber.store && getConfig().userExperience.localizeEfforts && isZh(localeNow(ctx))) {
-            return localizeEffortNames(info)
+            return localizeEffortNames(info, getConfig().userExperience.showOriginalEfforts)
         }
         return info
     }
@@ -95,4 +102,3 @@ export function reportLocale(locale: unknown): void {
     // 语言包插件开放 id 形态（BCP 47），非 zh 系原样记录：换名判定只关心是不是中文
     reportedLocale = locale
 }
-

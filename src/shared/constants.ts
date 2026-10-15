@@ -49,6 +49,13 @@ export const EFFORT_NAMES_ZH: Readonly<Record<string, string>> = {
     Default: '默认',
 }
 
+/**
+ * 「中文名 · 原档位名」的分隔符（用 `·`，U+00B7 中点，与宿主分隔符口径一致）。
+ * 浏览器半的 Default 伪菜单项（`src/client/locale-patch.ts`）与 Node 半的档位换名
+ * （`src/effort-name.ts`）两处拼装同一形态，故放共享层防走样。
+ */
+export const EFFORT_NAME_SEP = ' · '
+
 /** 当前代码支持的配置版本（新 NS 内的快照版本）；配置 schema 变化时递增，并在 upgrade.ts 中追加升级步骤 */
 export const CONFIG_VERSION = 8
 
