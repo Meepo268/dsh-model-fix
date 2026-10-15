@@ -48,10 +48,16 @@ export interface IndexEntry {
     image?: boolean
 }
 
-/** 按 provider 分组的内存索引，供 lookup 复用 */
+/**
+ * 按 provider 分组的内存索引，供 lookup 复用。
+ *
+ * `ids` 存的是经 `normalizeId` 归一后的**匹配键**（目录 id 保留原始大小写与命名空间前缀，
+ * 如 `tencent/Hy3`；三级匹配一律在归一空间进行，故键须先归一），供三级匹配逐位扫描。
+ * `byId` 是归一键到条目的直查表，匹配命中后由它反查条目本体；同组内归一后重复时保留首个。
+ */
 export interface ProviderGroup {
     ids: string[]
-    entries: IndexEntry[]
+    byId: Map<string, IndexEntry>
 }
 
 /** 目录及其预构建的 provider 分组索引 */

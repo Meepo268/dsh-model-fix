@@ -1,22 +1,27 @@
 // lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、提供方提示与推理级别转换
-import { lookup, toReasoningEfforts } from '@/lookup'
+import { lookup, normalizeId, toReasoningEfforts } from '@/lookup'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { check, stable } from '@test/helper'
 
-/** 构造目录条目 */
-function entry(id: string, efforts: string[] = []): IndexEntry {
-    return { id, efforts }
+/** 构造目录条目（第三参补容量等其余字段） */
+function entry(id: string, efforts: string[] = [], extra: Partial<IndexEntry> = {}): IndexEntry {
+    return { id, efforts, ...extra }
 }
 
-/** 构造分组索引 */
-function catalog(groups: Record<string, string[]>): IndexedCatalog {
+/** 构造分组索引（匹配键按 lookup 的归一规则建，与 catalog.ts 建索引同口径） */
+function indexed(groups: Record<string, IndexEntry[]>): IndexedCatalog {
     return {
         catalog: {},
-        groups: new Map(Object.entries(groups).map(([provider, ids]) => [provider, {
-            ids,
-            entries: ids.map((id) => entry(id)),
+        groups: new Map(Object.entries(groups).map(([provider, entries]) => [provider, {
+            ids: entries.map((item) => normalizeId(item.id)),
+            byId: new Map(entries.map((item) => [normalizeId(item.id), item])),
         }])),
     }
+}
+
+/** 以模型 id 列表构造分组索引 */
+function catalog(groups: Record<string, string[]>): IndexedCatalog {
+    return indexed(Object.fromEntries(Object.entries(groups).map(([provider, ids]) => [provider, ids.map((id) => entry(id))])))
 }
 
 /** 执行本文件的全部用例 */
@@ -30,6 +35,25 @@ export function run(): void {
     // ---------- provider+id 失败时全局匹配 ----------
     check('provider 不在目录 -> 全局唯一命中', lookup(catalog({ deepseek: ['deepseek-chat'] }), 'custom-router', 'deepseek-chat')?.id === 'deepseek-chat')
     check('provider 命中但模型不在 -> 全局唯一命中', lookup(catalog({ deepseek: ['deepseek-reasoner'], anthropic: ['claude-sonnet-4'] }), 'deepseek', 'claude-sonnet-4')?.id === 'claude-sonnet-4')
+
+    // ---------- 目录 id 自带命名空间前缀（目录中过半 id 如此）：完整 id 必须先在组内命中 ----------
+    check('目录 id 带前缀 -> 完整 id 组内命中', lookup(catalog({ deepinfra: ['tencent/Hy3'] }), 'deepinfra', 'tencent/Hy3')?.id === 'tencent/Hy3')
+    check('目录 id 带前缀 -> 匹配大小写无关', lookup(catalog({ deepinfra: ['tencent/Hy3'] }), 'deepinfra', 'TENCENT/hy3')?.id === 'tencent/Hy3')
+    check('本地带前缀而目录不带 -> 仍退回裸名命中', lookup(catalog({ zai: ['glm-5'] }), 'zai', 'z-ai/glm-5')?.id === 'glm-5')
+    // 末段唯一匹配：provider 严格匹配即已定域，裸名等于目录 id 末段且唯一时收下
+    check('provider 严格匹配 + 裸名等于唯一末段 -> 命中', lookup(catalog({ deepinfra: ['tencent/Hy3'] }), 'deepinfra', 'Hy3')?.id === 'tencent/Hy3')
+    check('末段匹配大小写无关', lookup(catalog({ deepinfra: ['tencent/Hy3'] }), 'deepinfra', 'hy3')?.id === 'tencent/Hy3')
+    check('末段多个不同条目 -> 判歧义无匹配', lookup(catalog({ deepinfra: ['a/Hy3', 'b/Hy3'] }), 'deepinfra', 'Hy3') === undefined)
+    check('provider 不在目录时不启用末段匹配 -> 全局兜底多命中仍无匹配', lookup(catalog({ deepinfra: ['tencent/Hy3'], other: ['tencent/Hy3'] }), 'custom-router', 'Hy3') === undefined)
+    check('末段匹配不跨提供方错配（他组同末段条目不得入选）', lookup(catalog({ deepinfra: ['tencent/Hy3'], 'tencent-tokenhub': ['hy3'] }), 'deepinfra', 'Hy3')?.id === 'tencent/Hy3')
+
+    // ---------- 跨提供方不错配：同名条目在多家网关重复，兜底须过唯一性门槛 ----------
+    check('兜底多命中 -> 判歧义无匹配', lookup(catalog({ a: ['Hy3'], b: ['Hy3'] }), 'custom-router', 'Hy3') === undefined)
+    check('兜底唯一命中 -> 放行', lookup(catalog({ a: ['Hy3'] }), 'custom-router', 'Hy3')?.id === 'Hy3')
+    check('带前缀 id 命中本组参数而非他组同名条目', lookup(
+        indexed({ 'tencent-tokenhub': [entry('hy3', [], { contextWindow: 256000 })], deepinfra: [entry('tencent/Hy3', [], { contextWindow: 262144 })] }),
+        'deepinfra', 'tencent/Hy3',
+    )?.contextWindow === 262144)
 
     // ---------- 官方提供方提示：模型名前缀优先在 hinted 提供方内匹配 ----------
     check(

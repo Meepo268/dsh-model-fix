@@ -7,7 +7,7 @@
   */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { IndexedCatalog } from '@/types'
+import type { IndexedCatalog, IndexEntry } from '@/types'
 import type { PluginConfig } from '@/shared/types'
 import { fix, planFill } from '@/fix'
 import { setConfigSource } from '@/config'
@@ -20,19 +20,19 @@ import { makeStubCtx, resetModules, type StubCtx } from '@test/ctx'
 /** 插件命名空间里当前版本快照的键（fix 的落盘口随版本变，故不写字面量） */
 const KEY = versionKey(CONFIG_VERSION)
 
-/** 合成目录索引：model-a 四字段齐全，model-b 无图片，model-c 无可用数据（efforts 空、无容量、无模态） */
+/** 目录条目：model-a 四字段齐全，model-b 无图片，model-c 无可用数据（efforts 空、无容量、无模态） */
+const ENTRIES: IndexEntry[] = [
+    { id: 'model-a', efforts: ['none', 'low', 'high'], contextWindow: 128000, maxTokens: 8192, image: true },
+    { id: 'model-b', efforts: ['none', 'medium'], contextWindow: 32000, maxTokens: 4096 },
+    { id: 'model-c', efforts: [] },
+]
+
+/** 合成目录索引 */
 const CAT: IndexedCatalog = {
     catalog: {},
     groups: new Map([[
         'testprovider',
-        {
-            ids: ['model-a', 'model-b', 'model-c'],
-            entries: [
-                { id: 'model-a', efforts: ['none', 'low', 'high'], contextWindow: 128000, maxTokens: 8192, image: true },
-                { id: 'model-b', efforts: ['none', 'medium'], contextWindow: 32000, maxTokens: 4096 },
-                { id: 'model-c', efforts: [] },
-            ],
-        },
+        { ids: ENTRIES.map((item) => item.id), byId: new Map(ENTRIES.map((item) => [item.id, item])) },
     ]]),
 }
 

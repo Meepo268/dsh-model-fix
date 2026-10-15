@@ -5,6 +5,7 @@ import { PLUGIN_NAME } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import type { CacheRecord, Catalog, IndexedCatalog, ModelEntry, ProviderGroup, IndexEntry } from '@/types'
 import { isCapacity } from '@/types'
+import { normalizeId } from '@/lookup'
 import { isPlainObject } from '@/shared/types'
 
 /** 目录尚未可用时的空兜底 */
@@ -97,17 +98,22 @@ export function buildCatalog(api: Record<string, unknown> | undefined): Catalog 
 function indexFromCatalog(catalog: Catalog): IndexedCatalog {
     const groups = new Map<string, ProviderGroup>()
     for (const [provider, models] of Object.entries(catalog)) {
-        const entries: IndexEntry[] = []
+        const ids: string[] = []
+        const byId = new Map<string, IndexEntry>()
         for (const [id, record] of Object.entries(models)) {
             if (!isCacheRecord(record)) continue
             const entry: IndexEntry = { id, efforts: record.efforts.slice() }
             if (record.contextWindow !== undefined) entry.contextWindow = record.contextWindow
             if (record.maxTokens !== undefined) entry.maxTokens = record.maxTokens
             if (record.image) entry.image = true
-            entries.push(entry)
+            // 匹配键必须归一：目录 id 保留原始大小写（`tencent/Hy3`），而三级匹配只在小写空间进行，
+            // 不归一则这类 id 连精确匹配都过不去（口径见 docs/decisions.md「参数来源」）
+            const key = normalizeId(id)
+            ids.push(key)
+            if (!byId.has(key)) byId.set(key, entry)
         }
-        if (entries.length === 0) continue
-        groups.set(provider, { ids: entries.map((entry) => entry.id), entries })
+        if (ids.length === 0) continue
+        groups.set(provider, { ids, byId })
     }
     return { catalog, groups }
 }
