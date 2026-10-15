@@ -19,6 +19,8 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 // SlotMap 的 'plugins.bundle.config' / 'plugins.row.config' 键声明合并（宿主 ui-plugin-manager 类型面）
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+// SlotMap 的 'conversation.input.left' 键声明合并（输入框工具行 list 席位，无 owner props）
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Card } from '@/client/card'
 import { en } from '@/client/locale-en'
 import { CARD_NS } from '@/client/locale-keys'
@@ -31,6 +33,12 @@ import { API_NS as PI_AI_NS, PLUGIN_NAME, PLUGIN_NS as MODEL_FIX_NS } from '@/sh
 import { decodeSection } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { makeScope, type DecodedScope } from '@/client/scope'
+import {
+    ComposerChips,
+    decodeHostModelSelection,
+    HOST_MODEL_SELECTION_NS,
+    type HostModelSelectionView,
+} from '@/client/composer'
 
 /** 提供方 scope 的解码占位值：本卡只消费 snapshot.user（原始用户层），value 无用途；decode 必须永不返回 undefined */
 const PROVIDERS_VIEW: readonly unknown[] = []
@@ -47,6 +55,7 @@ export function apply(ctx: ClientContext): void {
         boot(ctx,
             makeScope(configForms.get(MODEL_FIX_NS), decodeSection),
             makeScope(configForms.get(PI_AI_NS), () => PROVIDERS_VIEW),
+            makeScope(configForms.get(HOST_MODEL_SELECTION_NS), decodeHostModelSelection),
             rpc,
         )
     })
@@ -58,18 +67,20 @@ export function apply(ctx: ClientContext): void {
  *   声明过 inject，子 fiber 只声明了标记服务；子 ctx 只用于构造 scope 与获取 rpc）
  * @param scope - 本插件命名空间的 decode 后段视图（卡片与记忆监听消费）
  * @param providersScope - llm-pi-ai 命名空间的 decode 后段视图（只消费 user 层的提供方 id）
+ * @param hostModelScope - 宿主 subagent-model-selection-settings 的 decode 后视图（输入框「跟随」状态灯消费）
  * @param rpc - 宿主 connection 的 client RPC 面（由子 fiber 取出后传入，避免 ctx.get）
  */
 function boot(
     ctx: ClientContext,
     scope: DecodedScope<Flags>,
     providersScope: DecodedScope<readonly unknown[]>,
+    hostModelScope: DecodedScope<HostModelSelectionView>,
     rpc: ClientConnectionRpc,
 ): void {
     // 词典注册返回 disposer；经 effect 挂载，卸载/HMR 时自动撤销
     ctx.effect(() => ctx.locale.register(CARD_NS, { zh, en }), `${name}: card dictionaries`)
     // scope 的 form 订阅释放挂入本 fiber
-    ctx.effect(() => () => { scope.dispose(); providersScope.dispose() }, `${name}: scope disposal`)
+    ctx.effect(() => () => { scope.dispose(); providersScope.dispose(); hostModelScope.dispose() }, `${name}: scope disposal`)
     // 浏览器半调 Node 半的全部出口（四个写回端点 + 两条诊断链的读流）见 rpc-carrier.ts
     const { forceUpdate, resetModels, restoreModels, verifyModels, pruneEfforts, probeEfforts } =
         makeRpcCarrier(rpc)
@@ -119,6 +130,14 @@ function boot(
         label: () => t('tabLabel'),
         locale: CARD_NS,
     }, (props) => <Card {...props} defaultOpen {...cardProps} />))
+    // 输入框工具行（conversation.input.left，list 席位，与 plan/permission 同排）：两枚 chip 的组合入口
+    // 「模型优化」常驻弱化态，点开 Modal 弹完整配置卡；「跟随」状态灯常驻、按实际生效在亮绿/灰间切换、点击 toggle
+    ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
+        name: 'conversation.input.left',
+        id: `${MODEL_FIX_NS}-composer`,
+        order: 5,
+        locale: CARD_NS,
+    }, (props) => <ComposerChips {...props} scope={scope} hostModelScope={hostModelScope} cardProps={cardProps} providersScope={providersScope} />))
 
     // 每模型推理级别记忆的运行时监听（订阅会话投影、自动设级别）见 memory-listener.ts
     applyEffortMemoryListener(ctx, scope)

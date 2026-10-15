@@ -8,6 +8,7 @@ import {
     addExclude,
     applyGroup,
     decodeSection,
+    followingActive,
     groupAllPicked,
     groupValue,
     isDirty,
@@ -411,4 +412,18 @@ export function run(): void {
         probeTargetsOf(pick([], false, true)).map((t) => t.efforts),
     )
     check('probeTargetsOf 空候选得空', probeTargetsOf([]).length === 0)
+    // followingActive：跟随实际生效的判据（插件开关 && 宿主设置未显式开启）
+    // 默认配置 followParent=false → 任何 hostEnabled 下都不生效
+    check('followingActive 默认配置（followParent=false）：宿主未开启 → 不生效', !followingActive(DEFAULT_FLAGS, false))
+    check('followingActive 默认配置：宿主已开启 → 不生效', !followingActive(DEFAULT_FLAGS, true))
+    check('followingActive 默认配置：宿主段缺席（undefined）→ 不生效', !followingActive(DEFAULT_FLAGS, undefined))
+    // followParent=true
+    const followOn: Flags = { ...ALL_ON, userExperience: { ...ALL_ON.userExperience, followParent: true } }
+    check('followingActive followParent=true：宿主未开启 → 生效', followingActive(followOn, false))
+    check('followingActive followParent=true：宿主段缺席 → 生效（缺席≠显式开启）', followingActive(followOn, undefined))
+    check('followingActive followParent=true：宿主已开启 → 不生效（宿主优先覆盖）', !followingActive(followOn, true))
+    // followParent=false
+    const followOff: Flags = { ...ALL_ON, userExperience: { ...ALL_ON.userExperience, followParent: false } }
+    check('followingActive followParent=false：宿主未开启 → 不生效', !followingActive(followOff, false))
+    check('followingActive followParent=false：宿主已开启 → 不生效', !followingActive(followOff, true))
 }

@@ -178,6 +178,14 @@ export type CardKey =
     | 'star'
     | 'feedback'
     | 'issueBody'
+    // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
+    | 'chipModelOpt'
+    | 'chipModelOptTitle'
+    | 'chipFollowOn'
+    | 'chipFollowOnTitle'
+    | 'chipFollowOff'
+    | 'chipFollowOffTitle'
+    | 'chipFollowFail'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {

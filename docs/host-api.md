@@ -135,7 +135,7 @@
 - **带 inject 的 register 重载**：`DSH/packages/client/ui-slots/src/index.ts`，`BaseOptions` 为 `{ name: K; children?: D; store?: H; locale?: N; registrant?: string }`。inject 工厂参数 `InjectParams<K, H>`：严格 session 席位给 `sessionId: SessionIdOf`，session-maybe 席位给 `sessionId | undefined`，声明 store 时追加 `actions`。**没有 binding 对象参数。**
 - **props 合成**：同一文件的 `ComposedProps<…> = PropsRuntime & PropsRenderSlots & PropsRenderFactories & PropsStore<H> & InjectFace<I> & MatchedShare<SlotMap[K], M> & PropsLocale<N>`。要点：`InjectFace<I>` 里的 `hooks` 会被渲染器绑成 `use<Name>` 选择器 hook（组件看不到裸 observable），其余成员逐字透传；`PropsStore<H>`（`DSH/packages/client/store/src/contract.ts`）= `{ useStore; actions }`；**只有 `register({ locale: NS })` 声明了命名空间，props 上才出现 `t`**（`PropsLocale<N>`）。
 - **条目字段权威定义**：`DSH/packages/client/ui-slots/src/index.ts` 里 `KindOptions` —— list `{ id: string; order?: number; label?: SlotLabel; priority?: number }`、keyed `{ key: EntryKey; priority?: number }`、chain `{ select; priority?: number }`；`SlotLabel = string | (() => string)`；`resolveSlotLabel(label)`（每次渲染/排序时求值）。
-- 本插件四席的宿主契约（slot key → 定义处 → kind → 条目字段）：
+- 本插件五席的宿主契约（slot key → 定义处 → kind → 条目字段）：
 
 | slot key | SlotMap 定义 | kind | 条目字段 |
 | --- | --- | --- | --- |
@@ -143,6 +143,7 @@
 | `plugins.bundle.config` | `DSH/packages/client/ui-plugin-manager/src/client/slot-contract.ts`，owner props `PluginConfigViewProps{ view: 'summary' \| 'page'; form?: ConfigPageForm }`，`ConfigPageForm{ state: ConfigFormSnapshot<Record<string, unknown>>; mutate: ConfigForm<…>['mutate'] }` | keyed | `key`（必填，包名）/ `priority?` |
 | `plugins.row.config` | 同上文件（JSDoc：`keyed by \`<package name>#<row id>\` with the row id as the bundle's patch declares it`） | keyed | 同上 |
 | `settings.plugins.tab` | `DSH/packages/client/ui-settings/src/client/contract/slots.ts`，owner props `SettingsPluginsTabOwnerProps{ children?: never }` | list | `id` / `order?` / `label?` / `priority?` |
+| `conversation.input.left` | `DSH/packages/client/ui-conversation/src/client/contract/slots.ts:229-267`，**无 owner props**（本插件唯一的 list/session/no-owner 席位），渲染点在该包的 `src/client/skeleton/InputBar.tsx:463-469`（工具行 `.modes` 之后、与 plan/permission 同排） | list | `id` / `order?` / `label?` / `priority?` |
 
 - **keyed 拼接规则**：`DSH/packages/client/ui-plugin-manager/src/client/config-ledger.ts` 里 `rowConfigKey(bundle, rowId) { return \`${bundle}#${rowId}\` }` ⇒ 本仓 `${PLUGIN_NAME}#${PLUGIN_NS}` 逐字成立。
 
@@ -250,6 +251,7 @@
 | `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts` |
 | `@deepseek-ai/dsh-client-ui-settings-models/client` | 合并（slot key `settings.models.footer`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-ui-plugin-manager/client` | 合并（slot key `plugins.bundle.config` / `plugins.row.config`） | 合并 | `src/client/index.tsx` |
+| `@deepseek-ai/dsh-client-ui-conversation/client` | 合并（slot key `conversation.input.left`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-llm` | `LlmCallConfig` / `LlmCallConfigAdapterDefaults` / `ReasoningEffortId`（**必须包根**：`/types` 子路径不含 `LlmCallConfig`） | type-only | `src/subagent.ts` |
 
 - **浏览器半的运行期宿主依赖只有 `react`、`react/jsx-runtime` 与 `@deepseek-ai/dsh-client-ui-primitives`**：其余全是 type-only 或合并导入，擦除后不留痕。`ui-primitives` 属平台模块（宿主冻结模块表提供），故卡片用的是**宿主运行期对象**而非打包副本——这是有意选择（符号漂移由 typecheck 在构建期拦下），风险是宿主改名后运行期拿到 `undefined`，React #130 打空该 slot 条目；缓释手段是 devDep 类型面 + 升宿主时复核全部宿主值导入的符号面。
@@ -265,13 +267,13 @@
 
 - **settings 命名空间**：`PLUGIN_NS = 'tikaflow-model-fix'`（= `cordis.patch.yml` 的 `id`，浏览器半 `configForms.get(ns)` 与 Node 半写回 NS 同一字面量）、`API_NS = 'llm-pi-ai'`（宿主自带段，本插件只读 user 层并在同段写 `providers.<id>.models` 与路由 `compat`）。
 - **路由 compat 字段名**（`src/constants.ts`）：`DEVELOPER_COMPAT_FIELD = 'supportsDeveloperRole'`、`STORE_COMPAT_FIELD = 'supportsStore'`，宿主侧声明在 `PiAiCompatProfile`（`DSH/packages/llm/llm-pi-ai/src/catalog.ts`），两字段在该文件的 `COMPLETIONS_COMPAT_GATE` 都标 `offer`（只在 `openai-completions` 消费）。pi-ai（宿主 devDep `@earendil-works/pi-ai`，`dist/api/openai-completions.js`）构造请求时 `compat.supportsStore` 为真即 `params.store = false`；未标注端点的检测值为 `supportsStore: !isNonStandard`、`supportsDeveloperRole: isOpenRouterDeveloperRoleModel || (!isNonStandard && !isOpenRouter)`；compat 与检测值按 `model.compat.<字段> ?? detected.<字段>` 合并。⇒ 本插件写 `false` 的效果是**请求体不带 `store` 键**（不是把 `store` 改成别的取值），宿主对未标注端点默认按「支持」推断，故两条 compat 规则都是把宿主的乐观默认翻成保守。字段名、检测取向或合并口径变化时本仓须同步。
-- **子智能体相关的宿主字面量**：cordis 服务名 `subagentModelSelection`（宿主「允许 Agent 为子智能体选择模型」设置服务）、`agents`（Agent 注册表）、`sessionProjections`（宿主会话投影服务）——三者经 `src/subagent.ts` 的 `ctx.inject` 子 fiber 注入，**全就绪才注册 `agent/request` 监听，任一缺席则 PENDING 静默（该功能整体不启用）**；投影键名 `'modelSelection'`、`SessionHeader.origin = 'subagent'`。同一设置在浏览器半的对应 settings 命名空间（`subagent-model-selection-settings`）**本仓不读**：卡片不判该开关的生效条件（见 `docs/decisions.md`），故该命名空间不是本仓的依赖面。
+- **子智能体相关的宿主字面量**：cordis 服务名 `subagentModelSelection`（宿主「允许 Agent 为子智能体选择模型」设置服务）、`agents`（Agent 注册表）、`sessionProjections`（宿主会话投影服务）——三者经 `src/subagent.ts` 的 `ctx.inject` 子 fiber 注入，**全就绪才注册 `agent/request` 监听，任一缺席则 PENDING 静默（该功能整体不启用）**；投影键名 `'modelSelection'`、`SessionHeader.origin = 'subagent'`。同一设置在浏览器半的对应 settings 命名空间 `subagent-model-selection-settings`，**本仓现在读它**（`src/client/composer.tsx` 的 `decodeHostModelSelection` 只取 `enabled` 一个布尔值，用来判定「跟随」状态灯的生效态；段读不到即视为未开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致）。宿主该段的完整 schema 是 `{ enabled: z.boolean().default(false).volatile(), allowedModels: z.array(...).default([]).volatile() }`，但我们不调 `current()`、不复刻它的「enabled + 空授权表抛错」逻辑（浏览器半只读 enabled，简化判定）。
 - **档位自调相关的宿主字面量**：cordis 服务名 `tools` / `systemPrompt` / `sessionController`（与上条 `sessionProjections` 共四者，**任一缺席 ⇒ 子 fiber PENDING 静默——功能不激活，主功能不受影响，服务注册后自动激活**）；注册的工具名 `query_reasoning_efforts` / `set_reasoning_effort`（同名重复注册抛错，故装载幂等——已加载时自有段变更跳过，只在开关真正翻转时装/卸）；系统提示词段名 `model-fix:effort-tuning` 与 `order: 3200`（宿主 order 序列 MCP 3100 / SDK 工具 5000，落位其间，见「档位自调」小节）。
 - **RPC channel 与流路由**：`channel = '/tikaflow-model-fix'`、`VERIFY_STREAM_ROUTE = '/api/tikaflow-model-fix/verify'`、`PROBE_STREAM_ROUTE = '/api/tikaflow-model-fix/probe'`（两条都是 `connection.fetch` 的 exact 路由，须落在 `/api` 之下）、`VERIFY_STREAM_URL` / `PROBE_STREAM_URL = 对应 ROUTE.slice(1)`（浏览器 `fetch` 用文档相对路径）。两条流共用 `src/rpc.ts` 的 `progressStreamFetch`（同形状，只差执行器与措辞）；探测那条入口先查事件流守卫（它一轮之内要写两次配置），已开即回 409 + 中文文案。
 - **RPC endpoint 名**：`forceUpdate` / `resetModels` / `restoreModels` / `pruneEfforts`；结果信封 `{ ok: true, value: { changed } }` 或 `{ ok: true, value: { pruned } }`。
 - **本插件错误码**（`ConnectionRpcResult` 的 `error.code`）：`model-fix/write-in-progress`、`model-fix/force-update-failed`、`model-fix/reset-models-failed`、`model-fix/restore-models-failed`、`model-fix/prune-efforts-invalid`、`model-fix/prune-efforts-failed`、`model-fix/unknown-endpoint`。
 - **宿主错误码**：settings 冲突 `SETTINGS_CONFLICT`；信封层 `gateway/bad-request`；宿主自复刻的非法 rpcId 哨兵 `invalid-request`（`INVALID_RPC_ID`，非宿主常量）。
-- **slot 席位名**：`settings.models.footer`、`plugins.bundle.config`、`plugins.row.config`、`settings.plugins.tab`（四个 key 靠上述两个「合并」导入才拿到类型；`plugins.row.config` 的 `key` 拼接规则为 `${包名}#${patch 条目 id}`）。
+- **slot 席位名**：`settings.models.footer`、`plugins.bundle.config`、`plugins.row.config`、`settings.plugins.tab`、`conversation.input.left`（五个 key 靠上述「合并」导入拿到类型；`plugins.row.config` 的 `key` 拼接规则为 `${包名}#${patch 条目 id}`；`conversation.input.left` 是唯一无 owner props 的 list 席位）。
 - **locale 命名空间**：`CARD_NS = 'settings.modelFix'`，注册 slot 时以 `locale: CARD_NS` 声明换取类型化 `t`。
 - **LLM 失败码**（按 `failure.code` 判，全程不看 `status`、不比对文案）：`UNSUPPORTED_REASONING_EFFORT`、`QUOTA`、`ACCOUNT_QUOTA`、`INVALID_CREDENTIAL`、`MISSING_CREDENTIAL`、`TRANSPORT`、`STREAM_CLOSED`、`RATE_LIMIT`、`TIMEOUT`、`INVALID_REQUEST`。
 - **构建期注入标识**：`__PLUGIN_VERSION__`（`tsdown.config.ts` 的 define 内联 `package.json` version，`card.tsx` 声明为 `string`）。
@@ -279,7 +281,7 @@
 
 ## 装载与 HMR 契约
 
-- `package.json` 的 `dsh.client.inject` 只影响模块物化顺序、不影响 cordis 激活顺序（语义与到达序遍历见上文「模块装载」节）：本仓列槽位所有者包以保证先物化，cordis 服务名只写 `src/client/index.tsx` 的 `export const inject`。
+- `package.json` 的 `dsh.client.inject` 只影响模块物化顺序、不影响 cordis 激活顺序（语义与到达序遍历见上文「模块装载」节）：本仓列槽位所有者包（`ui-renderer` / `ui-settings-plugins` / `ui-settings-models` / `ui-plugin-manager` / `ui-conversation`）以保证先物化，cordis 服务名只写 `src/client/index.tsx` 的 `export const inject`。
 - client 模块须 `export const name`（宿主不强制等于包名，只影响显示名）与 `export const apply`，复刻 `window.__ModuleLoader__.load` 闭包工厂契约（`tsdown.config.ts` 的 `outputOptions` banner/intro/footer 逐字取自宿主 `tsdown.client.ts`）。**禁用 default export**——宿主 `unwrapExports` 走 `exports.default ?? exports`，default 会吃掉 `inject`/`Config`。声明 `dsh.client` 后缺 `lib/client.js` 会让宿主激活期聚合抛错，故 **build 必须先于安装**。
 - Node 半 `export const inject = ['settings','llm','credentials']`（三者都是基础配置无条件挂载的服务，见「credentials」节的依据）；`configForms` 只作子 fiber 标记（**不进父级 inject**），共享编排体一律走父 ctx。`connection` / `webServer` 在 `src/rpc.ts` 的子 fiber 内声明；`hmr` / `agents` / `sessionProjections` / `subagentModelSelection` 各自在 `src/index.ts` / `src/subagent.ts` 的子 fiber 内声明。
 - **宿主 `ObservableSnapshot.subscribe` 一律不推首值**（`DSH/packages/client/store/src/index.ts` 的 `createSnapshotStore` 无 `fireImmediately`）⇒ 本仓所有订阅都要手动补跑一次（同「sessions / modelDirectories」节末条）。
@@ -313,7 +315,7 @@
 - 逐字段比对 `TerminalBlockLabels`（0.2.1-alpha.2 起新增必填 `commandLine`）：本仓 devDep 停在 0.1.7-rc.2，宿主新增**必填**字段时编译期不会报错、只在点「验证」/「探测」首次渲染记录区时崩（`TerminalBlock` 在 `commandLines.map` 内无条件调用该字段，未提供则整卡被 error boundary 收走）。比对宿主 `DSH/packages/client/ui-primitives/lib/types/TerminalBlock.d.ts` 的字段全集与 `src/client/card.tsx` 的 `terminalLabelsOf` 返回值，缺口补字段 + 词典键 + zh/en 文案三处（词典照官方安装页措辞取词）。**已核过 `0.1.7-rc.2` 与 `0.2.1-alpha.3` 两版**：alpha.3 的字段全集恰好等于 rc.2 的 13 个字段加上 `commandLine`（`signal` / `exitCode` / `noExitCode` / `running` / `failed` / `done` / `copy` / `copied` / `noOutput` / `collapseAria` / `collapse` / `expandAria` / `expand`），**无其它新增、无改名**，故本仓 `terminalLabelsOf` 无需补字段；唯一待收的是 `src/client/card.tsx:210` / `:234` 两处 `useMemo<TerminalBlockLabels>` 标注与实参（多带 `commandLine`）不一致，升 devDep 后须一并改成 `TerminalLabels`。
 - 逐条复核「宿主服务与运行时面」小节里的签名与行为假设，尤其是 settings 写入语义（纯对象根 / unset 不折叠 / 仅 volatile 可写）、命名空间登记时序（晚于 `apply`、无 ready）、连接断开语义（`request.signal` abort、fetch disposer 异步）。
 - 复核 `SETTINGS_CONFLICT` 与 LLM 失败码字面量是否仍是宿主的归一化取值（尤其 `DSH/packages/llm/llm-pi-ai/src/stream.ts` 里 `classifyPiAiError` 文案正则是否改了——它决定 `TRANSPORT` / `STREAM_CLOSED` 的归一化来源）。
-- 复核四个 slot key、`rowConfigKey` 拼接、`SlotLabel` thunk 与 `PropsLocale`（`t` 只在声明 `locale:` 时上 props）。
+- 复核五个 slot key、`rowConfigKey` 拼接、`SlotLabel` thunk 与 `PropsLocale`（`t` 只在声明 `locale:` 时上 props）。
 - 复核 `ctx.sessions.binding()` / `ctx.modelDirectories.directoryFor()` 的失败契约（一个返回 `undefined`、一个抛错），二者互换会让记忆链路的 try/catch 失准。
 - 复核 compat 两字段的宿主契约：`supportsStore` / `supportsDeveloperRole` 仍在 `openai-completions` 的 compat gate 里 offer、检测默认与 `??` 合并口径未变（决定本插件两条 compat 规则是否仍能把宿主的乐观默认翻成保守）。
 - 复核 `Config` 仍是 volatile 实时引用（`Volatile<T>` + `loader/volatile-update`），以及 `z.any()` 与 `z.object` 在 schemastery 与 settings `projectForm` 两层的投影差异。

@@ -55,6 +55,18 @@ export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
     return rowsOf(flags, group)[key] === true
 }
 
+/**
+ * 跟随**实际生效**的判据：插件开关开着（`userExperience.followParent`）且宿主「允许 Agent 为子智能体选择模型」
+ * 那段设置未开启。宿主那段开启时，子智能体自会按宿主授权表选模型，跟随父智能体的模型/档位反而直接推翻宿主的合法选择——
+ * 此时「跟随中」灯应呈灰态（未生效），即使插件开关仍为真。
+ *
+ * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到（CLI/TUI 组合、或宿主未装配那段）
+ * 记 `undefined`＝视为未开启（缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致）。
+ */
+export function followingActive(flags: Flags, hostEnabled: boolean | undefined): boolean {
+    return groupValue(flags, 'userExperience', 'followParent') && !hostEnabled
+}
+
 /** 组总控的当前显示值：组内全为开才显示开。判据取 every 而非 any——部分选中显示关，点击即整组补全为开；
  *  若取 any，部分选中会显示成开、点击反而把用户已勾的那几行抹掉。口径与验证弹层分组「全选」一致。
  *  （总开关本身无对应存储，只是个批量操作） */

@@ -186,4 +186,12 @@ export const en: Record<CardKey, string> = {
     star: 'Star',
     feedback: 'Feedback',
     issueBody: '--Describe the problem in one sentence--\n\n### What happened\n\n### Environment\n- Plugin version: {version}\n- DSH version: --e.g. 0.2.0--\n- OS: --e.g. Windows 11--\n\n### Steps to reproduce\n1. --What you did first--\n2. --What you did next--\n\n### Expected behavior',
+    // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
+    chipModelOpt: 'Model tuning',
+    chipModelOptTitle: 'Open the full dsh-model-fix plugin settings',
+    chipFollowOn: 'Following',
+    chipFollowOnTitle: 'Click to turn off: subagents will stop following the parent agent\'s model and reasoning level',
+    chipFollowOff: 'Follow',
+    chipFollowOffTitle: 'Click to turn on: subagents will follow the parent agent\'s model and reasoning level',
+    chipFollowFail: 'Save failed; the change did not take effect',
 }

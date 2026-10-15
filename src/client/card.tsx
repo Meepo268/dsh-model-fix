@@ -132,6 +132,8 @@ export interface CardProps extends RpcCarrier {
     providersScope: DecodedScope<readonly unknown[]>
     /** 初始折叠态：插件详情页（plugins.bundle.config）、组件实例详情页（plugins.row.config）与「内置插件」选项卡（settings.plugins.tab）默认展开；模型页 footer 席不传即默认收起（与官方插件卡一致）。同时决定保存成功后是否自动收起——只在默认收起的席位上生效 */
     defaultOpen?: boolean
+    /** 是否允许点 header 折叠整卡：四席皆可；输入框弹层传 false（面板尺寸固定、可滚动，折叠会让面板内容与指针下的尺寸脱钩） */
+    collapsible?: boolean
 }
 
 /** 内联状态行：文本 + 色调（成功＝官方 .savedNotice 绿，失败＝.error 红） */
@@ -174,8 +176,10 @@ export function Card(props: CardProps) {
     // 全部写操作（保存 / 强制更新 / 重置 / 恢复 / 清空记忆 / 验证 / 探测 / 剔除）共用单一互斥标志：
     // 一者 in-flight 时其余入口与按钮全禁
     const [busy, setBusy] = useState<'save' | 'force' | 'reset' | 'restore' | 'clear' | 'verify' | 'probe' | 'prune' | null>(null)
+    // 不可折叠席位（输入框弹层）恒展开：面板尺寸固定、内容可滚，折叠无从触发
+    const collapsible = props.collapsible !== false
     // 折叠态为卡片本地状态（读姿而非配置）：初始值取 defaultOpen（缺省收起、与官方插件卡一致）；草稿跨折叠存活
-    const [open, setOpen] = useState(props.defaultOpen ?? false)
+    const [open, setOpen] = useState(collapsible ? (props.defaultOpen ?? false) : true)
     // 保存后自动收起只对默认收起的席位有意义：默认展开的三席（插件详情页 / 组件实例详情页 / 内置插件选项卡）
     // 保存后保持展开，否则用户刚配完就被收起、还得再点一次才看得见结果
     const autoCollapse = props.defaultOpen !== true
@@ -894,23 +898,35 @@ export function Card(props: CardProps) {
         </>
     )
 
+    // 不可折叠席位（输入框弹层）用静态头渲染：保留名称/描述/未保存胶囊，不给按钮语义与 chevron
+    const head = (
+        <span className="dsh-mf-headText">
+            <span className="dsh-mf-name">{t('title')}</span>
+            <span className="dsh-mf-desc">{t('description')}</span>
+        </span>
+    )
+
     return (
         <div className={open ? 'dsh-mf-card dsh-mf-cardOpen' : 'dsh-mf-card'}>
-            <button
-                type="button"
-                className="dsh-mf-header"
-                aria-expanded={open}
-                aria-label={`${t(open ? 'collapse' : 'expand')}: ${t('title')}`}
-                onClick={() => { setOpen(!open) }}
-            >
-                <span className="dsh-mf-headText">
-                    <span className="dsh-mf-name">{t('title')}</span>
-                    <span className="dsh-mf-desc">{t('description')}</span>
-                </span>
-                {/* 胶囊挂在 header：收起态也要说明卡里存着未落盘的编辑 */}
-                {dirty ? <Tag tone="neutral">{t('unsaved')}</Tag> : null}
-                <CHEVRON_DOWN className={open ? 'dsh-mf-chevron dsh-mf-chevronOpen' : 'dsh-mf-chevron'} />
-            </button>
+            {collapsible ? (
+                <button
+                    type="button"
+                    className="dsh-mf-header"
+                    aria-expanded={open}
+                    aria-label={`${t(open ? 'collapse' : 'expand')}: ${t('title')}`}
+                    onClick={() => { setOpen(!open) }}
+                >
+                    {head}
+                    {/* 胶囊挂在 header：收起态也要说明卡里存着未落盘的编辑 */}
+                    {dirty ? <Tag tone="neutral">{t('unsaved')}</Tag> : null}
+                    <CHEVRON_DOWN className={open ? 'dsh-mf-chevron dsh-mf-chevronOpen' : 'dsh-mf-chevron'} />
+                </button>
+            ) : (
+                <div className="dsh-mf-header dsh-mf-headerStatic">
+                    {head}
+                    {dirty ? <Tag tone="neutral">{t('unsaved')}</Tag> : null}
+                </div>
+            )}
             {notices}
             {open ? <div className="dsh-mf-body">{body}</div> : null}
             {confirms}

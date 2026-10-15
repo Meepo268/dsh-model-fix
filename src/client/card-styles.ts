@@ -194,6 +194,41 @@ const STYLE_TEXT = [
     // 叠加在 .dsh-mf-discard 之上时靠 :not(:disabled) 的高特异性压过其默认描边/字色
     '.dsh-mf-warn:not(:disabled){border-color:var(--dsw-alias-state-warn-label,#dd8629);color:var(--dsw-alias-state-warn-label,#dd8629)}',
     '.dsh-mf-warn:hover:not(:disabled){background:color-mix(in srgb, var(--dsw-alias-state-warn-label,#dd8629) 10%, transparent)}',
+    // 输入框工具行 chip（conversation.input.left）：几何逐条复刻宿主 PlanModeControl `.chip`（对称 padding 0 8px、min-width 34px），
+    // 配色按两枚 chip 的三态语义分色：
+    // · 弱化态（模型优化恒用、跟随关闭态复用）：透明底 + label-secondary 字；hover 出 interactive-bg-hover
+    // · 生效态（跟随中）：success 绿底 + 字；补 6px 状态点（::before），与弱化态在形状上即可区分（灰态不画点）
+    // · 失败态（写入被拒）：warn 琥珀色，原生 title 提示原因
+    // 弹层面板：宽度与 flex 参与方式复刻宿主设置面板 SettingsRoot.module.css 的 `.panel`（左下角齿轮点开的那一个），
+    // 高度改按内容收敛：设置面板是 800×800 的固定大框，本卡片内容远不足 800px，固定高度会让面板上下留出
+    // 一大片容器自身区域（无内容即无滚动提示、点击落在容器上），故取 640px——够放下多数瓦片的常用视域，
+    // 超出即在包裹层内滚动。min() 保留窄视口下的收敛，calc 分支给顶栏留出与 .root padding 相同的上下空气。
+    // flex:none：Modal 的 .root 是 align-items:center 的 flex 容器，不加则本项按内容高度参与对齐、面板不居中。
+    // Modal 走 headless（卡片直接作 children，宿主的标题栏/关闭钮/content/body 一律不渲染），
+    // .dialog 自带的 padding:0 0 24px 与 gap:20px 在此清空（头尾留白与子项间距原为 chrome 而设）。
+    // 底色/圆角/阴影取 .panel 的令牌（--dsw-alias-bg-layer-2 与 .card 的 bg-layer-3 分层，容器本身可见，
+    // 点击命中容器即不再误落到遮罩）。
+    '.dsh-mf-composerDialog{flex:none;display:flex;flex-direction:column;width:800px;height:min(640px,calc(100vh - 2 * max(24px,var(--dsh-frame-overlay-top,24px))));max-width:calc(100vw - 48px);padding:0;gap:0;overflow:hidden;border-radius:var(--dsw-radius-panel);background:var(--dsw-alias-bg-layer-2);box-shadow:var(--dsw-elevation-prominent);--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2)}',
+    // headless 下 children 直挂 .dialog（flex 列且已封顶），滚动容器由本包裹层承担：
+    // 伸展到面板全高，故内容不足时容器自身即是滚动视口（内容居上，不塌成内容高）
+    '.dsh-mf-composerBody{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}',
+    // 面板内的卡片去掉自身描边与底色，透出面板的 --dsw-alias-bg-layer-2，
+    // 与设置面板的内容列同观感（那边 .nav/.content 亦无 own fill，面板底色透出）
+    '.dsh-mf-composerBody>.dsh-mf-card{border-color:transparent;background:transparent}',
+    '.dsh-mf-chips{display:inline-flex;align-items:center;gap:12px}',
+    '.dsh-mf-composerChip{display:inline-flex;align-items:center;gap:4px;min-width:34px;height:28px;padding:0 8px;border:none;border-radius:var(--dsw-radius-sm);font-size:13px;font-weight:500;line-height:20px;cursor:pointer}',
+    '.dsh-mf-composerChip:focus-visible{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline:none}',
+    '.dsh-mf-composerChip:disabled{cursor:default;opacity:.6}',
+    // 弱化态：透明底 + label-secondary 字；hover 出 interactive-bg-hover
+    '.dsh-mf-composerChip[data-state="muted"]{background:transparent;color:var(--dsw-alias-label-secondary,#61666b)}',
+    '.dsh-mf-composerChip[data-state="muted"]:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}',
+    // 生效态：success 绿底 + 字；状态点 6px；hover 用 color-mix 同 PlanChip 手法（宿主无 success 悬停底令牌）
+    '.dsh-mf-composerChip[data-state="on"]{background:var(--dsw-alias-state-success-tertiary,#d3f8d6);color:var(--dsw-alias-state-success-primary,#22c55e)}',
+    '.dsh-mf-composerChip[data-state="on"]:hover:not(:disabled){background:color-mix(in srgb, var(--dsw-alias-state-success-tertiary,#d3f8d6) 94%, var(--dsw-alias-state-success-primary,#22c55e) 6%)}',
+    // 失败态：warn 琥珀底 + 字（同 .dsh-mf-warn 令牌）；与生效态同样画状态点，靠色相区分而非形状
+    '.dsh-mf-composerChip[data-state="fail"]{background:var(--dsw-alias-state-warn-tertiary,#fff1d6);color:var(--dsw-alias-state-warn-label,#dd8629)}',
+    // 状态点（只在 on/fail 态画）：6px 圆点，background:currentColor，随 chip 色变化
+    '.dsh-mf-composerChip[data-state="on"]::before,.dsh-mf-composerChip[data-state="fail"]::before{content:"";display:block;flex:none;width:6px;height:6px;border-radius:50%;background:currentColor}',
 ].join('\n')
 
 /** 幂等注入样式：每次渲染校验 DOM 实况——宿主 HMR 会按 data-plugin 摘走旧节点，节点在则同步内容 */

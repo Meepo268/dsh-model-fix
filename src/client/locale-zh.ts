@@ -184,4 +184,12 @@ export const zh: Record<CardKey, string> = {
     star: '点个 star',
     feedback: '问题反馈',
     issueBody: '--用一句话描述你遇到的问题--\n\n### 问题现象\n\n### 环境\n- 插件版本：{version}\n- DSH 版本：--如 0.2.0--\n- 操作系统：--如 Windows 11--\n\n### 复现步骤\n1. --第一步做了什么--\n2. --第二步做了什么--\n\n### 期望行为',
+    // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
+    chipModelOpt: '模型优化',
+    chipModelOptTitle: '打开 dsh-model-fix 插件的完整配置',
+    chipFollowOn: '跟随中',
+    chipFollowOnTitle: '点击关闭：子智能体将不再跟随父智能体的模型与推理级别',
+    chipFollowOff: '跟随',
+    chipFollowOffTitle: '点击开启：子智能体将跟随父智能体的模型与推理级别',
+    chipFollowFail: '保存失败，操作未生效',
 }
