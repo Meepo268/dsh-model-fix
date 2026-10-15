@@ -113,6 +113,7 @@
 - **语言判定三路取值、逐级回退**：Node 侧没有 `locale` 服务、读不到浏览器自动探测，故 ① 宿主 settings 文档 `locale.preference`（用户显式选择，落盘持久，Node 经 `descriptorOf`/`sectionOf` 直读）；② 浏览器半启动时经 RPC 端点 `reportLocale` 上报探测语言（进程内易失，重启由浏览器重新上报）；③ 回退 `en` 不换名。注意 volatile 是配置 schema 的必写形式、与是否落盘无关——`preference` 就是持久字段。
 - **词表键取宿主口径的显示名形式，键集挂共享层档位表**：`EFFORT_NAMES_ZH` 的键不是原始 id，而是宿主适配器算显示名用的那个表达式（`id` 首字母大写）——查表键与用户在界面上看到的英文逐字对得上，词典可直接对照 UI 校对；键集由共享层的 `EFFORT_LEVELS`（跨半共享，与 harness 的 ModelThinkingLevel 一致）约束，`test/effort-name.test.ts` 断言键集逐项相等且各值非空。**id 非全小写的档位（如 `HIGH`）不换名**：宿主对它的显示名是 `HIGH` 而非 `High`，不落七键，原样透传交给其作者命名——按宿主公式查表，不做大小写无关的猜测。**`Default` 也在同一张表内**：它是宿主 `ModelSelect.tsx` 自合成的伪菜单项（不属 `EFFORT_LEVELS`），译名与七档同表维护、避免散落硬编码；代价是该表类型只能是 `Record<string, string>`，键集改由上述测试兜住而非编译期。
 - **「显示原档位名」开关：中文后追加「 · 」与原档位名，两个开关都默认开**：翻译后单看「最大」无从判断对应哪个档位，故 `showOriginalEfforts`（默认 true）在中文名后追加 `` `${中文} · ${原档位名}` ``（分隔符取共享常量 `EFFORT_NAME_SEP`，原档位名直接用宿主给的 `efforts[].name` 原值、不重算）。三态：`localizeEfforts` 关 → 原样英文档位名；开而 `showOriginalEfforts` 关 → 纯中文；两者都开 → 「中文 · 原档位」。**Default 伪菜单项同步三态**（`src/client/locale-patch.ts` 的 `valueOf`，与 Node 半 `localizeEffortNames` 拼同一分隔符常量防走样）——它走浏览器半词典注入而非 `resolveModelInfo`，是换名链路唯一不共用的分支。
+- **Tooltip 方向一律 `side="top"`**：设置页卡片上方有 header、弹层位于视口中央，上方始终有足够空隙；help 图标都在行内左侧或中间，气泡从上方弹出不会被右侧滚动条或卡片边缘裁掉，统一方向也避免视觉抖动。不用 `side="right"` 是因为瓦片展开体的帮助图标贴近行尾，右侧空间窄。
 
 ## 档位自调
 

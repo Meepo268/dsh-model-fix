@@ -103,7 +103,7 @@ export function GroupTile(props: {
                                 <span className="dsh-mf-itemLabelGroup">
                                     <span className="dsh-mf-itemLabel">{t(ROW_KEYS[key])}</span>
                                     {/* 设置项释义用宿主 Tooltip 原语（锚点形态照官方 settings-form .helpButton 的信息图标键）。portal 必需：瓦片 overflow:hidden 加上 box-shadow 构成的层叠上下文会把气泡裁掉 */}
-                                    <Tooltip label={tip} side="right" maxWidth={TIP_MAX_WIDTH} portal>
+                                    <Tooltip label={tip} side="top" maxWidth={TIP_MAX_WIDTH} portal>
                                         <button type="button" className="dsh-mf-help" aria-label={tip}>
                                             <IconInfoOutlineRegular size={12} />
                                         </button>
