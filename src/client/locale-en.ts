@@ -7,7 +7,7 @@ import type { CardKey } from '@/client/locale-keys'
 export const en: Record<CardKey, string> = {
     title: 'Model field auto-fill',
     tabLabel: 'Model fill',
-    description: 'Configures how the plugin fills, syncs, and applies compatibility to provider models, which providers to exclude, and how reasoning efforts are remembered.',
+    description: 'Configure how the plugin handles provider models, the scope it applies to, and how it behaves in the UI.',
     colAutoFill: 'Auto fill',
     colAllowUpdate: 'Allow update',
     colCompat: 'Compatibility',
