@@ -186,6 +186,19 @@ export type CardKey =
     | 'chipFollowOff'
     | 'chipFollowOffTitle'
     | 'chipFollowFail'
+    // 「UI 与行为」组：四个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
+    | 'colBehavior'
+    | 'hintBehavior'
+    | 'rowShowInModels'
+    | 'rowShowInBuiltinPlugins'
+    | 'rowShowInComposer'
+    | 'rowShowFollowStatus'
+    | 'rowShowInPluginManager'
+    | 'tipShowInModels'
+    | 'tipShowInBuiltinPlugins'
+    | 'tipShowInComposer'
+    | 'tipShowFollowStatus'
+    | 'tipShowInPluginManager'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
@@ -204,6 +217,10 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     defaultHigh: 'rowDefaultHigh',
     forgetRemoved: 'rowForgetRemoved',
     followParent: 'rowFollowParent',
+    showInModels: 'rowShowInModels',
+    showInBuiltinPlugins: 'rowShowInBuiltinPlugins',
+    showInComposer: 'rowShowInComposer',
+    showFollowStatus: 'rowShowFollowStatus',
     selfTune: 'rowSelfTuneEffort',
     hideOfficial: 'rowHideOfficial',
     localizeEfforts: 'rowLocalizeEfforts',
@@ -215,6 +232,7 @@ export const COLUMN_KEYS: Record<Group, CardKey> = {
     autoFill: 'colAutoFill',
     allowUpdate: 'colAllowUpdate',
     compat: 'colCompat',
+    behavior: 'colBehavior',
     userExperience: 'colUserExperience',
 }
 
@@ -223,6 +241,7 @@ export const HINT_KEYS: Record<Group, CardKey> = {
     autoFill: 'hintAutoFill',
     allowUpdate: 'hintAllowUpdate',
     compat: 'hintCompat',
+    behavior: 'hintBehavior',
     userExperience: 'hintUserExperience',
 }
 
@@ -237,6 +256,10 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     defaultHigh: 'tipDefaultHigh',
     forgetRemoved: 'tipForgetRemoved',
     followParent: 'tipFollowParent',
+    showInModels: 'tipShowInModels',
+    showInBuiltinPlugins: 'tipShowInBuiltinPlugins',
+    showInComposer: 'tipShowInComposer',
+    showFollowStatus: 'tipShowFollowStatus',
     selfTune: 'tipSelfTuneEffort',
     hideOfficial: 'tipHideOfficial',
     localizeEfforts: 'tipLocalizeEfforts',

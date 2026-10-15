@@ -7,6 +7,7 @@ import {
     VERSION_KEY,
     addExclude,
     applyGroup,
+    behaviorVisible,
     decodeSection,
     followingActive,
     groupAllPicked,
@@ -23,17 +24,20 @@ import {
     verifyCandidatesOf,
     verifyKey,
     verifyTargets,
+    GROUP_KEYS,
 } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { EFFORT_LEVELS } from '@/shared/constants'
+import { BEHAVIOR_KEYS } from '@/shared/config-schema'
 
-/** 三组全开的配置（总控与整组置位用例的基准，无排除项，无记忆，用户体验各项全开） */
+/** 三组全开的配置（总控与整组置位用例的基准，无排除项，无记忆，用户体验与 UI 可见性各项全开） */
 const ALL_ON: Flags = {
     autoFill: { reasoning: true, context: true, image: true },
     allowUpdate: { reasoning: true, context: true, image: true },
     compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
+    behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
     userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true },
 }
 
@@ -56,6 +60,7 @@ export function run(): void {
             compat: { disableDeveloper: false, disableStore: false },
             excludes: ['acme-gateway'],
             efforts: {},
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true },
         }),
     )
@@ -68,6 +73,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true },
         }),
     )
@@ -80,6 +86,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: ['acme-gateway'],
             efforts: {},
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true },
         }),
     )
@@ -94,6 +101,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true },
         }),
     )
@@ -158,6 +166,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true },
         }),
         toStored(DEFAULT_FLAGS),
@@ -210,6 +219,7 @@ export function run(): void {
             compat: DEFAULT_FLAGS.compat,
             excludes: DEFAULT_FLAGS.excludes,
             efforts: DEFAULT_FLAGS.efforts,
+            behavior: DEFAULT_FLAGS.behavior,
             userExperience: DEFAULT_FLAGS.userExperience,
         }),
     )
@@ -426,4 +436,17 @@ export function run(): void {
     const followOff: Flags = { ...ALL_ON, userExperience: { ...ALL_ON.userExperience, followParent: false } }
     check('followingActive followParent=false：宿主未开启 → 不生效', !followingActive(followOff, false))
     check('followingActive followParent=false：宿主已开启 → 不生效', !followingActive(followOff, true))
+    // behaviorVisible：UI 可见性判据（配置缺席按可见、只有显式 false 才卸载）
+    check('behaviorVisible 配置缺席（段未就绪）→ 可见', behaviorVisible(undefined, 'showInModels'))
+    check('behaviorVisible 默认配置四项全可见', BEHAVIOR_KEYS.every((key) => behaviorVisible(DEFAULT_FLAGS, key)))
+    check('behaviorVisible 显式 false → 不可见', !behaviorVisible({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInModels: false } }, 'showInModels'))
+    check('behaviorVisible 关一项不影响其余三项', !behaviorVisible({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'showInComposer')
+        && ['showInModels', 'showInBuiltinPlugins', 'showFollowStatus'].every((key) => behaviorVisible({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, key as (typeof BEHAVIOR_KEYS)[number])))
+    // 四个开关是 behavior 组的全部行键，故组总控与脏检测都覆盖到它们
+    check('behavior 组行键为四个可见性开关', stable([...GROUP_KEYS.behavior]) === stable([...BEHAVIOR_KEYS]))
+    check('isDirty 覆盖 behavior 翻转', isDirty(
+        { ...ALL_ON, behavior: { ...ALL_ON.behavior, showInModels: false } },
+        ALL_ON,
+    ))
+    check('isDirty 不受 behavior 之外的组影响（behavior 相同时不脏）', !isDirty(ALL_ON, ALL_ON))
 }

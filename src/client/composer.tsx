@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { VERSION_KEY, followingActive, type Flags } from '@/client/model'
+import { VERSION_KEY, behaviorVisible, followingActive, type Flags } from '@/client/model'
 import { ensureStyles } from '@/client/card-styles'
 import { Card, type CardProps } from '@/client/card'
 import type { DecodedScope } from '@/client/scope'
@@ -104,6 +104,8 @@ export function ComposerChips(props: SlotProps & ComposerProps): ReactNode {
     const followTitle = chipFail
         ? t('chipFollowFail')
         : active ? t('chipFollowOnTitle') : t('chipFollowOffTitle')
+    // 「跟随」状态灯是工具栏内的二级显隐：工具栏整席的装卸由 visibility.ts 负责，这里只管挂上之后这一枚显不显示
+    const showFollow = behaviorVisible(flags, 'showFollowStatus')
 
     return (
         <>
@@ -117,16 +119,18 @@ export function ComposerChips(props: SlotProps & ComposerProps): ReactNode {
                 >
                     {t('chipModelOpt')}
                 </button>
-                <button
-                    type="button"
-                    className="dsh-mf-composerChip"
-                    data-state={followState}
-                    title={followTitle}
-                    disabled={disabled}
-                    onClick={onToggleFollow}
-                >
-                    {active ? t('chipFollowOn') : t('chipFollowOff')}
-                </button>
+                {showFollow ? (
+                    <button
+                        type="button"
+                        className="dsh-mf-composerChip"
+                        data-state={followState}
+                        title={followTitle}
+                        disabled={disabled}
+                        onClick={onToggleFollow}
+                    >
+                        {active ? t('chipFollowOn') : t('chipFollowOff')}
+                    </button>
+                ) : null}
             </span>
             {openCard && (
                 // headless：卡片直接作 children，不套宿主的标题栏/关闭钮/content/body 一层

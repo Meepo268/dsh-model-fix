@@ -44,6 +44,7 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         compat: { ...DEFAULT_CONFIG.compat, ...overrides.compat },
         excludes: overrides.excludes ?? [],
         efforts: overrides.efforts ?? {},
+        behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
 }

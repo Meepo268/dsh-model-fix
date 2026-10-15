@@ -111,6 +111,23 @@ export interface UserExperienceRules {
     showOriginalEfforts: boolean
 }
 
+/**
+ * UI 可见性规则：控制本插件各 UI 部件在宿主各处的挂载。
+ * 与其余组不同，这组不改变插件行为，只决定 UI 在不在——关闭某项即卸载对应席位的注册，
+ * 功能本体（填充 / compat / 跟随等 Node 半逻辑）照常运行。
+ * 同组新增键对既有形态只是「多一个可选字段」，向后兼容，因此不需要递增 CONFIG_VERSION（见 docs/versioning.md）。
+ */
+export interface BehaviorRules {
+    /** 在「设置 → 模型」页脚显示配置卡片；关闭即卸载该席位的注册 */
+    showInModels: boolean
+    /** 在「设置 → 内置插件」显示配置选项卡；关闭即卸载该席位的注册 */
+    showInBuiltinPlugins: boolean
+    /** 在对话框工具栏显示入口 chip；关闭即卸载该席位的注册 */
+    showInComposer: boolean
+    /** 工具栏上显示「跟随」状态灯；仅在 showInComposer 开着时生效（工具栏整体不可见时无从单独显示） */
+    showFollowStatus: boolean
+}
+
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */
 export type EffortMemory = Record<string, Record<string, string>>
 
@@ -133,6 +150,8 @@ export interface PluginConfig {
      * 结构非法时解析侧宽松回落 {}（不让记忆坏值连累配置自愈重写丢配置）。
      */
     efforts: EffortMemory
+    /** UI 可见性规则（只管各 UI 部件挂不挂载，不改插件行为） */
+    behavior: BehaviorRules
     /** 用户体验规则（前端行为开关，不支持按提供方排除） */
     userExperience: UserExperienceRules
 }
@@ -145,6 +164,7 @@ export interface PluginConfigSnapshot {
     compat: CompatRules
     excludes: string[]
     efforts: EffortMemory
+    behavior: BehaviorRules
     userExperience: UserExperienceRules
 }
 

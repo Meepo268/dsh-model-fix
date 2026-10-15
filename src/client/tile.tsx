@@ -9,7 +9,7 @@ import { COLUMN_KEYS, HINT_KEYS, ROW_KEYS, TIP_KEYS } from '@/client/locale-keys
 import { TIP_MAX_WIDTH } from '@/client/card-styles'
 
 /**
- * 卡片的瓦片层：展开体里五张瓦片的两种形态——布尔矩阵配置组瓦片（官方「插件列表」项卡同款）与
+ * 卡片的瓦片层：展开体里六张瓦片的两种形态——布尔矩阵配置组瓦片（官方「插件列表」项卡同款）与
  * 「排除提供方」的动态集合瓦片，渲染顺序由 TILE_ORDER 单一分发。
  *
  * 瓦片只管自己的 summary 与展开体结构，外加「排除提供方」那一份纯 UI 暂态（输入文本与校验反馈不属于配置）；
@@ -24,11 +24,22 @@ const { Pill, Switch, Tag, StateDot, Tooltip, IconInfoOutlineRegular, IconTrashO
 /** 瓦片文案函数：与卡片 props 的 t 同型，同为 slots.register 的 locale 席位合成注入 */
 type TileTranslate = TranslateNS<'settings.modelFix'>
 
-/** 瓦片渲染顺序：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 */
-export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience']
+/** 瓦片渲染顺序：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 / UI 与行为（末位：它管的是前面各处的显隐，放在最后读起来才顺） */
+export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience', 'behavior']
 
 /** Pill 组阈值：组内行键数 ≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
 const PILL_THRESHOLD = 5
+
+/**
+ * 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），渲染在组内真键之前。
+ * 它不绑任何配置键，故不进 `GROUP_KEYS`——组总控、草稿、脏检测都看不见它。
+ */
+export interface LockedRow {
+    /** 行标签文案键 */
+    label: CardKey
+    /** 说明气泡文案键 */
+    tip: CardKey
+}
 
 /** 配置组瓦片：summary 为组名 + 整组开关 + 折叠箭头，展开体为组释义 + 子开关行；
  * 整行可点由 .dsh-mf-itemToggle 覆盖层承担（无 button 嵌套），可访问名用 aria-labelledby 指向可见标题。
@@ -42,6 +53,8 @@ export function GroupTile(props: {
     onToggle: () => void
     onMaster: () => void
     onCell: (key: RowKey) => void
+    /** 追加在组内真键之后的恒定展示行（不绑配置、不受总控与脏检测影响）；缺省即无 */
+    lockedRow?: LockedRow
 }) {
     const { group, t, open } = props
     const id = `dsh-mf-item-${group}`
@@ -96,28 +109,46 @@ export function GroupTile(props: {
                                 )
                             })}
                         </div>
-                    ) : GROUP_KEYS[group].map((key) => {
-                        const tip = t(TIP_KEYS[key])
-                        return (
-                            <div key={key} className="dsh-mf-itemRow">
-                                <span className="dsh-mf-itemLabelGroup">
-                                    <span className="dsh-mf-itemLabel">{t(ROW_KEYS[key])}</span>
-                                    {/* 设置项释义用宿主 Tooltip 原语（锚点形态照官方 settings-form .helpButton 的信息图标键）。portal 必需：瓦片 overflow:hidden 加上 box-shadow 构成的层叠上下文会把气泡裁掉 */}
-                                    <Tooltip label={tip} side="top" maxWidth={TIP_MAX_WIDTH} portal>
-                                        <button type="button" className="dsh-mf-help" aria-label={tip}>
-                                            <IconInfoOutlineRegular size={12} />
-                                        </button>
-                                    </Tooltip>
-                                </span>
-                                <Switch
-                                    checked={groupValue(props.flags, group, key)}
-                                    disabled={props.disabled}
-                                    label={`${t(ROW_KEYS[key])} ${title}`}
-                                    onChange={() => { props.onCell(key) }}
-                                />
-                            </div>
-                        )
-                    })}
+                    ) : (
+                        <>
+                            {/* 恒定展示行排在组内真键之前：它是回入口，先看到它才知道下面几行关掉后从哪回来 */}
+                            {props.lockedRow === undefined ? null : (
+                                <div className="dsh-mf-itemRow">
+                                    <span className="dsh-mf-itemLabelGroup">
+                                        <span className="dsh-mf-itemLabel">{t(props.lockedRow.label)}</span>
+                                        <Tooltip label={t(props.lockedRow.tip)} side="top" maxWidth={TIP_MAX_WIDTH} portal>
+                                            <button type="button" className="dsh-mf-help" aria-label={t(props.lockedRow.tip)}>
+                                                <IconInfoOutlineRegular size={12} />
+                                            </button>
+                                        </Tooltip>
+                                    </span>
+                                    <Switch checked disabled label={`${t(props.lockedRow.label)} ${title}`} onChange={() => { /* 恒定展示行，无配置可写 */ }} />
+                                </div>
+                            )}
+                            {GROUP_KEYS[group].map((key) => {
+                                const tip = t(TIP_KEYS[key])
+                                return (
+                                    <div key={key} className="dsh-mf-itemRow">
+                                        <span className="dsh-mf-itemLabelGroup">
+                                            <span className="dsh-mf-itemLabel">{t(ROW_KEYS[key])}</span>
+                                            {/* 设置项释义用宿主 Tooltip 原语（锚点形态照官方 settings-form .helpButton 的信息图标键）。portal 必需：瓦片 overflow:hidden 加上 box-shadow 构成的层叠上下文会把气泡裁掉 */}
+                                            <Tooltip label={tip} side="top" maxWidth={TIP_MAX_WIDTH} portal>
+                                                <button type="button" className="dsh-mf-help" aria-label={tip}>
+                                                    <IconInfoOutlineRegular size={12} />
+                                                </button>
+                                            </Tooltip>
+                                        </span>
+                                        <Switch
+                                            checked={groupValue(props.flags, group, key)}
+                                            disabled={props.disabled}
+                                            label={`${t(ROW_KEYS[key])} ${title}`}
+                                            onChange={() => { props.onCell(key) }}
+                                        />
+                                    </div>
+                                )
+                            })}
+                        </>
+                    )}
                 </div>
             ) : null}
         </div>

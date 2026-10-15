@@ -1,5 +1,5 @@
 /**
- * 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（autoFill / allowUpdate / compat / userExperience 四组布尔 + excludes 列表）。
+ * 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（autoFill / allowUpdate / compat / behavior / userExperience 五组布尔 + excludes 列表）。
  * 跨半共享的常量、类型、解析函数单一来源在 `src/shared/`：浏览器半值导入 `@/shared/*`（经 client 纯度门禁放行，
  * 不引 `src/constants` / `src/types` / `src/config` 的值，避免 `node:path` / schemastery 被打进浏览器包）。
  * 本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生（总控 / 单格 / 脏检测 / 排除项增删 / 命中判定）、
@@ -9,29 +9,31 @@
 import type { PluginConfig } from '@/shared/types'
 import { isPlainObject, providersOf } from '@/shared/types'
 import { EFFORT_LEVELS } from '@/shared/constants'
-import { CONFIG_VERSION, DEFAULT_CONFIG, FIELD_KEYS, COMPAT_KEYS, USER_EXPERIENCE_KEYS, parseSnapshot, versionKey } from '@/shared/config-schema'
+import { CONFIG_VERSION, DEFAULT_CONFIG, FIELD_KEYS, COMPAT_KEYS, USER_EXPERIENCE_KEYS, BEHAVIOR_KEYS, parseSnapshot, versionKey } from '@/shared/config-schema'
 
 /** 版本快照键 */
 export const VERSION_KEY = versionKey(CONFIG_VERSION)
 
-/** 瓦片对应的配置组：两个填充列 + 兼容性组 + 用户体验组 */
-export type Group = 'autoFill' | 'allowUpdate' | 'compat' | 'userExperience'
+/** 瓦片对应的配置组：两个填充列 + 兼容性组 + UI 可见性组 + 用户体验组 */
+export type Group = 'autoFill' | 'allowUpdate' | 'compat' | 'behavior' | 'userExperience'
 
 /** 各组行键表（渲染顺序与总控共用） */
 export const GROUP_KEYS: Record<Group, readonly RowKey[]> = {
     autoFill: FIELD_KEYS,
     allowUpdate: FIELD_KEYS,
     compat: COMPAT_KEYS,
+    behavior: BEHAVIOR_KEYS,
     userExperience: USER_EXPERIENCE_KEYS,
 }
 
-/** 全部布尔配置组（脏检测遍历用；瓦片渲染顺序见 tile.tsx 的 TILE_ORDER，排除提供方夹在 compat 与 userExperience 之间） */
-const GROUPS: readonly Group[] = ['autoFill', 'allowUpdate', 'compat', 'userExperience']
+/** 全部布尔配置组（脏检测遍历用，遍历顺序无关紧要；瓦片的渲染顺序另见 tile.tsx 的 TILE_ORDER——behavior 排在用户体验之后） */
+const GROUPS: readonly Group[] = ['autoFill', 'allowUpdate', 'compat', 'behavior', 'userExperience']
 
 /** 组内行键全集（词典键映射与各组行表的类型） */
 export type RowKey =
     | (typeof FIELD_KEYS)[number]
     | (typeof COMPAT_KEYS)[number]
+    | (typeof BEHAVIOR_KEYS)[number]
     | (typeof USER_EXPERIENCE_KEYS)[number]
 
 /** 卡片侧消费的完整当前配置（与 PluginConfig 同形：四组布尔 + excludes + efforts） */
@@ -53,6 +55,17 @@ function rowsOf(flags: Flags, group: Group): Record<string, boolean> {
 /** 单格取值 */
 export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
     return rowsOf(flags, group)[key] === true
+}
+
+/**
+ * 某 UI 部件是否应当挂载：读 `behavior` 组对应开关，配置缺席（段未就绪）时按缺省全开处理。
+ *
+ * 与 `groupValue` 的差别只有缺省方向——本组关闭某项即卸载该 UI，配置读不到时若落 `false` 会让
+ * 首屏（段还在 loading）凭空少一块界面，故此处缺省取「可见」。组内取值仍一律按严格布尔判。
+ */
+export function behaviorVisible(flags: Flags | undefined, key: (typeof BEHAVIOR_KEYS)[number]): boolean {
+    if (flags === undefined) return true
+    return rowsOf(flags, 'behavior')[key] !== false
 }
 
 /**

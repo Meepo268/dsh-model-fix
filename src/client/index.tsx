@@ -1,9 +1,12 @@
 /**
  * 浏览器半入口（dsh.client 声明的 web 侧 cordis 插件）。宿主 settings 面为 0.1.7+ 的
  * ctx.configForms，经 makeScope 包装（decode 缓存语义）后供卡片与记忆监听消费。
- * 四个席位一律注册：`ctx.slots.inject` 对无声明方的席位只挂一个 pending wait（声明到达
- * 才跑回调，fiber 卸载即取消），故缺席者静默不发生（卡片不出现）。SlotMap 键经
- * models 包与本插件包 declaration merging 提供（均 type-only 导入，构建期擦除）。
+ * 五个席位一律经 `ctx.slots.inject` 注册：对无声明方的席位只挂一个 pending wait（声明到达才跑回调，
+ * fiber 卸载即取消），故缺席者静默不发生（卡片不出现）；向未声明的 slot 直接 register 会抛
+ * `slot "..." is not declared`，且该抛错发生在 fiber 启动期、连累同一 fiber 里后续的全部注册。
+ * 其中两席（插件详情页 / 组件实例详情页）在此直接注册；另三席（模型页 footer / 内置插件选项卡 /
+ * 输入框工具行）受「UI 与行为」组支配，由 visibility.ts 编排挂载与卸载。
+ * SlotMap 键经各宿主包与本插件包 declaration merging 提供（均 type-only 导入，构建期擦除）。
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -33,12 +36,8 @@ import { API_NS as PI_AI_NS, PLUGIN_NAME, PLUGIN_NS as MODEL_FIX_NS } from '@/sh
 import { decodeSection } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { makeScope, type DecodedScope } from '@/client/scope'
-import {
-    ComposerChips,
-    decodeHostModelSelection,
-    HOST_MODEL_SELECTION_NS,
-    type HostModelSelectionView,
-} from '@/client/composer'
+import { applySlotVisibility } from '@/client/visibility'
+import { decodeHostModelSelection, HOST_MODEL_SELECTION_NS, type HostModelSelectionView } from '@/client/composer'
 
 /** 提供方 scope 的解码占位值：本卡只消费 snapshot.user（原始用户层），value 无用途；decode 必须永不返回 undefined */
 const PROVIDERS_VIEW: readonly unknown[] = []
@@ -84,7 +83,7 @@ function boot(
     // 浏览器半调 Node 半的全部出口（四个写回端点 + 两条诊断链的读流）见 rpc-carrier.ts
     const { forceUpdate, resetModels, restoreModels, verifyModels, pruneEfforts, probeEfforts } =
         makeRpcCarrier(rpc)
-    // 四席共用的卡片入参：载体与 scope 逐席相同，逐席展开只会让每行都长到读不动
+    // 五席共用的卡片入参：载体与 scope 逐席相同，逐席展开只会让每行都长到读不动
     const cardProps = {
         scope,
         providersScope,
@@ -95,15 +94,6 @@ function boot(
         pruneEfforts,
         probeEfforts,
     }
-    // 单元格标识按 kind：list 席位用 id、keyed 席位用 key（footer 是配置 NS，bundle 是 npm 包名，
-    // row 是「包名#patch 条目 id」；不同 slot 即不同账本，无需后缀区分）；footer 以 order 排最前
-    // （list 渲染器按 order 单键重排）
-    ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
-        name: 'settings.models.footer',
-        id: MODEL_FIX_NS,
-        order: -999999,
-        locale: CARD_NS,
-    }, (props) => <Card {...props} {...cardProps} />))
     // 插件详情页的配置段：keyed 按 entryKey 分发，key 是 npm 包名（不是 patch 条目 id）
     // defaultOpen：配置段就是该页主体，默认收起等于让用户多点一次
     ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
@@ -120,24 +110,9 @@ function boot(
         key: `${name}#${MODEL_FIX_NS}`,
         locale: CARD_NS,
     }, (props) => <Card {...props} defaultOpen {...cardProps} />))
-    // 「设置 → 内置插件」的 tablist（list 席位，面板即本卡）：与官方「插件列表」tab 同级并排。
-    // tab label 走 thunk，section 每次读账本时求值、切语言即跟随
-    const t = ctx.locale.bind(CARD_NS)
-    ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-        name: 'settings.plugins.tab',
-        id: MODEL_FIX_NS,
-        order: 20,
-        label: () => t('tabLabel'),
-        locale: CARD_NS,
-    }, (props) => <Card {...props} defaultOpen {...cardProps} />))
-    // 输入框工具行（conversation.input.left，list 席位，与 plan/permission 同排）：两枚 chip 的组合入口
-    // 「模型优化」常驻弱化态，点开 Modal 弹完整配置卡；「跟随」状态灯常驻、按实际生效在亮绿/灰间切换、点击 toggle
-    ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-        name: 'conversation.input.left',
-        id: `${MODEL_FIX_NS}-composer`,
-        order: 5,
-        locale: CARD_NS,
-    }, (props) => <ComposerChips {...props} scope={scope} hostModelScope={hostModelScope} cardProps={cardProps} providersScope={providersScope} />))
+    // 三席（模型页 footer / 内置插件 tab / 输入框工具行）的挂载与卸载编排：
+    // 受「UI 与行为」组支配，开=挂载、关=撤销条目（真卸载，否则内置插件那个 tab 头会留下空选项卡）
+    applySlotVisibility(ctx, scope, cardProps, { scope, hostModelScope, providersScope })
 
     // 每模型推理级别记忆的运行时监听（订阅会话投影、自动设级别）见 memory-listener.ts
     applyEffortMemoryListener(ctx, scope)

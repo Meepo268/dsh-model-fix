@@ -192,4 +192,17 @@ export const zh: Record<CardKey, string> = {
     chipFollowOff: '跟随',
     chipFollowOffTitle: '点击开启：子智能体将跟随父智能体的模型与推理级别',
     chipFollowFail: '保存失败，操作未生效',
+    // 「UI 与行为」组：四个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
+    colBehavior: 'UI 与行为',
+    hintBehavior: '控制本插件的 UI 与行为。',
+    rowShowInModels: '显示在模型',
+    rowShowInBuiltinPlugins: '显示在内置插件',
+    rowShowInComposer: '显示在对话框工具栏',
+    rowShowFollowStatus: '显示跟随状态',
+    rowShowInPluginManager: '显示在插件管理',
+    tipShowInModels: '在「设置 → 模型」页底部显示本插件的配置卡片。',
+    tipShowInBuiltinPlugins: '在「设置 → 内置插件」里显示本插件的配置选项卡。',
+    tipShowInComposer: '在聊天输入框的工具栏上显示入口，点击即打开完整配置。',
+    tipShowFollowStatus: '在工具栏上显示「跟随」状态灯（亮绿表示子智能体跟随父智能体正在生效）。需先开启「显示在对话框工具栏」。',
+    tipShowInPluginManager: '本插件始终显示在「插件管理」里，且不可关闭——它是你重新打开上述任何界面的唯一入口。',
 }

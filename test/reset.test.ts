@@ -10,6 +10,7 @@ const base: PluginConfig = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: ['acme-gateway'],
     efforts: {},
+        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
     userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true },
 }
 

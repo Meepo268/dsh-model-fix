@@ -194,4 +194,17 @@ export const en: Record<CardKey, string> = {
     chipFollowOff: 'Follow',
     chipFollowOffTitle: 'Click to turn on: subagents will follow the parent agent\'s model and reasoning level',
     chipFollowFail: 'Save failed; the change did not take effect',
+    // 「UI 与行为」组：四个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
+    colBehavior: 'UI & behavior',
+    hintBehavior: 'Controls this plugin\'s UI and behavior.',
+    rowShowInModels: 'Show in models',
+    rowShowInBuiltinPlugins: 'Show in built-in plugins',
+    rowShowInComposer: 'Show in the composer toolbar',
+    rowShowFollowStatus: 'Show follow status',
+    rowShowInPluginManager: 'Show in plugin manager',
+    tipShowInModels: 'Shows this plugin\'s settings card at the bottom of the Models settings page.',
+    tipShowInBuiltinPlugins: 'Shows this plugin\'s settings tab under Settings → Built-in plugins.',
+    tipShowInComposer: 'Shows an entry chip on the chat composer toolbar that opens the full settings.',
+    tipShowFollowStatus: 'Shows the Follow status lamp on the toolbar (green while subagents actually follow the parent agent). Requires "Show in the composer toolbar".',
+    tipShowInPluginManager: 'This plugin always shows in the plugin manager and cannot be hidden — it is the only way back into any of the surfaces above.',
 }

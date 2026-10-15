@@ -74,12 +74,21 @@ const V8_LOCALIZE_EFFORTS_DEFAULT = true
 const V8_SHOW_ORIGINAL_EFFORTS_DEFAULT = true
 const V8_DISABLE_STORE_DEFAULT = true
 
+/**
+ * v8 形态内新增顶级组 `behavior` 的台阶默认值（四项全开）。
+ *
+ * 写入字面量而不引用当前版本的 BEHAVIOR_DEFAULTS，理由同上：台阶产物形态必须恒定。
+ * 此前落盘的 v8 快照没有这一段，解析时同样落全开，两条路径口径一致。
+ */
+const V8_BEHAVIOR_DEFAULT = true
+
 // ---------- 最低一级台阶（持守卫） ----------
 
 /**
  * 升到 v8（当前最低一级，自持最低版本守卫）。
  * 输入按 v7 冻结 schema 解析（非法整体回退 v7 默认）；efforts 经 parseEfforts 宽松保留；
- * 补 compat.disableStore 与 userExperience 的 followParent/selfTune/hideOfficial/localizeEfforts/showOriginalEfforts 默认值。
+ * 补 compat.disableStore、userExperience 的 followParent/selfTune/hideOfficial/localizeEfforts/showOriginalEfforts 默认值，
+ * 以及 v8 形态内新增的 behavior 段（四项全开）。
  *
  * 守卫：本函数是最低一级，其输入版本下限恰为 MIN_SUPPORTED_VERSION。
  * 调用方（migrateConfig 的候选过滤）已按该下限筛过迁移源，此处为误用兜底。
@@ -108,6 +117,12 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
         compat: { ...parsed.compat, disableStore: V8_DISABLE_STORE_DEFAULT },
         excludes: [...parsed.excludes],
         efforts,
+        behavior: {
+            showInModels: V8_BEHAVIOR_DEFAULT,
+            showInBuiltinPlugins: V8_BEHAVIOR_DEFAULT,
+            showInComposer: V8_BEHAVIOR_DEFAULT,
+            showFollowStatus: V8_BEHAVIOR_DEFAULT,
+        },
         userExperience: {
             ...parsed.userExperience,
             followParent: V8_FOLLOW_PARENT_DEFAULT,

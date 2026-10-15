@@ -1,11 +1,11 @@
 /**
- * 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。四个挂载席位（模型页 footer / 插件详情页 /
- * 组件实例详情页 / 内置插件选项卡）共用同一外壳，差异只有折叠态策略（`defaultOpen`：三处详情席位默认展开
- * 且保存后不自动收起，footer 席默认收起、保存后自动收起）；详情页仍自绘自己的图标 / 面包屑 / 开关，
- * 卡片头部只管本卡。
- * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发）：四张布尔矩阵瓦片（自动填充 / 允许更新 / 兼容性 /
- * 用户体验）+ 一张动态集合瓦片（排除提供方，summary 尾区为「N 命中」徽标，0 命中也常驻、不得画成错误色）
- * + 一张「子智能体推理级别」瓦片（两条互斥策略，随宿主「允许 Agent 为子智能体选择模型」开关择一生效）。
+ * 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。五个挂载席位（模型页 footer / 插件详情页 /
+ * 组件实例详情页 / 内置插件选项卡 / 输入框工具行弹层）共用同一外壳，差异只有折叠态策略（`defaultOpen`：
+ * 弹层与三处详情席位默认展开且保存后不自动收起，footer 席默认收起、保存后自动收起；输入框弹层另禁用折叠）；
+ * 详情页仍自绘自己的图标 / 面包屑 / 开关，卡片头部只管本卡。
+ * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发）：五张布尔矩阵瓦片（自动填充 / 允许更新 / 兼容性 /
+ * 用户体验 / UI 与行为）+ 一张动态集合瓦片（排除提供方，summary 尾区为「N 命中」徽标，0 命中也常驻、不得画成错误色）
+ * 。「UI 与行为」组内另有一条恒定展示行排在真键之前（插件管理，不绑配置、不可关闭——关掉就没有任何界面可以重新打开）。
  * 瓦片手风琴：默认收起、同时只开一个。
  * 布尔瓦片的每一行标题带一个说明键：悬停或键盘聚焦时经宿主 Tooltip 气泡给出该设置项释义（组释义在首行、项释义在气泡）。
  * footer 左侧为强制更新 / 重置推理级别（危险键）/ 恢复备份（次级键）/ 验证模型（次级键）/ 探测式填充（次级键），右侧为取消（仅未保存时渲染）/ 保存；
@@ -132,7 +132,7 @@ export interface CardProps extends RpcCarrier {
     providersScope: DecodedScope<readonly unknown[]>
     /** 初始折叠态：插件详情页（plugins.bundle.config）、组件实例详情页（plugins.row.config）与「内置插件」选项卡（settings.plugins.tab）默认展开；模型页 footer 席不传即默认收起（与官方插件卡一致）。同时决定保存成功后是否自动收起——只在默认收起的席位上生效 */
     defaultOpen?: boolean
-    /** 是否允许点 header 折叠整卡：四席皆可；输入框弹层传 false（面板尺寸固定、可滚动，折叠会让面板内容与指针下的尺寸脱钩） */
+    /** 是否允许点 header 折叠整卡：详情席位与选项卡席皆可；输入框弹层传 false（面板尺寸固定、可滚动，折叠会让面板内容与指针下的尺寸脱钩） */
     collapsible?: boolean
 }
 
@@ -687,7 +687,7 @@ export function Card(props: CardProps) {
         <>
             {!ready ? <p className="dsh-mf-line" role="status">{t('loading')}</p> : null}
             {ready && !snap.writable ? <p className="dsh-mf-line dsh-mf-warn" role="status">{t('readOnly')}</p> : null}
-            {/* 四个布尔组由组枚举与键表派生，「排除提供方」形状不同单独分发；顺序见 TILE_ORDER */}
+            {/* 五个布尔组由组枚举与键表派生，「排除提供方」形状不同单独分发；顺序见 TILE_ORDER */}
             <div className="dsh-mf-items">
                 {TILE_ORDER.map((tile) => tile === 'excludes' ? (
                     <ExcludesTile
@@ -712,6 +712,8 @@ export function Card(props: CardProps) {
                         onToggle={() => { onTileToggle(tile) }}
                         onMaster={() => { onMaster(tile) }}
                         onCell={(key) => { onCell(tile, key) }}
+                        // 「插件管理」是回入口，恒可见且不可关，故作恒定展示行而非配置项
+                        lockedRow={tile === 'behavior' ? { label: 'rowShowInPluginManager', tip: 'tipShowInPluginManager' } : undefined}
                     />
                 ))}
             </div>
