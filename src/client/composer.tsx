@@ -2,7 +2,7 @@
  * 输入框工具行（conversation.input.left）的两枚 chip，各占一个席位条目：
  * · 「模型优化」（`ComposerEntry`）—— 常驻弱化态入口，点开弹层面板（宿主 Modal 原语的 headless 形态：
  *   卡片即唯一可见层，面板几何与滚动见 card-styles.ts 的 .dsh-mf-composerDialog）
- * · 「跟随」状态灯（`FollowLamp`）—— 常驻，随 `followingActive(flags, hostEnabled)` 在「亮绿（生效中）/灰
+ * · 「跟随」状态灯（`FollowLamp`）—— 常驻，随 `followingActive(flags, hostEnabled)` 在「亮绿（生效中）/浅灰
  *   （未生效）」间切换；点击即 toggle 开关；写入失败（只读 / memory 模式 / 拒绝）时保持原态 + 琥珀色 +
  *   原生 title 提示原因
  *
@@ -24,7 +24,7 @@ import type { DecodedScope } from '@/client/scope'
 /** 宿主「允许 Agent 为子智能体选择模型」那段的最小 decode：只取 enabled，不管 allowedModels（我们不调 current()） */
 export interface HostModelSelectionView { enabled: boolean }
 
-type ChipState = 'muted' | 'on' | 'fail'
+type ChipState = 'muted' | 'off' | 'on' | 'fail'
 
 /** 宿主 subagent-model-selection-settings 段名（字面量与 host-api.md 登记一致） */
 export const HOST_MODEL_SELECTION_NS = 'subagent-model-selection-settings'
@@ -94,7 +94,7 @@ export function ComposerEntry(props: SlotProps & ComposerProps): ReactNode {
 }
 
 /**
- * 「跟随」状态灯：亮绿＝子智能体跟随父智能体正在生效，灰＝未生效；点击即 toggle `userExperience.followParent`。
+ * 「跟随」状态灯：亮绿＝子智能体跟随父智能体正在生效，浅灰＝未生效；点击即 toggle `userExperience.followParent`。
  *
  * 显隐由 `behavior.showFollowStatus` 决定（装卸在 visibility.ts）。
  */
@@ -142,7 +142,7 @@ export function FollowLamp(props: SlotProps & ComposerProps): ReactNode {
         }
     }, [scope, snapFlags, flags, busy])
 
-    const state: ChipState = chipFail ? 'fail' : (active ? 'on' : 'muted')
+    const state: ChipState = chipFail ? 'fail' : (active ? 'on' : 'off')
     // 原生 title 随态切换：失败原因 / 关闭提示 / 开启提示
     const title = chipFail
         ? t('chipFollowFail')

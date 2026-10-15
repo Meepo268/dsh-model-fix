@@ -195,9 +195,11 @@ const STYLE_TEXT = [
     '.dsh-mf-warn:not(:disabled){border-color:var(--dsw-alias-state-warn-label,#dd8629);color:var(--dsw-alias-state-warn-label,#dd8629)}',
     '.dsh-mf-warn:hover:not(:disabled){background:color-mix(in srgb, var(--dsw-alias-state-warn-label,#dd8629) 10%, transparent)}',
     // 输入框工具行 chip（conversation.input.left）：几何逐条复刻宿主 PlanModeControl `.chip`（对称 padding 0 8px、min-width 34px），
-    // 配色按两枚 chip 的三态语义分色：
-    // · 弱化态（模型优化恒用、跟随关闭态复用）：透明底 + label-secondary 字；hover 出 interactive-bg-hover
-    // · 生效态（跟随中）：success 绿底 + 字；补 6px 状态点（::before），与弱化态在形状上即可区分（灰态不画点）
+    // 配色按三档语义（弱化 / 生效 / 失败）分色，弱化档按「是否在表达未生效的状态」再分两级色深：
+    // · 模型优化（弱化档·深）：透明底 + label-secondary 字；hover 出 interactive-bg-hover
+    // · 跟随灯未生效（弱化档·浅）：同为透明底，字色降到 label-caption，取宿主 ModelSelect `.triggerEffort`
+    //   （当前推理级别）的色调——它同样表达「有个值摆在那里、此刻却不参与决策」，与模型名同权就误读成正常状态
+    // · 生效态（跟随中）：success 绿底 + 字；补 6px 状态点（::before），与非生效态在形状上即可区分（非生效态不画点）
     // · 失败态（写入被拒）：warn 琥珀色，原生 title 提示原因
     // 弹层面板：宽度与 flex 参与方式复刻宿主设置面板 SettingsRoot.module.css 的 `.panel`（左下角齿轮点开的那一个），
     // 高度改按内容收敛：设置面板是 800×800 的固定大框，本卡片内容远不足 800px，固定高度会让面板上下留出
@@ -218,9 +220,12 @@ const STYLE_TEXT = [
     '.dsh-mf-composerChip{display:inline-flex;align-items:center;gap:4px;min-width:34px;height:28px;padding:0 8px;border:none;border-radius:var(--dsw-radius-sm);font-size:13px;font-weight:500;line-height:20px;cursor:pointer}',
     '.dsh-mf-composerChip:focus-visible{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline:none}',
     '.dsh-mf-composerChip:disabled{cursor:default;opacity:.6}',
-    // 弱化态：透明底 + label-secondary 字；hover 出 interactive-bg-hover
+    // 弱化档·深（模型优化）：透明底 + label-secondary 字；hover 出 interactive-bg-hover
     '.dsh-mf-composerChip[data-state="muted"]{background:transparent;color:var(--dsw-alias-label-secondary,#61666b)}',
     '.dsh-mf-composerChip[data-state="muted"]:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}',
+    // 弱化档·浅（跟随灯未生效）：同为透明底，字色降到 label-caption（同宿主当前推理级别的色调）
+    '.dsh-mf-composerChip[data-state="off"]{background:transparent;color:var(--dsw-alias-label-caption,#adb2b8)}',
+    '.dsh-mf-composerChip[data-state="off"]:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}',
     // 生效态：success 绿底 + 字；状态点 6px；hover 用 color-mix 同 PlanChip 手法（宿主无 success 悬停底令牌）
     '.dsh-mf-composerChip[data-state="on"]{background:var(--dsw-alias-state-success-tertiary,#d3f8d6);color:var(--dsw-alias-state-success-primary,#22c55e)}',
     '.dsh-mf-composerChip[data-state="on"]:hover:not(:disabled){background:color-mix(in srgb, var(--dsw-alias-state-success-tertiary,#d3f8d6) 94%, var(--dsw-alias-state-success-primary,#22c55e) 6%)}',
