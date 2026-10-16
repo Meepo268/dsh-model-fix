@@ -4,20 +4,22 @@
  * 防止写回触发填充把刚改动的字段重新写回。refresh 的拉取结算是不经过事件入口的异步续体，
  * 须在 refresh 进入处与调 fix 前自查本守卫。
  * 置位先于 mutate 同步完成（await 前），finally 解除后事件链恢复正常。
+ * 计数而非布尔：持有可嵌套（启动回退无 check 地置位，可与在途探测重叠），
+ * 解除只折抵一次置位，先结束者不解掉仍在途者的守卫。
  */
-let ignoreAll = false
+let depth = 0
 
-/** 开启事件流守卫（写回前调用） */
+/** 开启事件流守卫（写回前调用；可嵌套，与解除严格配对） */
 export function startIgnoreAll(): void {
-    ignoreAll = true
+    depth += 1
 }
 
-/** 解除事件流守卫（写回全部落盘后调用） */
+/** 解除事件流守卫（写回全部落盘后调用；每次只折抵一次置位） */
 export function endIgnoreAll(): void {
-    ignoreAll = false
+    depth -= 1
 }
 
 /** 事件流守卫是否生效 */
 export function isIgnoreAll(): boolean {
-    return ignoreAll
+    return depth > 0
 }
