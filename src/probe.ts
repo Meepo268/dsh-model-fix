@@ -76,7 +76,10 @@ const runProbeGroup: GroupRunner = async (
             skipped = sameModelTail(group.probes, index)
         }
         if (skipped > 0) index += skipped
-        emitProbe(probe, { outcome, failure: verdict.failure }, skipped === 0 ? undefined : skipped)
+        emitProbe(probe, { outcome, failure: verdict.failure }, {
+            settled: 1 + skipped,
+            ...(skipped === 0 ? {} : { skipped }),
+        })
         if (blockedBy !== undefined) break
     }
     const models = new Set<string>()

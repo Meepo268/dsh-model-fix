@@ -77,11 +77,24 @@ export async function probeOnce(
 /** 「永不中止」的占位信号（AbortSignal 没有 null 态，未给 signal 时用它） */
 const NEVER_ABORTED = new AbortController().signal
 
-/** 一个 `runGroup` 的产出出口：一条请求的结论 + 因短路而未发出的条数（0 时传 undefined） */
+/**
+ * 一帧的进度交代：`settled` 是进度增量（`done` 只数计划条目），`skipped` 是因短路而未发出的条数。
+ *
+ * 恒有 `settled === skipped + (当前条目确已发出 ? 1 : 0)`：基线探测不是被验对象、占不了进度位，
+ * 而被短路而未发出的条目同样计入——它们不会再被验，进度就该在这一帧走完，否则整轮跑完停在 `done < total`。
+ */
+export interface ProbeFrameProgress {
+    /** 本帧了结的计划条目数；0 即附注帧，不推进 `done` */
+    settled: number
+    /** 因短路而未发出的条数；无则缺省 */
+    skipped?: number
+}
+
+/** 一个 `runGroup` 的产出出口：一条请求的结论 + 该帧的进度交代 */
 export type ProbeEmitter = (
     probe: Pick<VerifyProbe, 'provider' | 'model' | 'effort'>,
     verdict: ProbeVerdict,
-    skipped: number | undefined,
+    progress: ProbeFrameProgress,
 ) => void
 
 /** 一组怎么逐条跑：两个功能的全部差异都在这个回调里（验证带基线探测，探测式填充逐档平推） */
@@ -113,20 +126,21 @@ export async function runProbeGroups(
     options: ProbeRunOptions = {},
 ): Promise<VerifySummary> {
     const signal = options.signal ?? NEVER_ABORTED
+    // 分母只数计划条目：基线探测不是被验对象（口径同 `planned` / `probed`），故 `done ≤ total` 恒成立
     const total = groups.reduce((sum, group) => sum + group.probes.length, 0)
     // 稀疏数组：中止时从未开跑的组保持 undefined，汇报时据实排除
     const outcomes = new Array<ProviderProbeOutcome>(groups.length)
     let completed = 0
-    const emitProbe: ProbeEmitter = (probe, verdict, skipped): void => {
-        // 跨 worker 的累计位置：本函数只在 await 之后同步调用，单线程下不会交错，自增即可
-        completed++
+    const emitProbe: ProbeEmitter = (probe, verdict, progress): void => {
+        // 跨 worker 的累计位置：本函数只在 await 之后同步调用，单线程下不会交错，累加即可
+        completed += progress.settled
         options.onProgress?.({
             type: 'probed',
             provider: probe.provider,
             model: probe.model,
             effort: probe.effort,
             outcome: verdict.outcome,
-            ...(skipped === undefined ? {} : { skipped }),
+            ...(progress.skipped === undefined ? {} : { skipped: progress.skipped }),
             done: completed,
             total,
         })

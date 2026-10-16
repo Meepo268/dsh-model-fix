@@ -59,7 +59,7 @@ const runGroup: GroupRunner = async (
         const probe = group.probes[index]
         const tail = sameModelTail(group.probes, index)
         // 基线：组内该模型的第一条带 needTest 的请求即它的基线位。跑通只记事实、不发记录；
-        // 失败则据其短路，并发一条记录交代「这个模型为什么没验成」
+        // 失败则发一条模型级记录交代「这个模型为什么没验成」——能断定的据其短路，限流 / 超时则照常逐档位验
         if (probe.needTest && !probed.has(probe.model)) {
             probed.add(probe.model)
             const testVerdict = await probeOnce(llm, { provider: probe.provider, model: probe.model }, signal)
@@ -78,19 +78,21 @@ const runGroup: GroupRunner = async (
                 // 端点不通 / 凭据无效（以及本组首个请求就超时）：同一提供方共用同一 url 与同一把 key，整组都过不去
                 blockedBy = blockReason
                 // 未发出的条数含当前这条：它同样因基线不通而没发出去
-                emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, group.probes.length - index)
+                const remaining = group.probes.length - index
+                emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, { settled: remaining, skipped: remaining })
                 break
             } else if (shouldSkipModelTailAfterBaseline(testVerdict.outcome)) {
                 // 基线请求**不带推理级别**，故它的失败与档位无关：同一模型换任何档位，发出去的还是同一个请求。
                 // 额度用尽、或被厂商确定性拒绝（模型不存在、参数被拒、无权限）时，后续必然同样失败，短到该模型尾
-                emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, tail + 1)
+                emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, { settled: tail + 1, skipped: tail + 1 })
                 index += tail
                 continue
             } else {
                 // 限流与超时只否定了这一次：冷启动、限流窗口都可能让下一次反而跑通，断不得。
                 // 留一条模型级记录（不带档位——没有哪一档被验过）交代基线为什么没过，随后照常逐档位验：
                 // 用户要的正是「哪一档行」，宁可多烧几次额度也不能替他把答案省掉
-                emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, undefined)
+                // 附注帧：基线不是被验对象，不占进度位
+                emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, { settled: 0 })
             }
         }
         const verdict = await probeOnce(llm, probe, signal)
@@ -119,7 +121,10 @@ const runGroup: GroupRunner = async (
             skipped = 0
         }
         if (skipped > 0) index += skipped
-        emitProbe(probe, { outcome, failure: verdict.failure }, skipped === 0 ? undefined : skipped)
+        emitProbe(probe, { outcome, failure: verdict.failure }, {
+            settled: 1 + skipped,
+            ...(skipped === 0 ? {} : { skipped }),
+        })
         if (blockedBy !== undefined) break
     }
     // 计划数 = 该组的验证请求数（基线不在清单里）：关档位时等于勾选模型数，开档位时等于档位数之和

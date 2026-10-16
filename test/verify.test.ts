@@ -1,6 +1,6 @@
 // 用例覆盖：src/probe-verdict.ts 的失败分类与两级短路判据、src/probe-plan.ts 的请求计划展开（逐模型逐档位 / needTest 声明 /
 // 入参校验与配额）与按提供方分组、src/probe-report.ts 的逐组汇报与汇总求和，以及 src/verify.ts 带桩跑通的整条执行链（基线探测现发 +
-// 分组串行 + 两级短路，含「本组首个请求超时即短整组」）
+// 分组串行 + 两级短路，含「本组首个请求超时即短整组」与进度帧的 done 不变量）
 import { verifyModels } from '@/verify'
 import { groupProbesByProvider, planProbes } from '@/probe-plan'
 import { reportProvider, summarizeProviders } from '@/probe-report'
@@ -8,7 +8,7 @@ import { classifyFailure, providerBlockReason, shouldSkipModelTail, shouldSkipMo
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import { decodeProgressFrame, encodeProgressFrame, isProviderBlocking, isTransientOutcome } from '@/shared/verify-progress'
-import type { ProbeOutcome, VerifyFailureFacts, VerifyProbe, VerifyProbeResult, VerifyProgressFrame, VerifyProviderReport } from '@/shared/verify-progress'
+import type { ProbeOutcome, VerifyFailureFacts, VerifyProbe, VerifyProbeResult, VerifyProbedFrame, VerifyProgressFrame, VerifyProviderReport } from '@/shared/verify-progress'
 import { check, stable } from '@test/helper'
 
 /**
@@ -442,7 +442,7 @@ export async function run(): Promise<void> {
             'verifyModels 档位请求撞额度耗尽即短该模型尾并记 skipped',
             calls.length === 2 && summary.probed === 1 && summary.planned === 3
             && stable(frames[1]) === stable({
-                type: 'probed', provider: 'a', model: 'm1', effort: 'off', outcome: 'quota', skipped: 2, done: 1, total: 3,
+                type: 'probed', provider: 'a', model: 'm1', effort: 'off', outcome: 'quota', skipped: 2, done: 3, total: 3,
             }),
             { calls, summary, frames },
         )
@@ -574,6 +574,40 @@ export async function run(): Promise<void> {
         )
     }
     {
+        // 基线（不带档位的对照请求）不是被验对象，进度上也不占位：限流时它那条模型级记录是**附注帧**，
+        // 只交代「基线为什么没过」，done 不动，故后面逐档位的帧照常从 1 数起
+        const frames: VerifyProgressFrame[] = []
+        const { llm } = stub({ 'm1': [finishError('RATE_LIMIT', 429)] })
+        await verifyModels(llm, { models: [entry('a', 'm1', ['off', 'high'])] }, {
+            onProgress: (frame) => { frames.push(frame) },
+        })
+        check(
+            'verifyModels 基线瞬态失败的那帧不占进度位（done 不越界）',
+            stable(frames.slice(0, 4)) === stable([
+                { type: 'opened', total: 2 },
+                { type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'rate-limit', done: 0, total: 2 },
+                { type: 'probed', provider: 'a', model: 'm1', effort: 'off', outcome: 'usable', done: 1, total: 2 },
+                { type: 'probed', provider: 'a', model: 'm1', effort: 'high', outcome: 'usable', done: 2, total: 2 },
+            ]),
+            frames,
+        )
+    }
+    {
+        // 进度契约的不变式：任何分支下每帧 done ≤ total，且整轮跑完落在 total 上（基线不占位、跳过条目计入）
+        const frames: VerifyProgressFrame[] = []
+        const { llm } = stub({ 'm1': [finishError('RATE_LIMIT', 429)], 'm2': [finishError('TRANSPORT')] })
+        await verifyModels(llm, {
+            models: [entry('a', 'm1', ['off', 'high']), entry('a', 'm2', ['low', 'max'])],
+        }, { onProgress: (frame) => { frames.push(frame) } })
+        const probed = frames.filter((frame): frame is VerifyProbedFrame => frame.type === 'probed')
+        check(
+            'verifyModels 全程 done ≤ total 且整轮跑完落在 total 上',
+            probed.every((frame) => frame.done <= frame.total)
+            && probed[probed.length - 1].done === probed[probed.length - 1].total,
+            probed,
+        )
+    }
+    {
         // 探测撞上端点不通：整组立刻停。探测本身不是被验对象（不进明细、不计统计），
         // 但它不通就意味着这个模型一条都没验成——不发记录的话它在记录区彻底消失，
         // 用户只看到别的模型的结果，无从知道它为什么没出现。故发一条不带档位的模型级记录
@@ -587,7 +621,7 @@ export async function run(): Promise<void> {
             calls.length === 1 && summary.probed === 0 && summary.planned === 3 && summary.tested === 1
             && summary.providers[0].blockedBy === 'unreachable' && !summary.providers[0].reachable
             && stable(frames[1]) === stable({
-                type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'unreachable', skipped: 3, done: 1, total: 3,
+                type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'unreachable', skipped: 3, done: 3, total: 3,
             }) && frames[2].type === 'done',
             { calls, summary, frames },
         )
@@ -606,7 +640,7 @@ export async function run(): Promise<void> {
             // 理由记「超时」而非「不可达」，reachable 也不翻假：超时只是没等到受理，不是传输层失败的证据
             && summary.providers[0].blockedBy === 'timeout' && summary.providers[0].reachable
             && stable(frames[1]) === stable({
-                type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'timeout', skipped: 3, done: 1, total: 3,
+                type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'timeout', skipped: 3, done: 3, total: 3,
             }) && frames[2].type === 'done',
             { calls, summary, frames },
         )
@@ -633,7 +667,7 @@ export async function run(): Promise<void> {
         check(
             'verifyModels 探测不通短该模型时发一条记录，skipped 含探测自身',
             calls.length === 1 && stable(frames[1]) === stable({
-                type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'other', skipped: 2, done: 1, total: 2,
+                type: 'probed', provider: 'a', model: 'm1', effort: undefined, outcome: 'other', skipped: 2, done: 2, total: 2,
             }),
             frames,
         )
@@ -648,7 +682,7 @@ export async function run(): Promise<void> {
         check(
             'verifyModels provider 级短路那条 probed 带 skipped',
             calls.length === 2 && stable(frames[1]) === stable({
-                type: 'probed', provider: 'a', model: 'm1', effort: 'off', outcome: 'credential', skipped: 2, done: 1, total: 3,
+                type: 'probed', provider: 'a', model: 'm1', effort: 'off', outcome: 'credential', skipped: 2, done: 3, total: 3,
             }),
             frames,
         )
