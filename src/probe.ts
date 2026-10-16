@@ -231,9 +231,9 @@ export async function probeAndFill(
     }
     startIgnoreAll()
     try {
-        // 先落一份整段配置到自有段再动配置：崩了也不至于把预声明留在用户配置里（详见 probe-backup.ts）。
+        // 先把探测目标的档位表原值落进自有段再动配置：崩了也不至于把预声明留在用户配置里（详见 probe-backup.ts）。
         // 存不下就整轮中止——没有退路就不动用户配置
-        await saveProbeBackup(ctx)
+        await saveProbeBackup(ctx, targets)
         const preexisting = await declareProbeEfforts(ctx, targets)
         const summary = await runProbeGroups(llm, groups, runProbeGroup, options)
         const entries = convergeEntries(groups, targets, preexisting, summary, flags.dropUnsupported, options.signal?.aborted === true)

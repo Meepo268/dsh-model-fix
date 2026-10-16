@@ -1,17 +1,20 @@
 /**
- * 「探测式填充」的崩溃兜底备份：探测开始前把 `llm-pi-ai` 的**整段 providers** 压成一个字符串存进自有段，
- * 收敛落盘后立刻删掉；插件启动末尾若还留着它，说明上一轮探测没能收尾，按这份备份把配置回退一次。
+ * 「探测式填充」的崩溃兜底备份：探测开始前把**探测目标的档位表原值**存进自有段，
+ * 启动末尾若还留着它，说明上一轮探测没能收尾，按这份备份把那些档位表撤回去。
  *
- * 设计裁决（整段备份理由、deflateRaw+base64、顶层键不进快照、收尾窗口代价）见 docs/decisions.md「探测式填充」。
+ * 备份只覆盖预声明动过的那一个字段：崩溃回退的唯一目的是「撤掉预声明」，故既不碰其他模型、
+ * 也不碰同一模型的其他字段，更不会复活用户在探测期间删掉的模型（理由见 docs/decisions.md）。
+ * 设计裁决（只备探测范围的理由、顶层键不进快照、收尾窗口代价）见 docs/decisions.md「探测式填充」。
  */
-import { deflateRawSync, inflateRawSync } from 'node:zlib'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
+import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { MAX_ATTEMPTS } from '@/constants'
 import { API_NS, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
 import { isPlainObject, providersOf } from '@/shared/types'
-import { planRestore } from '@/restore'
-import { endIgnoreAll, startIgnoreAll } from '@/guard'
+import type { EffortApply } from '@/fill'
+import { stripEmptyFields } from '@/empty'
+import { startIgnoreAll, endIgnoreAll } from '@/guard'
 import { queueTask } from '@/host'
 import { descriptorOf, ownSection } from '@/section'
 import { isSettingsConflict } from '@/shared/errors'
@@ -19,20 +22,99 @@ import { isSettingsConflict } from '@/shared/errors'
 /** 自有段里存这份备份的键（顶层，与 `version-N` 同级） */
 const PROBE_BACKUP_KEY = 'probeBackup'
 
-/** 整段 providers 压成一个字符串（JSON → deflateRaw → base64）；纯函数，可单测 */
-export function encodeProbeBackup(providers: Record<string, unknown>): string {
-    return Buffer.from(deflateRawSync(Buffer.from(JSON.stringify(providers), 'utf8'))).toString('base64')
+/** 回退只动这一个模型字段 */
+const FILL_FIELD = 'reasoningEfforts'
+
+/** 备份的形状：提供方 id → 模型 id → 该模型 `reasoningEfforts` 的**原值**深拷贝；
+ * `null` 哨兵表示「探测前就没有该字段」，回退时删键而不是写回 null。 */
+type ProbeBackup = Record<string, Record<string, unknown>>
+
+/** 「提供方 / 模型」二元组键：模型 id 可含 '/'，故用序列化而非字符串拼接（与 fill.ts 同口径） */
+function targetKey(provider: string, model: string): string {
+    return JSON.stringify([provider, model])
 }
 
-/** 解码备份：非字符串、空串、解压失败、JSON 不成立或不是普通对象，一律 undefined（读取侧永不抛） */
-export function decodeProbeBackup(text: unknown): Record<string, unknown> | undefined {
+/** 采集探测目标的档位表原值：只认当前存在的目标模型，逐字深拷贝（保留用户自己的 wire 拼写） */
+export function captureProbeBackup(
+    providers: Record<string, unknown>,
+    targets: readonly EffortApply[],
+): ProbeBackup {
+    const wanted = new Map<string, string>()
+    for (const target of targets) wanted.set(targetKey(target.provider, target.model), target.model)
+    const backup: ProbeBackup = {}
+    for (const [providerId, provider] of Object.entries(providers)) {
+        if (!isPlainObject(provider) || !Array.isArray(provider.models)) continue
+        for (const model of provider.models) {
+            if (!isPlainObject(model) || typeof model.id !== 'string') continue
+            if (!wanted.has(targetKey(providerId, model.id))) continue
+            const rows = backup[providerId] ??= {}
+            rows[model.id] = isPlainObject(model[FILL_FIELD]) ? structuredClone(model[FILL_FIELD]) : null
+        }
+    }
+    return backup
+}
+
+/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩——内容只有几批目标模型的档位表，
+ * 压不动多少；base64 是为了让段里存的是一行无引号无换行的纯文本，而非整段转义 JSON。 */
+export function encodeProbeBackup(backup: ProbeBackup): string {
+    return Buffer.from(JSON.stringify(backup), 'utf8').toString('base64')
+}
+
+/** 解码备份：非字符串、空串、base64 解出不是合法 JSON、顶层不是普通对象，一律 undefined（读取侧永不抛） */
+export function decodeProbeBackup(text: unknown): ProbeBackup | undefined {
     if (typeof text !== 'string' || text.length === 0) return undefined
+    let parsed: unknown
     try {
-        const parsed: unknown = JSON.parse(inflateRawSync(Buffer.from(text, 'base64')).toString('utf8'))
-        return isPlainObject(parsed) ? parsed : undefined
+        parsed = JSON.parse(Buffer.from(text, 'base64').toString('utf8'))
     } catch {
         return undefined
     }
+    if (!isPlainObject(parsed)) return undefined
+    const backup: ProbeBackup = {}
+    for (const [providerId, models] of Object.entries(parsed)) {
+        if (!isPlainObject(models)) return undefined
+        backup[providerId] = { ...models }
+    }
+    return backup
+}
+
+/**
+ * 回退计划（纯函数，零 ctx 依赖可单测）：
+ * 把备份里那些**当前仍在**的模型的档位表整字段写回原值；提供方被整删、模型被删都跳过（不复活），
+ * 同一模型的其余字段原样保留。遍历的是当次现读的 `providers`，故备份里没有的（窗口内新增）不会被删。
+ * 写入前过 `stripEmptyFields`（与另几条写回路径同一判据）：探测前若只剩 off，恢复后按统一口径清成未声明。
+ * 仅当某 provider 至少改写一个模型时才产出整段 set op（零变更零 op）。
+ *
+ * @returns `{ modelOps, changed }`，`changed` 为被撤掉预声明的模型数
+ */
+export function planProbeRestore(
+    backup: ProbeBackup,
+    providers: Record<string, unknown>,
+): { modelOps: SettingsPathOp[]; changed: number } {
+    const modelOps: SettingsPathOp[] = []
+    let changed = 0
+    for (const [providerId, savedModels] of Object.entries(backup)) {
+        const provider = providers[providerId]
+        if (!isPlainObject(provider) || !Array.isArray(provider.models)) continue
+        const list = provider.models
+        let next: Record<string, unknown>[] | undefined
+        for (let i = 0; i < list.length; i++) {
+            const model = list[i]
+            if (!isPlainObject(model) || typeof model.id !== 'string') continue
+            if (!Object.hasOwn(savedModels, model.id)) continue
+            const saved = savedModels[model.id]
+            // 幂等：档位表已与备份一致（常见于收敛已落盘、只差清备份就被杀）即零变更
+            if (deepEqualJson(model[FILL_FIELD] ?? null, saved)) continue
+            next ??= list.slice()
+            const replaced = { ...model }
+            if (saved === null) delete replaced[FILL_FIELD]
+            else replaced[FILL_FIELD] = saved
+            next[i] = stripEmptyFields(replaced)
+            changed++
+        }
+        if (next) modelOps.push({ op: 'set', path: ['providers', providerId, 'models'], value: next })
+    }
+    return { modelOps, changed }
 }
 
 /** 写自有段（冲突重试，读回最新 revision 后重发同一组 op——备份与清除都是幂等的） */
@@ -55,13 +137,17 @@ async function mutateOwn(ctx: Context, ops: readonly SettingsPathOp[]): Promise<
 /**
  * 探测开始前落备份。**失败即中止整轮**：没有退路就不动用户配置（预声明一旦写下就可能来不及收回）。
  * 调用方（`probeAndFill`）已持有事件流守卫，本函数不碰守卫。
+ *
+ * @param targets - 本轮探测的目标清单：备份范围就是它
  */
-export async function saveProbeBackup(ctx: Context): Promise<void> {
+export async function saveProbeBackup(ctx: Context, targets: readonly EffortApply[]): Promise<void> {
     const providers = providersOf(descriptorOf(ctx, API_NS)?.user)
     if (!providers) throw new Error(`${PLUGIN_NAME}: 当前 ${API_NS} 无 providers 段，无法生成探测前的兜底备份`)
-    const text = encodeProbeBackup(providers)
+    const backup = captureProbeBackup(providers, targets)
+    const text = encodeProbeBackup(backup)
     await mutateOwn(ctx, [{ op: 'set', path: [PROBE_BACKUP_KEY], value: text }])
-    ctx.logger.info(`${PLUGIN_NAME}: 已存下探测前的配置兜底备份（${Object.keys(providers).length} 个提供方，${text.length} 字符）`)
+    const count = Object.values(backup).reduce((sum, models) => sum + Object.keys(models).length, 0)
+    ctx.logger.info(`${PLUGIN_NAME}: 已存下探测前的档位表兜底备份（${count} 个模型，${text.length} 字符）`)
 }
 
 /** 收敛落盘后清备份；调用方持有守卫。清理失败不在此抛，由调用方决定降级 */
@@ -69,21 +155,15 @@ export function clearProbeBackup(ctx: Context): Promise<void> {
     return mutateOwn(ctx, [{ op: 'unset', path: [PROBE_BACKUP_KEY] }])
 }
 
-/**
- * 按备份回退模型（与「恢复备份」同一 `planRestore` 口径：回退共有 provider 的共有 model，不复活被删的 provider、
- * 不覆盖新增；探测本身不删模型，故这条路径上不会触发 model 复活）。
- *
- * 刻意**不走** `src/writeback.ts` 的写回外壳：本回退不打任何逐次日志（成败由启动链末尾统一汇报一条），
- * 套壳会凭空多出「零变更」与「失败第 n 次」两条告警。
- */
-async function restoreProviders(ctx: Context, backup: Record<string, unknown>): Promise<number> {
+/** 按备份撤掉预声明（语义见 `planProbeRestore`）。刻意不走 `src/writeback.ts` 的写回外壳：本回退不打任何逐次日志 */
+async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         if (!ctx.fiber.store) return 0
         const descriptor = descriptorOf(ctx, API_NS)
         const providers = providersOf(descriptor?.user)
         // 与 restoreModels 同理：读不到段时显式失败，返回 0 会被当成「本就一致」而静默吞掉真故障
         if (!providers) throw new Error(`${PLUGIN_NAME}: 当前 ${API_NS} 无 providers 段，无法回退`)
-        const { modelOps, changed } = planRestore(backup, providers)
+        const { modelOps, changed } = planProbeRestore(backup, providers)
         if (modelOps.length === 0) return 0
         try {
             await queueTask(() => ctx.settings.mutate(API_NS, modelOps, descriptor?.revision || 0))
@@ -98,9 +178,9 @@ async function restoreProviders(ctx: Context, backup: Record<string, unknown>): 
 
 /**
  * 启动末尾的崩溃回退：段里没有备份即无事可做（本轮没探测过，或上一轮正常收尾）；
- * 有则按备份回退并清掉备份，返回被回退的模型数（0 = 无可回退或本就一致）。
- * 回退期间持事件流守卫——写回触发的段变更事件必须被入口拦下，否则 `fix` 会在回退途中把预声明又填回来。
- * **恢复成功才清备份**：清除失败只是下次启动再回退一次（幂等、零 op），反过来先清则备份永久丢失。
+ * 有则按备份撤掉预声明并清掉备份，返回被撤的模型数（0 = 无可撤或本就一致）。
+ * 回退期间持事件流守卫——写回触发的段变更事件必须被入口拦下，否则 `fix` 会把预声明又填回来。
+ * **回退成功才清备份**：清除失败只是下次启动再撤一次（幂等、零 op），反过来先清则备份永久丢失。
  */
 export async function restoreProbeBackup(ctx: Context): Promise<number> {
     const section = ownSection(ctx)
@@ -108,7 +188,7 @@ export async function restoreProbeBackup(ctx: Context): Promise<number> {
     if (raw === undefined) return 0
     const backup = decodeProbeBackup(raw)
     if (!backup) {
-        ctx.logger.warn(`${PLUGIN_NAME}: 遗留的探测兜底备份无法解码，已丢弃（不回退任何模型）`)
+        ctx.logger.warn(`${PLUGIN_NAME}: 遗留的探测兜底备份无法解码，已丢弃（不撤任何预声明）`)
         await clearProbeBackup(ctx)
         return 0
     }
@@ -116,7 +196,7 @@ export async function restoreProbeBackup(ctx: Context): Promise<number> {
     try {
         const changed = await restoreProviders(ctx, backup)
         await clearProbeBackup(ctx)
-        if (changed > 0) ctx.logger.warn(`${PLUGIN_NAME}: 检测到上次探测式填充未收尾，已按备份回退 ${changed} 个模型`)
+        if (changed > 0) ctx.logger.warn(`${PLUGIN_NAME}: 检测到上次探测式填充未收尾，已撤掉 ${changed} 个模型的预声明档位`)
         return changed
     } finally {
         endIgnoreAll()
