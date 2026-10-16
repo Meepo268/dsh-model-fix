@@ -9,10 +9,9 @@ import { MAX_ATTEMPTS } from '@/constants'
 import { getConfig } from '@/config'
 import { queueTask } from '@/host'
 import { descriptorOf } from '@/section'
-import { isSettingsConflict } from '@/writeback'
+import { errorText, isSettingsConflict } from '@/shared/errors'
 import { PLUGIN_NS, PLUGIN_NAME } from '@/shared/constants'
 import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
-import { errorText } from '@/shared/errors'
 import type { EffortMemory } from '@/shared/types'
 
 /**

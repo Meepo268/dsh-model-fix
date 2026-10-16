@@ -14,7 +14,7 @@ import { planRestore } from '@/restore'
 import { endIgnoreAll, startIgnoreAll } from '@/guard'
 import { queueTask } from '@/host'
 import { descriptorOf, ownSection } from '@/section'
-import { isSettingsConflict } from '@/writeback'
+import { isSettingsConflict } from '@/shared/errors'
 
 /** 自有段里存这份备份的键（顶层，与 `version-N` 同级） */
 const PROBE_BACKUP_KEY = 'probeBackup'

@@ -1,6 +1,9 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { EFFORT_LEVELS } from '@/shared/constants'
+import { EFFORT_LEVELS, MAX_ATTEMPTS } from '@/shared/constants'
+
+// MAX_ATTEMPTS 跨半共享在 src/shared/constants.ts；此处 re-export 保持 Node 半既有 import 路径不变
+export { MAX_ATTEMPTS }
 
 /** models.dev 容量字段对"无限/未公布"的哨兵建模值，视为无数据 */
 export const CAPACITY_UNLIMITED = 99_999_999
@@ -8,8 +11,6 @@ export const CAPACITY_UNLIMITED = 99_999_999
 export const API_URL = 'https://models.dev/api.json'
 /** 拉取超时（毫秒） */
 export const FETCH_MS = 10_000
-/** 拉取、缓存写入与填充冲突共用的总尝试次数 */
-export const MAX_ATTEMPTS = 3
 /** 拉取与缓存写入失败后的固定重试间隔（毫秒） */
 export const RETRY_DELAY_MS = 5_000
 /** 事件驱动刷新的最小间隔（毫秒）：距上次成功拉取不足该时长时，事件只填充不重新拉取 */

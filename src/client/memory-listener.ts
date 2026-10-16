@@ -23,10 +23,12 @@ import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/
 // SessionId 品牌 id（sessions / modelDirectories 服务的键类型）
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DEFAULT_CONFIG } from '@/shared/config-schema'
+import { MAX_ATTEMPTS } from '@/shared/constants'
 import { VERSION_KEY } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { applyEffort, classifyTransition, sameSelection } from '@/client/effort'
 import type { DecodedScope } from '@/client/scope'
+import { isSettingsConflict } from '@/shared/errors'
 
 /**
  * 挂上记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用）。
@@ -35,12 +37,26 @@ import type { DecodedScope } from '@/client/scope'
  * @param scope - 本插件命名空间的 decode 后段视图（记忆经它直写）
  */
 export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScope<Flags>): void {
-    // 每模型推理级别记忆经自有 NS 的 settings scope 直写（与「保存」同一条写路径）；
-    // 空记忆也写 `{}` 而非删键——字段在文件里恒存在、形态恒定
+    // 记忆写入带三条护栏：
+    // 1. 段未 ready 放弃——ConfigForm loading 时 value 回落 DEFAULT_CONFIG（efforts={}），
+    //    以此整段 set 等于清空全部记忆，宁丢勿误清。
+    // 2. expectedRevision 围栏——与 Node 半 updateMemory 对称。
+    // 3. SETTINGS_CONFLICT 重读重算——按旧段回放会抹掉他方刚写入的记忆。
     const rememberEffort = (provider: string, model: string, effort: string | null): void => {
-        const next = applyEffort(scope.getSnapshot().value?.efforts ?? {}, provider, model, effort)
-        // 记忆写入失败不影响会话本身（级别已在当前会话生效），故只吞掉 rejection
-        void scope.mutate([{ op: 'set', path: [VERSION_KEY, 'efforts'], value: next }]).catch(() => {})
+        void (async (): Promise<void> => {
+            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                const snap = scope.getSnapshot()
+                if (snap.status !== 'ready' || snap.value === undefined || snap.revision === undefined) return
+                const next = applyEffort(snap.value.efforts, provider, model, effort)
+                try {
+                    await scope.mutate([{ op: 'set', path: [VERSION_KEY, 'efforts'], value: next }], snap.revision)
+                    return
+                } catch (error) {
+                    if (isSettingsConflict(error) && attempt < MAX_ATTEMPTS) continue
+                    return // 记忆可丢，非冲突错误静默放过
+                }
+            }
+        })()
     }
 
     // 记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用）：纯监听，只订阅会话投影；

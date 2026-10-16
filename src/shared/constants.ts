@@ -71,3 +71,8 @@ export const ENDPOINT_RESTORE_MODELS = 'restoreModels'
 export const ENDPOINT_PRUNE_EFFORTS = 'pruneEfforts'
 /** 浏览器半启动时上报探测语言的 endpoint 名（Node 侧没有 locale 服务，见 effort-name.ts 的语言解析） */
 export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
+
+/**
+ * settings 写回冲突重试共用次数（纯数值，跨半共享）。值变更须同步两端——差异直接造成写入行为不一致。
+ */
+export const MAX_ATTEMPTS = 3

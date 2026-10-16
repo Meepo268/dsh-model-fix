@@ -10,7 +10,7 @@ import type { PluginConfigSnapshot, VersionedSection } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
 import { upgradeConfig } from '@/upgrade'
-import { isSettingsConflict } from '@/writeback'
+import { isSettingsConflict } from '@/shared/errors'
 
 /**
  * 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。

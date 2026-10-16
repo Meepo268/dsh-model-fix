@@ -14,16 +14,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { MAX_ATTEMPTS } from '@/constants'
 import { API_NS, PLUGIN_NAME } from '@/shared/constants'
-import { errorText } from '@/shared/errors'
+import { errorText, isSettingsConflict } from '@/shared/errors'
 import { providersOf } from '@/shared/types'
 import { endIgnoreAll, startIgnoreAll } from '@/guard'
 import { queueTask } from '@/host'
 import { descriptorOf } from '@/section'
-
-/** 冲突判定：命名空间在读写之间被改动，宿主以 `code` 拒写（码面见 `docs/host-api.md`） */
-export function isSettingsConflict(error: unknown): boolean {
-    return (error as { code?: unknown })?.code === 'SETTINGS_CONFLICT'
-}
 
 /** 写回计划的共同形状：整段 `models` 的 op（各端点自带统计字段，形状不动以免波及纯函数的单测） */
 export interface ApiWritebackPlan {
