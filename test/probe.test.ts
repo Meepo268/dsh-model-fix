@@ -1,12 +1,11 @@
 // src/probe.ts 与 src/fill.ts 用例：预声明 → 逐档探测 → 收敛写回的整条链（档位不支持的两条件判据、
-// 与档位无关的失败（额度耗尽，及本功能自有的限流）短到模型尾而「参数不正确」不短、provider 级短路（含本组首个请求超时即短整组）、未跑完即还原、关自动写入整轮还原、剔除不支持、忽略排除、帧序列与终帧里的写回统计）
+// 与档位无关的失败（额度耗尽，及本功能自有的限流）短到模型尾而「参数不正确」不短、provider 级短路（含本组首个请求超时即短整组）、未跑完即还原、关自动写入整轮还原、剔除不支持、写回范围只认冻结的候选清单、帧序列与终帧里的写回统计）
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import { probeAndFill } from '@/probe'
 import { planEffortApply, declaredEffortsOf } from '@/fill'
 import { API_NS, EFFORT_LEVELS } from '@/shared/constants'
-import type { PluginConfig } from '@/shared/types'
 import type { VerifyProgressFrame } from '@/shared/verify-progress'
 import { makeStubCtx } from '@test/ctx'
 import { check, stable } from '@test/helper'
@@ -352,12 +351,12 @@ export async function run(): Promise<void> {
         )
     }
     {
-        // 忽略排除：同一个 ctx，开关开则被排除的提供方照常预声明与写回
+        // 写回范围只认冻结的候选清单：lab 在 excludes 里也照写
         const ctx = ctxOf()
         const { llm, calls } = stub({})
-        await probeAndFill(ctx as unknown as Context, llm, { models: [target('lab', 'n1')], ignoreExcludes: true })
+        await probeAndFill(ctx as unknown as Context, llm, { models: [target('lab', 'n1')] })
         check(
-            '忽略排除：被排除的提供方也探测并写入',
+            'excludes 里的提供方只要在候选清单中就照常预声明与写入',
             calls.length === 6 && stable(Object.keys(effortsOf(ctx, 'lab', 'n1') as Record<string, unknown>)) === stable(EFFORT_LEVELS.filter((l) => l !== 'off')),
             { calls, efforts: effortsOf(ctx, 'lab', 'n1') },
         )
@@ -406,16 +405,7 @@ export async function run(): Promise<void> {
         check('档位越界即拒绝', message.includes('探测请求不合法') && ctx.mutateCalls.length === 0, message)
     }
 
-    // ---------- 纯函数：planEffortApply 的两种口径与排除判定 ----------
-    const base: PluginConfig = {
-        autoFill: { reasoning: true, context: false, image: true },
-        allowUpdate: { reasoning: false, context: true, image: false },
-        compat: { disableDeveloper: true, disableStore: true },
-        excludes: ['lab'],
-        efforts: {},
-        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
-        userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true },
-    }
+    // ---------- 纯函数：planEffortApply 的两种统计口径与范围判定 ----------
     const providers = {
         acme: {
             models: [
@@ -426,8 +416,8 @@ export async function run(): Promise<void> {
         },
         lab: { models: [{ id: 'n1' }] },
     }
-    const apply = (entries: readonly { provider: string; model: string; levels: readonly string[] }[], ignore = false) =>
-        planEffortApply(base, providers, entries, ignore)
+    const apply = (entries: readonly { provider: string; model: string; levels: readonly string[] }[]) =>
+        planEffortApply(providers, entries)
     {
         // 算出的档位表与现有相同 ⇒ 零变更零 op（幂等：重跑一轮不该反复写）
         const same = apply([{ provider: 'acme', model: 'm2', levels: ['off', 'high'] }])
@@ -449,13 +439,14 @@ export async function run(): Promise<void> {
         )
         // 空表即删键：不写空对象（空壳等同未声明，且会反复触发写入判定）
         check('空表删键时按原有档位表计删除条数（m2 原有两档）', two.models === 2 && two.added === 1 && two.removed === 2, two)
-        // 排除命中：默认整组跳过
-        const skipped = apply([{ provider: 'lab', model: 'n1', levels: ['off'] }])
-        check('排除命中的提供方默认整组跳过', skipped.modelOps.length === 0 && skipped.models === 0, skipped)
-        const forced = apply([{ provider: 'lab', model: 'n1', levels: ['off'] }], true)
-        check('忽略排除时同一份目标照写', forced.modelOps.length === 1 && forced.models === 1, forced)
+        // 范围只由 entries 决定：excludes 里的提供方进了清单也照写
+        const listed = apply([{ provider: 'lab', model: 'n1', levels: ['off'] }])
+        check('excludes 里的提供方进了 entries 就照写，不按 excludes 跳过', listed.modelOps.length === 1 && listed.models === 1, listed)
+        // 目标在当次配置里不存在（探测途中被删）即静默不命中，不产出 op
+        const gone = apply([{ provider: 'acme', model: 'removed', levels: ['off'] }])
+        check('entries 里的目标已不在配置中：零 op、零统计', gone.modelOps.length === 0 && gone.models === 0, gone)
         // 模型 id 可含 '/'：键用二元组序列化，与 verifyKey / planPruneEfforts 同口径
-        const slashed = planEffortApply(base, { acme: { models: [{ id: 'z-ai/glm-5' }] } }, [{ provider: 'acme', model: 'z-ai/glm-5', levels: ['off'] }], false)
+        const slashed = planEffortApply({ acme: { models: [{ id: 'z-ai/glm-5' }] } }, [{ provider: 'acme', model: 'z-ai/glm-5', levels: ['off'] }])
         check('模型 id 含斜杠仍按二元组键命中', slashed.models === 1, slashed)
         // 原有档位表读取：只认纯对象的键并按规范次序排序，未声明即空表
         check(
@@ -466,7 +457,7 @@ export async function run(): Promise<void> {
         )
         // 补齐档位时保留已有键的线拼写（如 high:'ultra'），不为所有键重写默认值
         const customProviders = { acme: { models: [{ id: 'mc', reasoningEfforts: { off: 'none', high: 'ultra' } }] } }
-        const customApply = planEffortApply(base, customProviders, [{ provider: 'acme', model: 'mc', levels: ['off', 'low', 'high', 'xhigh'] }], false)
+        const customApply = planEffortApply(customProviders, [{ provider: 'acme', model: 'mc', levels: ['off', 'low', 'high', 'xhigh'] }])
         const customWritten = customApply.modelOps[0]?.op === 'set' ? customApply.modelOps[0].value : undefined
         check(
             '补齐档位时保留已有线拼写（off:none 与 high:ultra 原样保留，新补的取档位名）',
@@ -475,7 +466,8 @@ export async function run(): Promise<void> {
         )
     }
     {
-        // 自有段缺失 ⇒ 无法确认排除列表 ⇒ 必须显式失败（回退默认会让 excludes 变空）
+        // 自有段缺失 ⇒ 兜底备份无处可放，整轮中止（预声明一旦写下就可能来不及收回，没有退路就不动用户配置）。
+        // 与 excludes 无关：写回已不读它，但备份始终要存进自有段
         const ctx = makeStubCtx({ api: { providers: { acme: { models: [{ id: 'm1' }] } } }, noPlugin: true })
         const { llm } = stub({})
         let message = ''
@@ -484,21 +476,8 @@ export async function run(): Promise<void> {
         } catch (error) {
             message = error instanceof Error ? error.message : String(error)
         }
-        check('自有段不可读且未忽略排除：显式失败且零写入', message.includes('自有配置段') && ctx.mutateCalls.length === 0, message)
-    }
-    {
-        // 自有段缺失 ⇒ 连兜底备份都无处可放，整轮中止（预声明一旦写下就可能来不及收回，没有退路就不动用户配置）。
-        // 「忽略排除」豁免不了这一条：它只豁免读 excludes，不豁免「崩了怎么收场」
-        const ctx = makeStubCtx({ api: { providers: { acme: { models: [{ id: 'm1' }] } } }, noPlugin: true })
-        const { llm } = stub({})
-        let message = ''
-        try {
-            await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')], ignoreExcludes: true })
-        } catch (error) {
-            message = error instanceof Error ? error.message : String(error)
-        }
         check(
-            '自有段不可读即便忽略排除也中止：显式失败且模型配置一个字节都没动',
+            '自有段不可读即中止：显式失败且模型配置一个字节都没动',
             message.includes('自有配置段') && apiWrites(ctx).length === 0,
             message,
         )

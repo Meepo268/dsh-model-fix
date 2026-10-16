@@ -3,7 +3,7 @@
  * 按结论**收敛**成最终档位表并写回。全过程只由用户主动发起，且在途全程持有事件流守卫。
  *
  * 设计裁决（预声明必要性、收敛口径、两级短路判据、中止整轮还原、配额、兜底备份）见 docs/decisions.md「探测式填充」。
- * 本文件独有的口径：flagsOf 三开关缺省语义——`ignoreExcludes` 与 `dropUnsupported` 缺省为关，`autoWrite` 缺省为开。
+ * 本文件独有的口径：flagsOf 的开关缺省语义——`dropUnsupported` 缺省为关，`autoWrite` 缺省为开。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -97,8 +97,9 @@ const runProbeGroup: GroupRunner = async (
     }
 }
 
-/** 三个开关的取值：「自动写入」缺省为开（不带该键的旧前端行为不变），其余缺省为关；显式给了却不是布尔值按非法入参拒绝（Node 半不替浏览器半反推语义） */
-function flagsOf(payload: unknown): { ignoreExcludes: boolean; dropUnsupported: boolean; autoWrite: boolean } {
+/** 两个开关的取值：「自动写入」缺省为开（不带该键的旧前端行为不变），「剔除不支持」缺省为关；显式给了却不是布尔值按非法入参拒绝（Node 半不替浏览器半反推语义）。
+ * 「忽略排除」照此校验却不取用：它只决定浏览器半点开弹层时冻结的候选清单含不含被排除的提供方，两次写回一律按那份清单走，不再读 excludes */
+function flagsOf(payload: unknown): { dropUnsupported: boolean; autoWrite: boolean } {
     if (!isPlainObject(payload)) throw new Error(PROBE_REJECT_MESSAGE)
     const read = (key: string, absent: boolean): boolean => {
         const value = payload[key]
@@ -106,7 +107,8 @@ function flagsOf(payload: unknown): { ignoreExcludes: boolean; dropUnsupported: 
         if (typeof value !== 'boolean') throw new Error(PROBE_REJECT_MESSAGE)
         return value
     }
-    return { ignoreExcludes: read('ignoreExcludes', false), dropUnsupported: read('dropUnsupported', false), autoWrite: read('autoWrite', true) }
+    read('ignoreExcludes', false)
+    return { dropUnsupported: read('dropUnsupported', false), autoWrite: read('autoWrite', true) }
 }
 
 /**
@@ -232,12 +234,12 @@ export async function probeAndFill(
         // 先落一份整段配置到自有段再动配置：崩了也不至于把预声明留在用户配置里（详见 probe-backup.ts）。
         // 存不下就整轮中止——没有退路就不动用户配置
         await saveProbeBackup(ctx)
-        const preexisting = await declareProbeEfforts(ctx, targets, flags.ignoreExcludes)
+        const preexisting = await declareProbeEfforts(ctx, targets)
         const summary = await runProbeGroups(llm, groups, runProbeGroup, options)
         const entries = convergeEntries(groups, targets, preexisting, summary, flags.dropUnsupported, options.signal?.aborted === true)
         let fill: NonNullable<VerifySummary['fill']>
         if (flags.autoWrite) {
-            const { models, added, removed } = await convergeProbeEfforts(ctx, entries, flags.ignoreExcludes, preexisting)
+            const { models, added, removed } = await convergeProbeEfforts(ctx, entries, preexisting)
             fill = { models, added, removed }
         } else {
             // 「自动写入」关闭：结论只算不写——写回端走整轮还原（与中止同一形态），
@@ -248,7 +250,7 @@ export async function probeAndFill(
                 const before = preexisting.get(targetKey(target.provider, target.model))
                 if (before !== undefined) restore.push({ provider: target.provider, model: target.model, levels: before })
             }
-            await convergeProbeEfforts(ctx, restore, flags.ignoreExcludes, preexisting)
+            await convergeProbeEfforts(ctx, restore, preexisting)
         }
         // 收敛已落盘即可撤掉兜底备份；撤不掉只告警（下次启动会把这轮补全回退掉，多探一次而已），
         // 不因清理失败把已经成功的补全报成失败
