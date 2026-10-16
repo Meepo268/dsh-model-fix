@@ -96,7 +96,8 @@ function terminalLabelsOf(t: TranslateNS<'settings.modelFix'>): TerminalLabels {
     }
 }
 
-/** 每种探测结论对应的展示词；判别值与 `ProbeOutcome` 一一对应，漏一个即类型报错 */
+/** 每种探测结论对应的展示词；判别值与 `ProbeOutcome` 一一对应，漏一个即类型报错。
+ * `aborted` 只占类型位：中止一律不入账，不会出现在记录区 */
 const OUTCOME_KEYS: Record<ProbeOutcome, CardKey> = {
     usable: 'verifyOutUsable',
     'unsupported-effort': 'verifyOutUnsupported',
@@ -105,6 +106,7 @@ const OUTCOME_KEYS: Record<ProbeOutcome, CardKey> = {
     credential: 'verifyOutCredential',
     'rate-limit': 'verifyOutRateLimit',
     timeout: 'verifyOutTimeout',
+    aborted: 'verifyOutAborted',
     other: 'verifyOutOther',
 }
 

@@ -50,6 +50,11 @@ export type ProbeOutcome =
     | 'rate-limit'
     /** 瞬态失败：本方或上游超时，理由同上 */
     | 'timeout'
+    /**
+     * 中止（外部：用户点停止 / 关窗 / 断连；或上游主动中止）：**这一条没有结论**。
+     * 故不入明细、不发帧、不短路——记成「其它失败」等于把用户按的停止说成厂商拒绝。
+     */
+    | 'aborted'
     /** 其它厂商侧拒绝（含上游 5xx）：**不能断定后续请求必然失败**，故既不短整组也不短该模型的档位尾 */
     | 'other'
 
@@ -77,6 +82,7 @@ export function isProviderBlocking(outcome: ProbeOutcome): outcome is Exclude<Pr
  *
  * 这类结论既不算不可用，也**不能用来短该模型的后续档位**：控制变量法的前提是变量已知失败，
  * 而限流与超时恰恰说明这次结果不可外推；把它们当失败等于把一次偶发抖动固化成「这个档位不可用」。
+ * 中止不在其列：它压根没跑成，由执行层直接不入账。
  */
 export function isTransientOutcome(outcome: ProbeOutcome): boolean {
     return outcome === 'rate-limit' || outcome === 'timeout'

@@ -48,6 +48,8 @@ const runProbeGroup: GroupRunner = async (
         const probe = group.probes[index]
         const verdict = await probeOnce(llm, probe, signal)
         sent += 1
+        // 中止没有结论：不入明细也不发帧，不能进补全与剔除的输入
+        if (verdict.outcome === 'aborted') continue
         if (verdict.outcome === 'usable') usable.add(probe.model)
         // 判「这一档不被支持」要两个条件：宿主判为「参数不正确」，且该模型已有更低档跑通
         // （更低的档已跑通 ⇒ 端点、凭据、额度、网络与模型名都无碍，唯一剩下的变量就是这一档）。

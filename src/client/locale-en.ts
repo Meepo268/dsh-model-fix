@@ -110,6 +110,7 @@ export const en: Record<CardKey, string> = {
     verifyOutCredential: 'invalid credential',
     verifyOutRateLimit: 'rate limited, no conclusion',
     verifyOutTimeout: 'timed out, no conclusion',
+    verifyOutAborted: 'aborted, no conclusion',
     verifyOutOther: 'unavailable',
     verifyStopped: 'Stopped',
     verifyStoppedLine: 'Stopped; this run does not continue.',

@@ -16,6 +16,9 @@ const FINISH_STOP = { type: 'finish', reason: { kind: 'stop' } }
 const finishError = (code: string, status?: number): StreamChunk =>
     ({ type: 'finish', reason: { kind: 'error', failure: { code, message: '文案随便写', ...(status === undefined ? {} : { status }) } } }) as unknown as StreamChunk
 const ok = (): readonly StreamChunk[] => [BLOCK_START as unknown as StreamChunk, FINISH_STOP as unknown as StreamChunk]
+/** 宿主归一出的中止终帧（`signal?.aborted || code === 'ABORTED'` → `aborted`） */
+const finishAborted = (): readonly StreamChunk[] =>
+    [{ type: 'finish', reason: { kind: 'aborted', failure: { code: 'ABORTED', message: '文案随便写' } } } as unknown as StreamChunk]
 
 /** 探测的请求计划：已声明 off 的模型发满七档，未声明的不发 off（与浏览器半 probeTargetsOf 同形） */
 const target = (provider: unknown, model: unknown, hasOff = false) => ({
@@ -324,6 +327,20 @@ export async function run(): Promise<void> {
             { m1: effortsOf(ctx, 'acme', 'm1'), m2: effortsOf(ctx, 'acme', 'm2') },
         )
         check('中止时零写入（整轮还原后与原值相同）', summary.fill?.models === 0, summary.fill)
+    }
+    {
+        // 上游自己报 ABORTED 而我们并未中止：不入账但不短档位尾，后面照探；
+        // 少了这一条即 probed < planned，该模型被既有「没跑满即还原」挡住，半截结论不写回
+        const ctx = ctxOf()
+        const { llm, calls } = stub({ 'm1@low': finishAborted() })
+        const summary = await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')] })
+        check(
+            '上游中止不入账但不短档位尾：后续档位照探，且该模型按「没跑满」还原',
+            calls.length === 6 && summary.results.every((item) => item.outcome !== 'aborted')
+            && summary.usableEfforts.every((item) => item.effort !== 'low')
+            && effortsOf(ctx, 'acme', 'm1') === undefined && summary.fill?.models === 0,
+            { calls, results: summary.results, efforts: effortsOf(ctx, 'acme', 'm1'), fill: summary.fill },
+        )
     }
     {
         // 关「自动写入」：探测照常预声明与执行，结论只算不写——全部模型原样还原预声明之前的

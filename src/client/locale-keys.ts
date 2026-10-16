@@ -115,6 +115,7 @@ export type CardKey =
     | 'verifyOutCredential'
     | 'verifyOutRateLimit'
     | 'verifyOutTimeout'
+    | 'verifyOutAborted'
     | 'verifyOutOther'
     | 'verifyStopped'
     | 'verifyStoppedLine'

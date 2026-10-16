@@ -19,6 +19,8 @@ const UNSUPPORTED_EFFORT_CODE = 'UNSUPPORTED_REASONING_EFFORT'
 const RATE_LIMIT_CODE = 'RATE_LIMIT'
 /** 宿主规范码：上游超时；与本方探测超时同性质 */
 const TIMEOUT_CODE = 'TIMEOUT'
+/** 宿主规范码：请求被中止。用户点停止、关窗断连与上游主动中止都归到它，故它不是失败、没有结论 */
+const ABORTED_CODE = 'ABORTED'
 /**
  * 宿主给出的传输层失败码：连接中断、流被截断。真「连不上」只有这一类信号。
  *
@@ -39,9 +41,9 @@ export interface ProbeVerdict {
 
 /**
  * 由终止块的失败事实判定探测结果。一律按宿主的 `code` 判：不看 `status`（对 pi-ai 侧恒缺），
- * 也不比对文案。限流与超时单列为瞬态——它们只说明「这一次没跑成」，不是模型或档位不可用的证据，
- * 故不参与 provider 级短路、也不短该模型的后续档位。其余未识别的码归「其它厂商侧拒绝」，
- * 多与具体模型有关。
+ * 也不比对文案。限流与超时单列为瞬态——只说明「这一次没跑成」，不参与 provider 级短路、也不短该模型的后续档位。
+ * 中止单列一态：它没有结论，落到「其它」等于把用户按的停止说成厂商拒绝，进而错误短掉整个模型的档位尾。
+ * 其余未识别的码归「其它厂商侧拒绝」，多与具体模型有关。
  */
 export function classifyFailure(failure: LlmFailure): Exclude<ProbeOutcome, 'usable'> {
     if (failure.code === UNSUPPORTED_EFFORT_CODE) return 'unsupported-effort'
@@ -50,6 +52,7 @@ export function classifyFailure(failure: LlmFailure): Exclude<ProbeOutcome, 'usa
     if (UNREACHABLE_CODES.has(failure.code)) return 'unreachable'
     if (failure.code === RATE_LIMIT_CODE) return 'rate-limit'
     if (failure.code === TIMEOUT_CODE) return 'timeout'
+    if (failure.code === ABORTED_CODE) return 'aborted'
     return 'other'
 }
 
@@ -122,6 +125,7 @@ export function shouldSkipModelTail(outcome: ProbeOutcome, failure: VerifyFailur
  * 基线请求**不带推理级别**，故它的失败天生与档位无关：同一个模型再换任何档位，请求的其余部分一模一样。
  * 于是只剩「这个失败是不是确定性的」一问——限流与超时明确不是（隔一会儿就通），
  * 额度耗尽与其它厂商侧拒绝则是（模型不存在、参数被拒、无权限、上游持续故障），故短路。
+ * 中止不在其列：它没有结论，什么也没否定。
  *
  * 与档位请求上的模型级短路分开，是因变量不同：那里「档位」是唯一变过的变量，故只有额度够格；
  * 这里档位压根没参与，剩下的失败对同一模型的后续请求照样成立。

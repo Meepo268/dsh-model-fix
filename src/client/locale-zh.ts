@@ -110,6 +110,7 @@ export const zh: Record<CardKey, string> = {
     verifyOutCredential: '凭据无效',
     verifyOutRateLimit: '触发限流，未得出结论',
     verifyOutTimeout: '超时，未得出结论',
+    verifyOutAborted: '已中止，未得出结论',
     verifyOutOther: '不可用',
     verifyStopped: '已停止',
     verifyStoppedLine: '已停止，本轮不再继续验证。',

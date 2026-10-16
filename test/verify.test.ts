@@ -27,6 +27,9 @@ const FINISH_STOP = { type: 'finish', reason: { kind: 'stop' } }
 const finishError = (code: string, status?: number): StreamChunk =>
     ({ type: 'finish', reason: { kind: 'error', failure: failure(code, status) } }) as unknown as StreamChunk
 
+/** 宿主归一出的中止终帧（`signal?.aborted || code === 'ABORTED'` → `aborted`，见 docs/host-api.md） */
+const FINISH_ABORTED = { type: 'finish', reason: { kind: 'aborted', failure: failure('ABORTED') } } as unknown as StreamChunk
+
 /** 失败事实（`VerifyFailureFacts`）桩：只给 code 与 message，status 恒缺（pi-ai 路径即如此） */
 const failureFacts = (code: string): VerifyFailureFacts => ({ code, status: undefined, message: '文案随便写' })
 
@@ -120,6 +123,8 @@ export async function run(): Promise<void> {
     // 当成「不可用」还顺手跳过后续档位，等于把一次抖动固化成结论
     check('classifyFailure 上游限流归瞬态而非不可用', classifyFailure(failure('RATE_LIMIT', 429)) === 'rate-limit')
     check('classifyFailure 上游超时归瞬态而非不可用', classifyFailure(failure('TIMEOUT')) === 'timeout')
+    // 中止不是失败：用户按的停止与上游主动中止都归到它，落到「其它」会把停止说成厂商拒绝
+    check('classifyFailure 中止单列一态', classifyFailure(failure('ABORTED')) === 'aborted')
 
     // ---------- isProviderBlocking：单看自身就否定整个提供方的只有端点不通与凭据无效 ----------
     check('isProviderBlocking 端点不可达', isProviderBlocking('unreachable') === true)
@@ -151,6 +156,8 @@ export async function run(): Promise<void> {
     check('基线额度耗尽短该模型尾', shouldSkipModelTailAfterBaseline('quota') === true)
     check('基线被厂商确定性拒绝（模型不存在 / 参数被拒 / 无权限）短该模型尾', shouldSkipModelTailAfterBaseline('other') === true)
     check('基线限流与超时不断（冷启动、限流窗口都可能让下一次反而跑通）', shouldSkipModelTailAfterBaseline('rate-limit') === false && shouldSkipModelTailAfterBaseline('timeout') === false)
+    // 中止没有结论，什么也没否定：按它短掉整个模型的档位尾 = 把用户按的停止当成厂商拒绝
+    check('基线中止不断（没有结论可言）', shouldSkipModelTailAfterBaseline('aborted') === false && providerBlockReason('aborted', true) === undefined && shouldSkipModelTail('aborted', undefined) === false)
     check('基线可用不短', shouldSkipModelTailAfterBaseline('usable') === false)
 
     // ---------- isTransientOutcome：瞬态既不算不可用，也不能用来短该模型的后续档位 ----------
@@ -700,6 +707,39 @@ export async function run(): Promise<void> {
             'verifyModels 中止后早停且不发 done',
             calls.length === 2 && frames.every((frame) => frame.type !== 'done')
             && summary.probed === 1 && summary.planned === 3,
+            { calls, frames, summary },
+        )
+    }
+    {
+        // 中止撞在在途请求上：宿主给 `aborted` 终帧。它没有结论——不记「不可用」，也不短该模型档位尾
+        const controller = new AbortController()
+        const frames: VerifyProgressFrame[] = []
+        const { llm, calls } = stub({ m1: [FINISH_ABORTED] }, () => controller.abort())
+        const summary = await verifyModels(llm, { models: [entry('a', 'm1', ['off', 'high'])] }, {
+            signal: controller.signal,
+            onProgress: (frame) => { frames.push(frame) },
+        })
+        check(
+            'verifyModels 基线中止不入账不发帧（不再记成不可用、不再甩锅短路）',
+            calls.length === 1 && summary.results.length === 0
+            && frames.filter((frame) => frame.type === 'probed').length === 0
+            && frames.every((frame) => frame.type !== 'done'),
+            { calls, frames, summary },
+        )
+    }
+    {
+        // 上游自己报 ABORTED 而我们并未中止：同样没有结论，但不能因此停下，后面档位照验
+        const frames: VerifyProgressFrame[] = []
+        const { llm, calls } = stub({ 'm1@off': [FINISH_ABORTED] })
+        const summary = await verifyModels(llm, { models: [entry('a', 'm1', ['off', 'high'])] }, {
+            onProgress: (frame) => { frames.push(frame) },
+        })
+        check(
+            'verifyModels 上游中止不记账但继续验后续档位',
+            calls.length === 3 && summary.probed === 1 && summary.planned === 2 && summary.efforts === 1
+            && stable(summary.results) === stable([
+                { provider: 'a', model: 'm1', effort: 'high', outcome: 'usable', failure: undefined },
+            ]),
             { calls, frames, summary },
         )
     }

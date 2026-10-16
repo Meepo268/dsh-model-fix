@@ -87,6 +87,9 @@ const runGroup: GroupRunner = async (
                 emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, { settled: tail + 1, skipped: tail + 1 })
                 index += tail
                 continue
+            } else if (testVerdict.outcome === 'aborted') {
+                // 中止没有结论：不发记录、不短路。外部中止就此整组停下；上游中止照常往下验
+                if (signal.aborted) break
             } else {
                 // 限流与超时只否定了这一次：冷启动、限流窗口都可能让下一次反而跑通，断不得。
                 // 留一条模型级记录（不带档位——没有哪一档被验过）交代基线为什么没过，随后照常逐档位验：
@@ -97,6 +100,8 @@ const runGroup: GroupRunner = async (
         }
         const verdict = await probeOnce(llm, probe, signal)
         sent += 1
+        // 中止没有结论：不入明细也不发帧，更不能算成「档位不支持」
+        if (verdict.outcome === 'aborted') continue
         // 基线已通过、且该档位的失败指明了「就是它」时，才判该档位不支持。判据见 isEffortRejection
         const outcome = probe.effort !== undefined && baselineOk.has(probe.model) && isEffortRejection(verdict.failure)
             ? 'unsupported-effort'

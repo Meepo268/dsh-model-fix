@@ -27,7 +27,7 @@ function failureFacts(failure: LlmFailure): VerifyFailureFacts {
 
 /**
  * 发一次探测并判定：收到首个 `block-start` 即判「受支持」；否则读到终止块、据其失败事实分类。
- * 我方超时引发的 `aborted` 不算「端点不可达」——那会把慢端点误判成断线，进而错误短路整组。
+ * 中止（外部或上游）没有结论，单列 `'aborted'`；我方超时归 `'timeout'`——都不能误判成端点不可达。
  */
 export async function probeOnce(
     llm: Pick<LlmRuntime, 'stream'>,
@@ -57,6 +57,11 @@ export async function probeOnce(
                 const reason = chunk.reason
                 // stop / tool-calls / max-tokens：正常终止却没有内容块，宿主归为退化完成，同样没跑成
                 if (reason.kind !== 'error' && reason.kind !== 'aborted') return { outcome: 'other', failure: undefined }
+                // 外部中止单列：没有结论，既不是不可用也不能断后续请求。
+                // 只认外部那一路——我方超时也走 `aborted` 终帧（合成信号被中止），归下面的 timeout
+                if (reason.kind === 'aborted' && signal.aborted) {
+                    return { outcome: 'aborted', failure: failureFacts(reason.failure) }
+                }
                 // 我方超时不算端点不可达，也不算不可用——但原始失败事实照留，供调用方自行判断
                 return {
                     outcome: timedOut ? 'timeout' : classifyFailure(reason.failure),
@@ -64,6 +69,8 @@ export async function probeOnce(
                 }
             }
         }
+        // 适配器中止时直接收流、不给终帧：同样没有结论
+        if (signal.aborted) return { outcome: 'aborted', failure: undefined }
         return { outcome: 'other', failure: undefined }
     } catch {
         // 适配器未注册等抛出的异常一律归入「其它失败」，不参与短路——宁可少短路，不可误短路
