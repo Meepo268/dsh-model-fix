@@ -81,9 +81,12 @@ function refresh(ctx: Context, retryCount = MAX_ATTEMPTS): void {
         })
 }
 
-/** 卸载清理：取消待触发的重试定时器（回调闭包持有 ctx，重装窗口内触发还会误清 refreshing） */
+/** 卸载清理：取消待触发的重试定时器（回调闭包持有 ctx，重装窗口内触发还会误清 refreshing），
+ * 并复位在途守卫——定时器存在即无在途拉取；不复位则 refreshing 永久为真，此后本进程再也不拉 models.dev。
+ * 反之定时器不存在而 refreshing 为真是在途拉取，不复位，在途续体自行复位 */
 export function cancelRefreshRetry(): void {
     if (retryTimer === undefined) return
     clearTimeout(retryTimer)
     retryTimer = undefined
+    refreshing = false
 }

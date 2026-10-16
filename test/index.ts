@@ -16,6 +16,7 @@ import { run as runUpgrade } from '@test/upgrade.test'
 import { run as runPrune } from '@test/prune.test'
 import { run as runProbe } from '@test/probe.test'
 import { run as runProbeBackup } from '@test/probe-backup.test'
+import { run as runRefresh } from '@test/refresh.test'
 import { run as runReset } from '@test/reset.test'
 import { run as runRestore } from '@test/restore.test'
 import { run as runRpcRoute } from '@test/rpc-route.test'
@@ -53,6 +54,8 @@ section('official-filter.test.ts')
 runOfficialFilter()
 section('prune.test.ts')
 runPrune()
+section('refresh.test.ts')
+await runRefresh()
 section('reset.test.ts')
 runReset()
 section('restore.test.ts')
