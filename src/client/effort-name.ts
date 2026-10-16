@@ -18,7 +18,7 @@ import { PLUGIN_NS, ENDPOINT_REPORT_LOCALE } from '@/shared/constants'
 /**
  * 启动时把界面语言上报给 Node 半：子 fiber 声明 `locale` + `connection`，两者装载即上报一次。
  * 上报失败静默——Node 侧会回退 en（不换名），不因这条诊断链影响会话。
- * @param ctx - 父 fiber 的 ctx
+ * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：其 fiber 卸载即级联撤销
  */
 export function applyLocaleReporter(ctx: ClientContext): void {
     ctx.inject(['locale', 'connection'], (child) => {

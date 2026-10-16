@@ -31,7 +31,7 @@ import type { DecodedScope } from '@/client/scope'
 /**
  * 挂上记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用）。
  *
- * @param ctx - 父 fiber 的 ctx：子 fiber 只声明这两个服务，记忆写入另走自有 NS 的 scope
+ * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：监听子 fiber 再挂其下，其 fiber 卸载即级联撤销
  * @param scope - 本插件命名空间的 decode 后段视图（记忆经它直写）
  */
 export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScope<Flags>): void {

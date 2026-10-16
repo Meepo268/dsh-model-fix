@@ -41,7 +41,7 @@ type SharedCardProps = Omit<CardProps, 't' | 'scope' | 'providersScope'>
 /**
  * 挂上装卸编排：每个部件在所属 slot 声明到达后按开关决定挂不挂，之后每次配置变更重算。
  *
- * @param ctx - 父 fiber 的 ctx：注册与订阅都挂在它上面，fiber 卸载即级联撤销
+ * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：注册与订阅都挂在它上面，fiber 卸载即级联撤销
  * @param scope - 本插件命名空间的 decode 后段视图（读 behavior 组的开关）
  * @param shared - 卡片入参的共有部分（六个写回出口）
  * @param composerProps - 两枚 chip 的入参（宿主 model-selection 段的 scope 等）

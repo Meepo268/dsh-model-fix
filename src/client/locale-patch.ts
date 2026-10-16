@@ -68,7 +68,7 @@ function patchZhDict(runtime: LocaleRuntimeHack, localized: boolean, showOrigina
  * 挂上词典 patch 逻辑：启动时按开关状态设置一次，scope 变化（用户切开关）时重新 patch，
  * fiber 卸载时恢复原状。
  *
- * @param ctx - 父 fiber 的 ctx
+ * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：其 fiber 卸载即级联撤销
  * @param scope - 本插件命名空间的 decode 后段视图（读 localizeEfforts 与 showOriginalEfforts 开关）
  */
 export function applyLocalePatch(ctx: ClientContext, scope: DecodedScope<Flags>): void {

@@ -50,9 +50,9 @@ export function apply(ctx: ClientContext): void {
     // 宿主 get 只收一个 entryId 参数（无 decode spec），段值解码由 makeScope 的 decode 完成
     ctx.inject(['configForms', 'connection'], (child) => {
         const configForms = child.get('configForms') as { get: (ns: string) => ConfigForm<unknown> }
-        // connection 已在父级 inject 中声明（必然存在）；child fiber 只是提供类型安全的获取路径
+        // connection 已在父级 inject 中声明（必然存在）；rpc 与整套编排同取 child，落在同一 fiber
         const rpc = (child.get('connection') as unknown as { rpc: ClientConnectionRpc }).rpc
-        boot(ctx,
+        boot(child,
             makeScope(configForms.get(MODEL_FIX_NS), decodeSection),
             makeScope(configForms.get(PI_AI_NS), () => PROVIDERS_VIEW),
             makeScope(configForms.get(HOST_MODEL_SELECTION_NS), decodeHostModelSelection),
@@ -63,8 +63,10 @@ export function apply(ctx: ClientContext): void {
 
 /**
  * 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。
- * @param ctx - 父 fiber 的 ctx：共享编排一律在其上执行（ctx.<name> 属性读要求本 fiber
- *   声明过 inject，子 fiber 只声明了标记服务；子 ctx 只用于构造 scope 与获取 rpc）
+ * @param ctx - 子 fiber 的 ctx（`apply` 里那个 `ctx.inject` 的 child）：注册一律挂它，
+ *   子 fiber 卸载即级联撤销；挂父 ctx 则卸载不清理、重建时重复注册（第二次
+ *   `locale.register` 按宿主契约抛 `already has locale`）。`locale` / `slots` 经父链
+ *   解析得到，父级 inject 已保证就绪，故不必写进子 fiber 的 inject
  * @param scope - 本插件命名空间的 decode 后段视图（卡片与记忆监听消费）
  * @param providersScope - llm-pi-ai 命名空间的 decode 后段视图（只消费 user 层的提供方 id）
  * @param hostModelScope - 宿主 subagent-model-selection-settings 的 decode 后视图（输入框「跟随」状态灯消费）
