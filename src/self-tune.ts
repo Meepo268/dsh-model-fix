@@ -99,26 +99,32 @@ function isRouted(route: ToolRoute | null | undefined): route is { provider: str
  * 当前会话「下一次请求该用的路由」：投影的待生效选择优先（UI 换档后即刻可读，不必等请求消费），
  * 其次 `lastUsed`（最近一次请求用过的），再回落请求头（最新一次请求的配置；`adapterDefaults.reasoningEffort
  * === true` 是适配器兜底值而非用户所选，档位视作未选），最后回落 Agent 自身 options（尚无任何请求时）。
- * 取不到路由（无 agent 或全链为空）即 undefined。
+ *
+ * 取不到路由即 undefined，含读宿主投影/请求头抛错——读失败与「没有路由」同归，两枚工具据此回
+ * `no-route`，不让异常冒泡出 `execute`。
  */
 function resolveCurrentRoute(agent: ToolAgent, projections: HostSessionProjections | undefined): ResolvedRoute | undefined {
-    const state = projections?.stateOf(agent.session, 'modelSelection')
-    const projected = state?.pending ?? state?.lastUsed
-    if (isRouted(projected)) {
-        return {
-            provider: projected.provider,
-            model: projected.model,
-            ...projected.reasoningEffort === undefined ? {} : { currentEffort: projected.reasoningEffort },
+    try {
+        const state = projections?.stateOf(agent.session, 'modelSelection')
+        const projected = state?.pending ?? state?.lastUsed
+        if (isRouted(projected)) {
+            return {
+                provider: projected.provider,
+                model: projected.model,
+                ...projected.reasoningEffort === undefined ? {} : { currentEffort: projected.reasoningEffort },
+            }
         }
-    }
-    const header = agent.session.requestHeader()
-    const source = header?.config ?? agent.options
-    if (!isRouted(source)) return undefined
-    const effort = header?.adapterDefaults?.reasoningEffort === true ? undefined : source.reasoningEffort
-    return {
-        provider: source.provider,
-        model: source.model,
-        ...effort === undefined ? {} : { currentEffort: effort },
+        const header = agent.session.requestHeader()
+        const source = header?.config ?? agent.options
+        if (!isRouted(source)) return undefined
+        const effort = header?.adapterDefaults?.reasoningEffort === true ? undefined : source.reasoningEffort
+        return {
+            provider: source.provider,
+            model: source.model,
+            ...effort === undefined ? {} : { currentEffort: effort },
+        }
+    } catch {
+        return undefined
     }
 }
 

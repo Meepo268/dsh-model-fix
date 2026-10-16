@@ -76,6 +76,8 @@ function makeCtx(init: {
     missing?: 'tools' | 'systemPrompt' | 'sessionController' | 'sessionProjections'
     /** 投影 stateOf 的返回：undefined 表示服务在但投影未注册 */
     projected?: { pending: RouteStub | null; lastUsed: RouteStub | null } | undefined
+    /** stateOf 直接抛错 */
+    stateThrows?: boolean
     select?: SelectStub
     resolve?: (provider: string, model: string, signal?: AbortSignal) => Promise<ModelInfoStub>
 } = {}) {
@@ -132,8 +134,10 @@ function makeCtx(init: {
             }
             if (name === 'sessionProjections') {
                 return init.missing === 'sessionProjections' ? undefined : {
-                    stateOf: (_session: object, key: string) =>
-                        key === 'modelSelection' ? init.projected : undefined,
+                    stateOf: (_session: object, key: string) => {
+                        if (init.stateThrows) throw new Error('stateOf 读失败')
+                        return key === 'modelSelection' ? init.projected : undefined
+                    },
                 }
             }
             return undefined
@@ -274,6 +278,9 @@ export async function run(): Promise<void> {
         const noAgent = await queryOf({})
         check('query: 无 agent 为 no-route', stable(noAgent) === stable({ ok: false, error: 'no-route' }))
 
+        const stateThrows = await queryOf({ stateThrows: true }, makeAgent({}))
+        check('query: stateOf 抛错同归 no-route 而非抛出', stable(stateThrows) === stable({ ok: false, error: 'no-route' }))
+
         // resolveModelInfo 抛错：resolve-failed；入参核对 provider/model/signal
         let resolveArgs: { provider: string; model: string; hasSignal: boolean } | undefined
         const failed = await queryOf({
@@ -328,6 +335,10 @@ export async function run(): Promise<void> {
         check('set: 无 agent 回 no-route', stable(noRoute) === stable({ ok: false, effort: 'low', error: 'no-route' }))
         const noRouteEmpty = await set.execute({ effort: 'low' }, execOf(makeAgent({}))) as Record<string, unknown>
         check('set: 路由全空回 no-route', stable(noRouteEmpty) === stable({ ok: false, effort: 'low', error: 'no-route' }))
+        const t4 = makeCtx({ stateThrows: true })
+        installSelfTune(t4.ctx)
+        const stateFailed = await t4.tools[1].execute({ effort: 'low' }, execOf(makeAgent({}))) as Record<string, unknown>
+        check('set: stateOf 抛错同归 no-route 而非抛出', stable(stateFailed) === stable({ ok: false, effort: 'low', error: 'no-route' }))
 
         // selectModel 抛错：文案原样透传（含 RemoteError 文案与子智能体 ownership 拒绝）
         const ownership = makeCtx({ select: async () => { throw new Error('session "s" is owned by subagent routing') } })
