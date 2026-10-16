@@ -32,7 +32,7 @@ import { verifyModels } from '@/verify'
 import { createChannelRoute } from '@/rpc-route'
 import type { EndpointHandler } from '@/rpc-route'
 
-/** 一轮执行的入口：载荷 → 进度帧 → 终帧。验证与探测式填充同型，只有执行器与措辞不同 */
+/** 一轮执行的入口：载荷 → 进度帧 → 终帧。验证与探测式填充同型，只有执行器不同 */
 type ProgressRunner = (payload: unknown, options: ProbeRunOptions) => Promise<VerifySummary>
 
 /** 守卫已开（另一写回在途）时的统一拒绝结果 */
@@ -122,14 +122,14 @@ export function installRpc(ctx: Context): void {
                 path: VERIFY_STREAM_ROUTE,
                 methods: ['POST'],
                 requestBody: 'buffered',
-                fetch: progressStreamFetch((payload, options) => verifyModels(ctx.llm, payload, options), '验证'),
+                fetch: progressStreamFetch((payload, options) => verifyModels(ctx.llm, payload, options)),
             })
             // 探测式填充的流多带一个 ctx：它一轮之内要写两次配置（预声明 + 收敛），都在守卫内完成
             const disposeProbe = connection.fetch.register({
                 path: PROBE_STREAM_ROUTE,
                 methods: ['POST'],
                 requestBody: 'buffered',
-                fetch: progressStreamFetch((payload, options) => probeAndFill(ctx, ctx.llm, payload, options), '探测', true),
+                fetch: progressStreamFetch((payload, options) => probeAndFill(ctx, ctx.llm, payload, options), true),
             })
             return () => {
                 disposeChannel()
@@ -149,7 +149,7 @@ export function installRpc(ctx: Context): void {
  * connection 自 0.1.5 起不再注入 webServer 那个坑）。
  *
  * 验证与探测式填充共用这一份实现：两者的线上形状逐字段同形（同一批帧类型、同一编解码），
- * 差别的只有执行器与报错措辞，故那两样由调用方给。
+ * 差别的只有执行器本身，故它由调用方给。
  *
  * `needsIdleGuard` 只给会写配置的那条流用：它与写回端点共用事件流守卫做互斥，
  * 故入口先查守卫，已开即拒（409，文案即给前端展示，故不是裸状态码）。
@@ -159,7 +159,6 @@ export function installRpc(ctx: Context): void {
  */
 export function progressStreamFetch(
     run: ProgressRunner,
-    label: string,
     needsIdleGuard = false,
 ): (request: Request) => Promise<Response> {
     const encoder = new TextEncoder()
@@ -195,7 +194,6 @@ export function progressStreamFetch(
                     signal: request.signal,
                     onProgress: push,
                 }).then(settle, (error: unknown) => {
-                    console.error(`[${PLUGIN_NAME}] ${label}流异常终止`, error)
                     if (!request.signal.aborted) push({ type: 'failed', message: errorText(error) })
                     settle()
                 })

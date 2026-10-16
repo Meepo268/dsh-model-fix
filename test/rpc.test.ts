@@ -46,13 +46,13 @@ export async function run(): Promise<void> {
         options.onProgress?.({ type: 'opened', total: 2 })
         options.onProgress?.({ type: 'done', summary: SUMMARY })
         return Promise.resolve(SUMMARY)
-    }, '验证')
+    })
     const okFrames = await framesOf(await okFetch(request({ models: [] })))
     check('进度流正常路径转发 opened 与 done', okFrames.length === 2
         && okFrames[0].type === 'opened' && okFrames[1].type === 'done', okFrames)
 
     // ---------- 异常路径：执行器抛错（入参非法 / 超配额）须发 failed 终帧带真实原因，而不是空流 ----------
-    const failFetch = progressStreamFetch(() => Promise.reject(new Error('tikaflow-model-fix: 验证请求不合法（超出上限）')), '验证')
+    const failFetch = progressStreamFetch(() => Promise.reject(new Error('tikaflow-model-fix: 验证请求不合法（超出上限）')))
     const failFrames = await framesOf(await failFetch(request({ models: [] })))
     check('进度流异常终止发 failed 终帧并带出原因', failFrames.length === 1
         && failFrames[0].type === 'failed' && failFrames[0].message === 'tikaflow-model-fix: 验证请求不合法（超出上限）', failFrames)
@@ -64,7 +64,7 @@ export async function run(): Promise<void> {
         // 执行器收到的就是 request.signal；已 abort 时不该发终帧
         check('中止时执行器收到的是已 abort 的 signal', options.signal?.aborted === true)
         return Promise.reject(new Error('aborted'))
-    }, '验证')
+    })
     const abortedRequest = new Request('http://localhost/api/tikaflow-model-fix/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -79,7 +79,7 @@ export async function run(): Promise<void> {
     const badBody = progressStreamFetch(() => {
         ran = true
         return Promise.resolve(SUMMARY)
-    }, '验证')
+    })
     const badResponse = await badBody(new Request('http://localhost/api/tikaflow-model-fix/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
