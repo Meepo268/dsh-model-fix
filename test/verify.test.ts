@@ -1,14 +1,16 @@
 // 用例覆盖：src/probe-verdict.ts 的失败分类与两级短路判据、src/probe-plan.ts 的请求计划展开（逐模型逐档位 / needTest 声明 /
 // 入参校验与配额）与按提供方分组、src/probe-report.ts 的逐组汇报与汇总求和，以及 src/verify.ts 带桩跑通的整条执行链（基线探测现发 +
-// 分组串行 + 两级短路，含「本组首个请求超时即短整组」与进度帧的 done 不变量）
+// 分组串行 + 两级短路，含「本组首个请求超时即短整组」与进度帧的 done 不变量），以及 src/probe-engine.ts 的 probeOnce
+// 超时兜底（软超时发中止信号、宽限期满即硬兜底返回、被放弃的循环不再消费分片也不产未处理拒绝）
 import { verifyModels } from '@/verify'
+import { probeOnce, runProbeGroups, type GroupRunner } from '@/probe-engine'
 import { groupProbesByProvider, planProbes } from '@/probe-plan'
 import { reportProvider, summarizeProviders } from '@/probe-report'
 import { classifyFailure, providerBlockReason, shouldSkipModelTail, shouldSkipModelTailAfterBaseline } from '@/probe-verdict'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import { decodeProgressFrame, encodeProgressFrame, isProviderBlocking, isTransientOutcome } from '@/shared/verify-progress'
-import type { ProbeOutcome, VerifyFailureFacts, VerifyProbe, VerifyProbeResult, VerifyProbedFrame, VerifyProgressFrame, VerifyProviderReport } from '@/shared/verify-progress'
+import type { ProbeOutcome, ProviderBlockReason, VerifyFailureFacts, VerifyProbe, VerifyProbeResult, VerifyProbedFrame, VerifyProgressFrame, VerifyProviderReport } from '@/shared/verify-progress'
 import { check, stable } from '@test/helper'
 
 /**
@@ -39,6 +41,45 @@ const finishErrorText = (code: string, status: number, message: string): StreamC
         type: 'finish',
         reason: { kind: 'error', failure: { code, status, message } as LlmFailure },
     }) as unknown as StreamChunk
+
+/** probeOnce 用的探测入参（所有用例都探同一个「a/m1@off」） */
+const probeOf = (): Pick<VerifyProbe, 'provider' | 'model' | 'effort'> =>
+    ({ provider: 'a', model: 'm1', effort: 'off' })
+
+/**
+ * 永不 settle 且不理会 signal 的流桩：模拟「适配器忽略 signal 并停在未决 await 上」这一宿主回归形态。
+ * `probeOnce` 若没有硬兜底，读流就会永远挂在这里。
+ */
+const deafStream = (): Pick<LlmRuntime, 'stream'> => ({
+    stream: () => ({
+        [Symbol.asyncIterator]: () => ({
+            next: () => new Promise<IteratorResult<StreamChunk>>(() => {}),
+        }),
+    }) as AsyncIterable<StreamChunk>,
+})
+
+/**
+ * 不理 signal 但持续产出的流桩：每 5ms 给一块 text-delta、永不 finish，并记录被消费的块数与是否被请求关闭。
+ * 用来观测「硬兜底之后被放弃的循环是否还在后台继续消费」——没修的话它会一直读下去。
+ */
+const endlessStream = (): { llm: Pick<LlmRuntime, 'stream'>; chunks: () => number; closed: () => boolean } => {
+    let chunks = 0
+    let closed = false
+    const stream = (): AsyncIterable<StreamChunk> => ({
+        [Symbol.asyncIterator]: () => ({
+            next: async (): Promise<IteratorResult<StreamChunk>> => {
+                await new Promise((resolve) => { setTimeout(resolve, 5) })
+                chunks += 1
+                return { done: false, value: { type: 'text-delta', index: 0, delta: 'x' } as unknown as StreamChunk }
+            },
+            return: async (): Promise<IteratorResult<StreamChunk>> => { closed = true; return { done: true, value: undefined } },
+        }),
+    })
+    return { llm: { stream } as unknown as Pick<LlmRuntime, 'stream'>, chunks: () => chunks, closed: () => closed }
+}
+
+/** 等待指定毫秒（真定时器，供「块数停止增长」这类时间相关的断言留出余量） */
+const wait = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms) })
 
 /** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
@@ -760,6 +801,93 @@ export async function run(): Promise<void> {
             // 但它们验的是模型不是级别，故计划推理级别数为 0（开档位模式的分母会是 0，此时改用 verifyDoneModels 那行）
             && summary.planned === 3 && summary.probed === 3 && summary.tested === 3 && summary.plannedEfforts === 0,
             summary.providers.map((report) => report.provider),
+        )
+    }
+
+    // ---------- probeOnce 超时兜底：到点必然返回，不依赖适配器配合 ----------
+    {
+        // 适配器忽略 signal 且永不 settle（宿主回归形态）：probeOnce 必须自己在宽限期后返回——
+        // 否则 runProbeGroups 的 Promise.all 永不 settle、probeAndFill 的 finally 永不执行、守卫永久为 true。
+        // 时长一并验：传入的软超时与宽限生效（等的是 40ms 而非生产默认的 33s）
+        const startedAt = Date.now()
+        const verdict = await probeOnce(deafStream(), probeOf(), new AbortController().signal, 30, 10)
+        check(
+            'probeOnce 硬兜底：适配器忽略 signal 也自行返回 timeout（不挂死、参数化超时生效）',
+            verdict.outcome === 'timeout' && verdict.failure === undefined && Date.now() - startedAt < 2_000,
+            { verdict, elapsed: Date.now() - startedAt },
+        )
+    }
+    {
+        // 外部中止撞上不配合的适配器：兜底也必须归 aborted——用户按的停止不是超时，
+        // 记成 timeout 会被当成「本组首个请求超时」而错误短掉整组
+        const controller = new AbortController()
+        controller.abort()
+        const verdict = await probeOnce(deafStream(), probeOf(), controller.signal, 30, 10)
+        check('probeOnce 硬兜底遇外部已中止归 aborted 而非 timeout', verdict.outcome === 'aborted' && verdict.failure === undefined, verdict)
+    }
+    {
+        // 硬兜底不止「本函数返回」：被放弃的读流循环必须停止消费（省额度），且迭代器被请求关闭。
+        // 迟到的块是放弃那一刻在途的那一次，其后必须为零增量
+        const endless = endlessStream()
+        const verdict = await probeOnce(endless.llm, probeOf(), new AbortController().signal, 30, 10)
+        await wait(20)
+        const settled = endless.chunks()
+        await wait(60)
+        check(
+            'probeOnce 硬兜底后读流循环不再继续消费分片，且迭代器被请求关闭',
+            verdict.outcome === 'timeout' && endless.chunks() === settled && endless.closed(),
+            { verdict, settled, after: endless.chunks(), closed: endless.closed() },
+        )
+    }
+    {
+        // 被放弃的那次 next() 之后若才拒绝（适配器迟来的拒绝），不得变成未处理拒绝——
+        // 那在宿主进程里是会终止进程的崩溃源
+        const rejections: unknown[] = []
+        const onRejection = (reason: unknown): void => { rejections.push(reason) }
+        process.on('unhandledRejection', onRejection)
+        const late = (): Pick<LlmRuntime, 'stream'> => ({
+            stream: () => ({
+                [Symbol.asyncIterator]: () => ({
+                    next: () => new Promise<IteratorResult<StreamChunk>>((_, reject) => { setTimeout(() => reject(new Error('迟来的拒绝')), 40) }),
+                }),
+            }) as AsyncIterable<StreamChunk>,
+        })
+        const verdict = await probeOnce(late(), probeOf(), new AbortController().signal, 20, 10)
+        await wait(100)
+        process.off('unhandledRejection', onRejection)
+        check('probeOnce 被放弃的 next() 迟来抛错不产生未处理拒绝', verdict.outcome === 'timeout' && rejections.length === 0, { verdict, rejections })
+    }
+    {
+        // 组合层：Promise.all 只认 probeOnce settle——适配器忽略 signal 时整轮也必须收尾。
+        // runGroup 注入小超时（真实链路里 runGroup 是 verify.ts / probe.ts 注入的那两个，此处只验编排与引擎的接缝）
+        const runner: GroupRunner = async (llm, group, signal, emit) => {
+            const results: VerifyProbeResult[] = []
+            let blockedBy: ProviderBlockReason | undefined
+            for (let index = 0; index < group.probes.length; index++) {
+                const probe = group.probes[index]
+                const verdict = await probeOnce(llm, probe, signal, 30, 10)
+                const firstRequest = index === 0
+                if (blockedBy === undefined) blockedBy = providerBlockReason(verdict.outcome, firstRequest)
+                results.push({ provider: probe.provider, model: probe.model, effort: probe.effort, outcome: verdict.outcome, failure: verdict.failure })
+                emit(probe, verdict, blockedBy === undefined ? { settled: 1 } : { settled: 1, skipped: group.probes.length - index - 1 })
+                if (blockedBy !== undefined) break
+            }
+            return { provider: group.provider, results, tests: [], blockedBy, planned: group.probes.length, plannedEfforts: group.probes.length, tested: group.probes.length }
+        }
+        const frames: VerifyProgressFrame[] = []
+        const summary = await runProbeGroups(deafStream(), groupProbesByProvider([
+            { provider: 'a', model: 'm1', effort: 'off', needTest: false },
+            { provider: 'a', model: 'm1', effort: 'high', needTest: false },
+            { provider: 'a', model: 'm1', effort: 'max', needTest: false },
+            { provider: 'a', model: 'm2', effort: 'low', needTest: false },
+        ]), runner, { onProgress: (frame) => { frames.push(frame) } })
+        check(
+            'runProbeGroups 在适配器忽略 signal 时仍整轮收尾：首个请求超时短整组、终帧由调用方照发',
+            summary.probed === 1 && summary.planned === 4 && summary.providers.length === 1
+            && summary.providers[0].blockedBy === 'timeout' && summary.providers[0].reachable
+            && frames.length === 2 && frames[0].type === 'opened' && frames[1].type === 'probed'
+            && frames[1].outcome === 'timeout' && frames[1].skipped === 3,
+            { summary, frames },
         )
     }
 
