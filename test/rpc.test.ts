@@ -1,6 +1,7 @@
 // rpc.ts 进度流测试：以标准 Request/Response 驱动 progressStreamFetch，覆盖正常发帧、异常发 failed 终帧、中止不发终帧与非法请求体
 import { check } from '@test/helper'
 import { progressStreamFetch } from '@/rpc'
+import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
 import type { ProbeRunOptions } from '@/probe-engine'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 
@@ -86,4 +87,16 @@ export async function run(): Promise<void> {
         body: 'not json',
     }))
     check('非法请求体回 400 且不执行', badResponse.status === 400 && !ran, badResponse.status)
+
+    // ---------- 探测流（needsIdleGuard）的守卫互斥：守卫已开即 409，不进执行器 ----------
+    let probeRan = false
+    const probeFetch = progressStreamFetch(() => {
+        probeRan = true
+        return Promise.resolve(SUMMARY)
+    }, true)
+    startIgnoreAll()
+    const busy = await probeFetch(request({ models: [] }))
+    endIgnoreAll()
+    check('探测流在守卫已开时回 409 且不执行', busy.status === 409 && !probeRan, busy.status)
+    check('守卫互斥判定不遗留守卫状态', isIgnoreAll() === false)
 }

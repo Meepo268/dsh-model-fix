@@ -163,15 +163,15 @@ export function progressStreamFetch(
 ): (request: Request) => Promise<Response> {
     const encoder = new TextEncoder()
     return async (request) => {
-        // 写配置的流（探测式填充）入口先查守卫：别在别的写回在途时插进来，
-        // 那样对方的 finally 会提前解掉本轮的守卫，预声明写回就失去事件链的短路保护
-        if (needsIdleGuard && isIgnoreAll()) return new Response('另一操作进行中，请稍后重试', { status: 409 })
         let payload: unknown
         try {
             payload = await request.json()
         } catch {
             return new Response('invalid json body', { status: 400 })
         }
+        // 写配置的流（探测式填充）在此查守卫：载荷先解析，故判定与执行器的守卫置位之间无 await，
+        // 并发请求不可能双双通过检查
+        if (needsIdleGuard && isIgnoreAll()) return new Response('另一操作进行中，请稍后重试', { status: 409 })
         const stream = new ReadableStream<Uint8Array>({
             start(controller) {
                 const settle = (): void => {
