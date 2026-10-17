@@ -21,8 +21,8 @@ AGENTS.md 只留索引，正文在此；仅供开发查阅，不进 `files`。
 ## 冻结形态与台阶链
 
 - 冻结类型：`src/types.ts` 里只有 `V7*` 一套。
-- 台阶链：`src/upgrade.ts` 里只有一段 v7 冻结 schema + 一级 `upgradeTo8`（最低一级、自持 `MIN_SUPPORTED_VERSION` 守卫）。
-- 台阶写法：当前台阶按 `upgradeToN` 命名；它是最低一级，输入版本下限恰为 `MIN_SUPPORTED_VERSION`。
+- 台阶链：`src/upgrade.ts` 里只有一段 v7 冻结 schema + 两级台阶：`upgradeTo8 → upgradeTo7`（最低一级，守卫校验 `MIN_SUPPORTED_VERSION`）。
+- 台阶写法：`upgradeToN` 只负责把低一级的配置升到 N（输入下限 N-1，低于即转交 N-1）；最低一级的守卫是全链唯一的版本下限校验。
 - 台阶与当前形态**刻意不共享任何可演进来源**：schema、默认常量、台阶默认值一律就地写字面量，不引用 `CONFIG_VERSION`——否则今天调整一个默认值，明天就会连带改写历史台阶的语义，破坏高版本快照的无损回退。
 - 台阶链（`src/upgrade.ts`）与当前版本侧（`src/shared/config-schema.ts` + `src/migrate.ts`）分居文件，互不串改。
 

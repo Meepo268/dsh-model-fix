@@ -12,10 +12,10 @@ import { isPlainObject } from '@/shared/types'
  * 否则今天调整一个默认值，明天就会连带改写历史台阶的语义，破坏高版本快照的无损回退。
  *
  * 台阶写法约定（见 docs/versioning.md）：
- * - 升级链只有一级（upgradeTo8），它是最低一级、自持最低版本守卫。
- * - 冻结类型 V7* 配套在 src/types.ts；台阶与冻结类型同步演进。
- * - 未来形态不兼容时：追加新台阶 upgradeTo9、新冻结类型 V8*、提升 MIN_SUPPORTED_VERSION。
- *   届时 upgradeTo9 变为最低一级、自持守卫，upgradeTo8 去掉守卫改为中间接力台阶。
+ * - `upgradeToN` 只负责把低一级的配置升到 N：输入下限 N-1，低于即转交 upgradeToN-1。
+ * - 当前链只有两级：upgradeTo8 → upgradeTo7（最低一级，校验 MIN_SUPPORTED_VERSION）。
+ * - 未来形态不兼容时：追加新冻结类型 V8* 与台阶 upgradeTo9（输入下限 8，低于即转交 upgradeTo8），
+ *   并让 upgradeConfig 改指它；届时 MIN_SUPPORTED_VERSION 抬到 8、v7 台阶与冻结类型一并移除。
  *
  * 当前版本的规范化、旧快照清理与自愈不在这里，见 src/migrate.ts。
  */
@@ -85,18 +85,29 @@ const V8_BEHAVIOR_DEFAULT = true
 // ---------- 最低一级台阶（持守卫） ----------
 
 /**
- * 升到 v8（当前最低一级，自持最低版本守卫）。
- * 输入按 v7 冻结 schema 解析（非法整体回退 v7 默认）；efforts 经 parseEfforts 宽松保留；
- * 补 compat.disableStore、userExperience 的 followParent/selfTune/hideOfficial/localizeEfforts/showOriginalEfforts 默认值，
- * 以及 v8 形态内新增的 behavior 段（四项全开）。
- *
- * 守卫：本函数是最低一级，其输入版本下限恰为 MIN_SUPPORTED_VERSION。
- * 调用方（migrateConfig 的候选过滤）已按该下限筛过迁移源，此处为误用兜底。
+ * 升到 v7：最低一级。v7 已是本仓支持的最早形态、无更早台阶可转交，
+ * 守卫确认输入不低于全局最低支持版本后原样返回——v7 即终态，无「升级动作」可言。
  */
-function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot {
+function upgradeToMinVersion(config: unknown, fromVersion: number): V7PluginConfigSnapshot {
     if (fromVersion < MIN_SUPPORTED_VERSION) {
         throw new Error(`无法从 v${fromVersion} 升级：低于最低支持版本 v${MIN_SUPPORTED_VERSION}`)
     }
+    return config as V7PluginConfigSnapshot
+}
+
+/** 升到 v7 的台阶名（与 upgradeToN 命名法对齐；本体即最低一级的校验） */
+const upgradeTo7 = upgradeToMinVersion
+
+/**
+ * 升到 v8。输入按 v7 冻结 schema 解析（非法整体回退 v7 默认）；efforts 经 parseEfforts 宽松保留；
+ * 补 compat.disableStore、userExperience 的 followParent/selfTune/hideOfficial/localizeEfforts/showOriginalEfforts 默认值，
+ * 以及 v8 形态内新增的 behavior 段（四项全开）。
+ *
+ * 输入下限是 7：低于 7 交给 upgradeTo7。
+ */
+function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot {
+    // 输入下限 7：低于即转交最低一级（只可能抛错——校验不过直接终止，返回值无产物意义）
+    if (fromVersion < 7) upgradeTo7(config, fromVersion)
     let parsed: Omit<V7PluginConfigSnapshot, 'configVersion' | 'efforts'>
     try {
         parsed = V7ConfigSchema((isPlainObject(config) ? config : {}) as unknown as Omit<V7PluginConfigSnapshot, 'configVersion' | 'efforts'>)
