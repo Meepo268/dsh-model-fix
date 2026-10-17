@@ -89,6 +89,7 @@ export type CardKey =
     | 'restoreGo'
     | 'restoreDone'
     | 'restoreFailed'
+    | 'writebackTimeout'
     | 'verify'
     | 'verifyTitle'
     | 'verifyDesc'

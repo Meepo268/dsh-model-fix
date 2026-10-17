@@ -76,3 +76,10 @@ export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
  * settings 写回冲突重试共用次数（纯数值，跨半共享）。值变更须同步两端——差异直接造成写入行为不一致。
  */
 export const MAX_ATTEMPTS = 3
+
+/**
+ * 四个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 除调用方给的 `signal` 外没有任何计时器，
+ * 不给就有一条「等不到结果即永远占着卡片占用态」的挂死路径。超时只中止这次等待，Node 半的写回照跑完，
+ * 故文案说「未收到结果」而不是「未写入」（取值与取舍见 docs/decisions.md「写回端点」）。
+ */
+export const WRITEBACK_MS = 10_000

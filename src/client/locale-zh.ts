@@ -82,6 +82,8 @@ export const zh: Record<CardKey, string> = {
     restoreGo: '确认恢复',
     restoreDone: '已恢复 {count} 个模型。',
     restoreFailed: '恢复失败：{message}。',
+    // 四个写回共用：超时只说明没等到结果，写回可能已生效
+    writebackTimeout: '等待超时，未收到结果（写回可能已生效）',
     verify: '验证模型',
     verifyTitle: '选择要验证的模型',
     verifyDesc: '对选中的模型发起请求，确认模型/推理级别是否可用；验证所耗时间随模型数量增加。',

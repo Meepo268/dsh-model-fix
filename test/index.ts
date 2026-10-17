@@ -19,6 +19,7 @@ import { run as runProbeBackup } from '@test/probe-backup.test'
 import { run as runRefresh } from '@test/refresh.test'
 import { run as runReset } from '@test/reset.test'
 import { run as runRestore } from '@test/restore.test'
+import { run as runRpcCarrier } from '@test/rpc-carrier.test'
 import { run as runRpcRoute } from '@test/rpc-route.test'
 import { run as runRpc } from '@test/rpc.test'
 import { run as runSelfTune } from '@test/self-tune.test'
@@ -66,6 +67,8 @@ section('probe.test.ts')
 await runProbe()
 section('probe-backup.test.ts')
 await runProbeBackup()
+section('rpc-carrier.test.ts')
+await runRpcCarrier()
 section('rpc-route.test.ts')
 await runRpcRoute()
 section('rpc.test.ts')

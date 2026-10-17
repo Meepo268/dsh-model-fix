@@ -77,7 +77,7 @@
   - `ConnectionRpcResult<T> = { ok:true; value:T } | { ok:false; error: ConnectionRpcFailure }`，`ConnectionRpcFailure{ code; message; details: object }`（**`details` 必填**）；handler 侧另有带附件的 `ConnectionRpcHandlerResult`。
   - 信封层错误码 `gateway/bad-request` 两处（均在 `src/rpc-host.ts`）：method 与 endpoint 不匹配、信封非法（`message: 'invalid client-request message'`）。传输层失败走 `transportError` 产出 `code:'gateway/internal'`（`src/rpc.ts`）。
   - channel 约束 `CHANNEL_PATTERN = /^\/[A-Za-z0-9._~-]+$/` 且不得是 `/api`（`src/rpc-host.ts` 的 `assertChannel`）；endpoint 段 `ENDPOINT_SEGMENT_PATTERN = /^[A-Za-z0-9_$.-]+$/`（同包 `src/client/rpc.ts`）——本仓 `src/rpc-route.ts` 逐字复制了后者。
-  - 浏览器侧 `rpc.call(channel, endpoint, payload, signal?)`（接口在 `src/rpc.ts`，实现 `src/client/rpc.ts`）把 channel+endpoint 拼成**文档相对**路径后 POST；非 2xx 抛 `transport failure for …: HTTP <status>`、rpcId 不符抛 `rpcId mismatch …`（**传输失败不是 result**，故本仓卡片把 reject 与 `result.ok === false` 同路处理）。
+  - 浏览器侧 `rpc.call(channel, endpoint, payload, signal?)`（接口在 `src/rpc.ts`，实现 `src/client/rpc.ts`）把 channel+endpoint 拼成**文档相对**路径后 POST；非 2xx 抛 `transport failure for …: HTTP <status>`、rpcId 不符抛 `rpcId mismatch …`（**传输失败不是 result**，故本仓卡片把 reject 与 `result.ok === false` 同路处理）。`signal` 只作用于这一次 `fetch`——宿主实现除它以外**没有任何计时器**（浏览器 `fetch` 也无默认超时），中止即 reject，但**handler 照旧跑完**（本仓 channel 路由的 signal 是占位）：本仓四个写回端点按此给的 `WRITEBACK_MS` 只解卡片的占用态，不主张写回未发生。
 - **本插件不走 `connection.rpc.handle` 的原因**（写在这里备查）：那条路要求 channel 注册并由宿主解码信封，而本插件要的是「在宿主 webServer 上自持一条 prefix 路由、自己解码信封」，故 `src/rpc.ts` 直接 `webServer.register({ kind:'prefix', path: channel, handler: createChannelRoute(...) })`。
 
 ### webServer：prefix 路由

@@ -11,13 +11,13 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import {
     ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
-    PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL,
+    PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
 } from '@/shared/constants'
 import { decodeProgressFrame } from '@/shared/verify-progress'
 import type { UnsupportedEffort, VerifyProgressUpdate, VerifySummary } from '@/shared/verify-progress'
 import type { VerifyTarget } from '@/client/model'
 
-/** 卡片可用的调用面：四个写回端点与两条诊断链的读流 */
+/** 卡片可用的调用面：四个写回端点（各带 `WRITEBACK_MS` 等待上限）与两条诊断链的读流 */
 export interface RpcCarrier {
     /** 强制更新 RPC：channel 与端点在入口拼好，卡片只消费结果 */
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
@@ -54,13 +54,13 @@ export interface RpcCarrier {
  */
 export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const channel = `/${PLUGIN_NS}`
-    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {})
-    const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {})
-    const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {})
+    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(WRITEBACK_MS))
+    const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
+    const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     // 剔除不被支持的推理级别：走 Node 半而非浏览器半直写，因为这条写回必须经事件流守卫，
     // 而守卫是 Node 半的模块级标志，浏览器半跨不过半纯度门禁
     const pruneEfforts = (targets: readonly UnsupportedEffort[]) =>
-        rpc.call(channel, ENDPOINT_PRUNE_EFFORTS, { targets })
+        rpc.call(channel, ENDPOINT_PRUNE_EFFORTS, { targets }, AbortSignal.timeout(WRITEBACK_MS))
     /**
      * 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
      *

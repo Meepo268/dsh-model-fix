@@ -80,6 +80,8 @@ export const en: Record<CardKey, string> = {
     restoreGo: 'Restore',
     restoreDone: 'Restored {count} model(s).',
     restoreFailed: 'Restore failed: {message}.',
+    // Shared by all four writebacks: a timeout only means no result arrived; the write itself may have landed
+    writebackTimeout: 'timed out with no result (the write may still have taken effect)',
     verify: 'Verify models',
     verifyTitle: 'Choose models to verify',
     verifyDesc: 'Each selected model gets a request to confirm the model / reasoning level is usable; verification takes longer with more models.',

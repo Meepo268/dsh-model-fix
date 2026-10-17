@@ -149,6 +149,11 @@ function truncateMessage(value: string): string {
     return value.length > 120 ? `${value.slice(0, 119)}…` : value
 }
 
+/** 写回超时不是失败原因而是「没等到结果」，状态行另给中文；`DOMException` 不继承 `Error`，不能按 `Error` 判 */
+function isWritebackTimeout(error: unknown): boolean {
+    return error instanceof DOMException && error.name === 'TimeoutError'
+}
+
 /** 卡片主体 */
 export function Card(props: CardProps) {
     ensureStyles()
@@ -305,7 +310,7 @@ export function Card(props: CardProps) {
             }
         })
             .catch((error: unknown) => {
-                failed(errorText(error))
+                failed(isWritebackTimeout(error) ? t('writebackTimeout') : errorText(error))
             })
             .finally(() => {
                 setBusy(null)
