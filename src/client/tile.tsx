@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 // primitives 由宿主模块表注入
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -175,6 +175,7 @@ export function ExcludesTile(props: {
     // 输入文本与校验反馈是纯 UI 暂态（不属于配置），故留在瓦片本地
     const [text, setText] = useState('')
     const [error, setError] = useState<CardKey | undefined>()
+    const errorId = useId()
     const inputRef = useRef<HTMLInputElement>(null)
     const commit = () => {
         const value = text.trim()
@@ -229,6 +230,7 @@ export function ExcludesTile(props: {
                         placeholder={t('excludePlaceholder')}
                         aria-label={t('excludeAdd')}
                         aria-invalid={error !== undefined}
+                        aria-describedby={error !== undefined ? errorId : undefined}
                         disabled={props.disabled}
                         onChange={(event) => {
                             setText(event.target.value)
@@ -242,7 +244,7 @@ export function ExcludesTile(props: {
                             }
                         }}
                     />
-                    {error !== undefined ? <p className="dsh-mf-fieldError" role="alert">{t(error)}</p> : null}
+                    {error !== undefined ? <p className="dsh-mf-fieldError" id={errorId} role="alert">{t(error)}</p> : null}
                     {props.flags.excludes.map((excluded) => {
                         const hit = props.hits.has(excluded)
                         const stateText = t(hit ? 'excludeHit' : 'excludeUnmatched')
