@@ -2,6 +2,7 @@ import type { TSESLint } from 'typescript-eslint'
 import js from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
+import { CLIENT_EXTERNALS, NODE_EXTERNALS } from './scripts/build-externals.mjs'
 
 /** 构建产物目录：非本仓源码，一律不检查 */
 const IGNORES = ['lib/', '.tmp-*']
@@ -9,17 +10,8 @@ const IGNORES = ['lib/', '.tmp-*']
 /** 浏览器半 `@/` 值导入的放行根：跨半共享层与本半内部，其余即 Node 半专属源码 */
 const BROWSER_ALIAS_ROOTS = ['@/shared', '@/client']
 
-/**
- * 浏览器半允许**值导入**的宿主包：宿主模块表基线（与宿主 `DSH/packages/client/web/src/platform.ts`
- * 的 PLATFORM_MODULES 对齐），基线外的打进包内后运行期拿不到宿主实例。
- * 与 `tsdown.config.ts` 的 `HOST_EXTERNALS` 同源（同一张表），改动须两边同步。
- */
-const BROWSER_HOST_BASELINE = [
-    '@deepseek-ai/cordis',
-    '@deepseek-ai/dsh-client-store',
-    '@deepseek-ai/dsh-client-ui-slots',
-    '@deepseek-ai/dsh-client-ui-primitives',
-]
+/** 浏览器半允许值导入的宿主包：CLIENT_EXTERNALS 里的 `@deepseek-ai/*` 项（react 系不经此规则），基线外即被打包内联 */
+const BROWSER_HOST_BASELINE = CLIENT_EXTERNALS.filter(source => source.startsWith('@deepseek-ai/'))
 
 /**
  * 跨半纯度门禁：Node 半与浏览器半的依赖方向约束。
@@ -72,7 +64,23 @@ const halfPurity: TSESLint.FlatConfig.Plugin = {
                         node: node.source,
                         message: `client bundle purity: "${source}" 不在宿主模块表基线内；`
                             + '跨插件只能经 cordis 服务协作（type-only 导入会被擦除、不受此限），'
-                            + '或将其加入基线（须确认宿主 platform.ts 提供）',
+                            + '或将其加入 scripts/build-externals.mjs 的 CLIENT_EXTERNALS（须确认宿主 platform.ts 提供）',
+                    })
+                },
+            }),
+        },
+        // 同上：表外即被打包内联，宿主进程没装的包要到运行期 require 才爆
+        'baseline-only-in-node': {
+            create: context => ({
+                ImportDeclaration(node) {
+                    if (node.importKind === 'type') return
+                    const source = node.source.value
+                    if (!source.startsWith('@deepseek-ai/') || NODE_EXTERNALS.includes(source)) return
+                    context.report({
+                        node: node.source,
+                        message: `node bundle purity: "${source}" 不在 NODE_EXTERNALS 内；`
+                            + '宿主提供且运行期需要的包须先登记进 scripts/build-externals.mjs（并确认宿主 base 依赖链已装），'
+                            + '纯类型协作不受此限',
                     })
                 },
             }),
@@ -116,7 +124,10 @@ export default tseslint.config(
         files: ['src/**/*.{ts,tsx}'],
         ignores: ['src/client/**'],
         plugins: { 'half-purity': halfPurity },
-        rules: { 'half-purity/no-client-in-node': 'error' },
+        rules: {
+            'half-purity/no-client-in-node': 'error',
+            'half-purity/baseline-only-in-node': 'error',
+        },
     },
     {
         files: ['src/client/**/*.{ts,tsx}'],

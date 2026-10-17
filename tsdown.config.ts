@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'tsdown'
+import { CLIENT_EXTERNALS, NODE_EXTERNALS } from './scripts/build-externals.mjs'
 
 /** 浏览器半模块 id：必须用包名（client-modules 以 package.json name 注册 __ModuleLoader__ 行） */
 const CLIENT_ID = 'dsh-model-fix'
@@ -8,25 +9,7 @@ const CLIENT_ID = 'dsh-model-fix'
 /** `@` → src 目录（tsdown 不读 tsconfig paths，必须在此显式声明；test 构建见 tsdown.test.config.ts） */
 const SRC_ALIAS = { '@': fileURLToPath(new URL('./src', import.meta.url)) }
 
-/**
- * 外置 specifier 清单：宿主模块表在运行期提供的包，外置后由宿主 require 兑现；其余一律打进包内。
- * 与宿主 `DSH/packages/client/web/src/platform.ts` 的 PLATFORM_MODULES 对齐，漂移即运行期 require 未命中。
- * 与 `eslint.config.ts` 的 `BROWSER_HOST_BASELINE` 同源（同一张表），改动须两边同步。
- */
-const HOST_EXTERNALS = [
-    'react',
-    'react/jsx-runtime',
-    'react-dom',
-    'react-dom/client',
-    '@deepseek-ai/cordis',
-    '@deepseek-ai/dsh-client-store',
-    '@deepseek-ai/dsh-client-ui-slots',
-    '@deepseek-ai/dsh-client-ui-primitives',
-    '@deepseek-ai/dsh-credentials',
-]
-
-const isExternal = (specifier: string): boolean =>
-    (HOST_EXTERNALS as readonly string[]).includes(specifier)
+// 外置表单一来源见 scripts/build-externals.mjs
 
 /**
  * 版本号的唯一来源 = package.json。浏览器半运行在浏览器里、读不到磁盘，且 src 内禁相对导入
@@ -54,7 +37,7 @@ export default defineConfig([
         alias: SRC_ALIAS,
         // Node 半同样外置宿主模块：tsdown 默认只外置 dependencies/peerDependencies，devDependencies 会被内联
         deps: {
-            neverBundle: isExternal,
+            neverBundle: (specifier: string): boolean => NODE_EXTERNALS.includes(specifier),
         },
     },
     // ---------- 浏览器半：web-ui 卡片（lazy-CJS 工厂产物，格式复刻 harness clientBundle 预设） ----------
@@ -82,8 +65,8 @@ export default defineConfig([
         },
         deps: {
             // 外置的交给宿主 require，其余一律打进包内（浏览器半只留纯逻辑与宿主原语引用）
-            neverBundle: isExternal,
-            alwaysBundle: (specifier: string) => !isExternal(specifier),
+            neverBundle: (specifier: string): boolean => CLIENT_EXTERNALS.includes(specifier),
+            alwaysBundle: (specifier: string): boolean => !CLIENT_EXTERNALS.includes(specifier),
         },
         alias: SRC_ALIAS,
         outputOptions: {
