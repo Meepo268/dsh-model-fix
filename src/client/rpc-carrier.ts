@@ -1,5 +1,5 @@
 /**
- * 浏览器半调 Node 半的唯一出口：四个 channel RPC 写回端点与两条进度流的读流。
+ * 浏览器半调 Node 半的唯一出口：四个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
  *
  * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与
  * Node 半一一对应；散在入口里改一个端点名，要翻两个文件才找得到另一处。卡片只消费
@@ -10,14 +10,14 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 // channel RPC 的结果信封
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import {
-    ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
-    PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
+    ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
+    ENDPOINT_RESTORE_MODELS, PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
 } from '@/shared/constants'
 import { decodeProgressFrame } from '@/shared/verify-progress'
 import type { UnsupportedEffort, VerifyProgressUpdate, VerifySummary } from '@/shared/verify-progress'
 import type { VerifyTarget } from '@/client/model'
 
-/** 卡片可用的调用面：四个写回端点（各带 `WRITEBACK_MS` 等待上限）与两条诊断链的读流 */
+/** 浏览器半经本文件调 Node 半的调用面：四个写回端点（各带 `WRITEBACK_MS` 等待上限）、语言上报与两条诊断链的读流 */
 export interface RpcCarrier {
     /** 强制更新 RPC：channel 与端点在入口拼好，卡片只消费结果 */
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
@@ -27,6 +27,8 @@ export interface RpcCarrier {
     restoreModels: () => Promise<ConnectionRpcResult<unknown>>
     /** 剔除不被支持的推理级别：入参是验证明细给出的「提供方 / 模型 / 档位」清单；返回实际剔掉的档位条数 */
     pruneEfforts: (targets: readonly UnsupportedEffort[]) => Promise<ConnectionRpcResult<unknown>>
+    /** 语言上报：把浏览器界面语言告知 Node 半（取值链见 `src/effort-name.ts`）；无等待上限——失败由调用方重报 */
+    reportLocale: (locale: string) => Promise<ConnectionRpcResult<unknown>>
     /** 验证模型：走进度流端点，对「模型 × 推理级别」各发一次最小请求（`needTest` 的模型另发一次不计数的探测作对照），逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined，没能开跑或中途异常则抛错 */
     verifyModels: (
         models: readonly VerifyTarget[],
@@ -61,6 +63,7 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     // 而守卫是 Node 半的模块级标志，浏览器半跨不过半纯度门禁
     const pruneEfforts = (targets: readonly UnsupportedEffort[]) =>
         rpc.call(channel, ENDPOINT_PRUNE_EFFORTS, { targets }, AbortSignal.timeout(WRITEBACK_MS))
+    const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
     /**
      * 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
      *
@@ -142,5 +145,5 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => streamSummary(PROBE_STREAM_URL, { models, ...flags }, onFrame, signal)
-    return { forceUpdate, resetModels, restoreModels, pruneEfforts, verifyModels, probeEfforts }
+    return { forceUpdate, resetModels, restoreModels, pruneEfforts, reportLocale, verifyModels, probeEfforts }
 }

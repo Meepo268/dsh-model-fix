@@ -13,7 +13,8 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // ctx.connection 服务面（ClientConnectionRpc）
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import { ENDPOINT_REPORT_LOCALE, MAX_ATTEMPTS, PLUGIN_NS } from '@/shared/constants'
+import { makeRpcCarrier } from '@/client/rpc-carrier'
+import { MAX_ATTEMPTS } from '@/shared/constants'
 
 /** 上报失败后的重报间隔（毫秒）：取 2 秒，与宿主「等落定」的既有取值同量级（`HMR_WAIT_MS`、`MIGRATE_WAIT_MS`） */
 const REPORT_RETRY_MS = 2_000
@@ -26,10 +27,11 @@ export function applyLocaleReporter(ctx: ClientContext): void {
     ctx.inject(['locale', 'connection'], (child) => {
         const locale = child.locale.getSnapshot().active
         const rpc = (child.get('connection') as unknown as { rpc: ClientConnectionRpc }).rpc
+        const { reportLocale } = makeRpcCarrier(rpc)
         void (async (): Promise<void> => {
             for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                 try {
-                    if ((await rpc.call(`/${PLUGIN_NS}`, ENDPOINT_REPORT_LOCALE, locale)).ok) return
+                    if ((await reportLocale(locale)).ok) return
                 } catch {
                     // 抛错与 `ok: false` 同等：都算没送达
                 }

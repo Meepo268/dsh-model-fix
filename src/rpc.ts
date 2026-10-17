@@ -94,7 +94,7 @@ function handleReportLocale(payload: unknown): ConnectionRpcResult<unknown> {
     return { ok: true, value: {} }
 }
 
-/** 注册一个 channel（四个端点）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
+/** 注册一个 channel（五个端点）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer：webServer 用于注册前缀路由，connection 用于信任围栏。
     // 无 webServer 的 profile（如 headless）下子 fiber 不启动，插件其余功能不受影响。

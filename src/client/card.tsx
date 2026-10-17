@@ -126,8 +126,8 @@ function verifyLineOf(frame: VerifyProbedFrame, t: TranslateNS<'settings.modelFi
     return frame.skipped === undefined ? line : `${line}${t('verifySkipped', { count: String(frame.skipped) })}`
 }
 
-/** 卡片组件 props（t 由 slots.register 的 locale 席位合成注入；scope/forceUpdate 由入口闭包传入）；六个调 Node 半的方法由 `RpcCarrier` 给出，入口整包递进来 */
-export interface CardProps extends RpcCarrier {
+/** 卡片组件 props（t 由 slots.register 的 locale 席位合成注入；scope/forceUpdate 由入口闭包传入）；六个调 Node 半的方法由 `RpcCarrier` 给出，入口整包递进来（语言上报不经过卡片，故从调用面里剔掉） */
+export interface CardProps extends Omit<RpcCarrier, 'reportLocale'> {
     t: TranslateNS<'settings.modelFix'>
     scope: DecodedScope<Flags>
     /** 宿主 llm-pi-ai 命名空间：只取 snapshot.user 的提供方 id，判定排除项是否命中 */
