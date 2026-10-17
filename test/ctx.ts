@@ -4,6 +4,7 @@
   * 仅覆盖这两个编排体实际消费的 ctx 面：
   *   - settings.describe() → [{ns, user, revision}]（user 为可变段值，每次 describe 返回实时引用与最新 revision）
   *   - settings.mutate(ns, ops, revision) → 校验 revision 围栏（陈旧即抛 SETTINGS_CONFLICT）、应用 path op、bump revision
+  *   - 每次 mutate 记下调用当次的事件流守卫状态
   *   - get('hmr') → undefined（使 src/host.ts 的 queueTask 走 task() 降级路径，不依赖 AsyncLocalStorage）
   *   - logger.{info,warn,error} → 空实现
   *
@@ -16,6 +17,7 @@ import { API_NS, PLUGIN_NS } from '@/shared/constants'
 import { setConfigSource } from '@/config'
 import { setCatalog } from '@/catalog'
 import { setHmrExecuting } from '@/host'
+import { isIgnoreAll } from '@/guard'
 import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import { isPlainObject } from '@/shared/types'
 
@@ -50,8 +52,8 @@ export interface StubCtx {
     logger: { info(msg: string): void; warn(msg: string): void; error(msg: string): void }
     /** 测试断言入口：取某段的实时段值 */
     userOf(ns: string): Record<string, unknown>
-    /** 全部 mutate 调用（含被围栏拒绝的），按调用序 */
-    mutateCalls: Array<{ ns: string; ops: SettingsPathOp[]; revision: number }>
+    /** 全部 mutate 调用（含被围栏拒绝的），按调用序；`guard` 为调用当次事件流守卫是否生效 */
+    mutateCalls: Array<{ ns: string; ops: SettingsPathOp[]; revision: number; guard: boolean }>
 }
 
 /** 应用单条 path op 到段值：set 逐级建中间对象；unset 中间缺失即 no-op */
@@ -91,7 +93,7 @@ export function makeStubCtx(opts: StubCtxOpts = {}): StubCtx {
                 return [...sections.entries()].map(([ns, s]) => ({ ns, user: s.user, revision: s.revision }))
             },
             mutate(ns, ops, revision) {
-                mutateCalls.push({ ns, ops, revision })
+                mutateCalls.push({ ns, ops, revision, guard: isIgnoreAll() })
                 const section = sections.get(ns)
                 if (!section) return Promise.resolve()
                 // 模拟冲突：不校验 revision、不应用 op、不 bump，直接拒绝（测试 fix 的重试环控制流）

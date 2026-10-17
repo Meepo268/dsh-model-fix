@@ -1,5 +1,5 @@
 // src/probe-backup.ts 用例：探测目标档位表兜底备份的采集/编解码，与启动末尾只撤预声明的回退
-// （不复活被删的模型、不撤销用户在窗口内对其他字段与范围外模型的编辑）
+// （不复活被删的模型、不撤销用户在窗口内对其他字段与范围外模型的编辑；撤预声明与清备份的写回全程持守卫）
 import type { Context } from '@deepseek-ai/cordis'
 import { captureProbeBackup, decodeProbeBackup, encodeProbeBackup, restoreProbeBackup, saveProbeBackup } from '@/probe-backup'
 import { API_NS, PLUGIN_NS } from '@/shared/constants'
@@ -172,6 +172,11 @@ export async function run(): Promise<void> {
             && backupWrites(ctx)[0].ops[0]?.op === 'unset',
             ctx.mutateCalls.map((c) => `${c.ns}:${c.ops.map((op) => op.op).join('+')}`),
         )
+        check(
+            '回退期间每一次写回都在事件流守卫内',
+            ctx.mutateCalls.every((c) => c.guard),
+            ctx.mutateCalls.map((c) => `${c.ns}:${c.guard}`),
+        )
         check('回退期间持事件流守卫，结束后已释放', isIgnoreAll() === false, isIgnoreAll())
         check(
             '回退后自有段里不再有备份键（再调一次即无事可做、零写入）',
@@ -189,6 +194,11 @@ export async function run(): Promise<void> {
             changed === 0 && apiWrites(ctx).length === 0 && backupWrites(ctx).length === 1
             && (ctx.userOf(PLUGIN_NS).probeBackup === undefined),
             { changed, writes: ctx.mutateCalls.map((c) => c.ns) },
+        )
+        check(
+            '清备份的写回也在事件流守卫内',
+            backupWrites(ctx)[0]?.guard === true,
+            ctx.mutateCalls.map((c) => `${c.ns}:${c.guard}`),
         )
     }
     {

@@ -179,21 +179,22 @@ async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<numb
 /**
  * 启动末尾的崩溃回退：段里没有备份即无事可做（本轮没探测过，或上一轮正常收尾）；
  * 有则按备份撤掉预声明并清掉备份，返回被撤的模型数（0 = 无可撤或本就一致）。
- * 回退期间持事件流守卫——写回触发的段变更事件必须被入口拦下，否则 `fix` 会把预声明又填回来。
+ * 回退全程持事件流守卫——写回触发的段变更事件必须被入口拦下：撤预声明那次被放过去，`fix` 会把预声明又填回来；
+ * 解不出内容时只有清备份这一次写回，放过去同样白跑一轮自愈、填充与记忆剪枝，故守卫在解码前就置位。
  * **回退成功才清备份**：清除失败只是下次启动再撤一次（幂等、零 op），反过来先清则备份永久丢失。
  */
 export async function restoreProbeBackup(ctx: Context): Promise<number> {
     const section = ownSection(ctx)
     const raw = section?.[PROBE_BACKUP_KEY]
     if (raw === undefined) return 0
-    const backup = decodeProbeBackup(raw)
-    if (!backup) {
-        ctx.logger.warn(`${PLUGIN_NAME}: 遗留的探测兜底备份无法解码，已丢弃（不撤任何预声明）`)
-        await clearProbeBackup(ctx)
-        return 0
-    }
     startIgnoreAll()
     try {
+        const backup = decodeProbeBackup(raw)
+        if (!backup) {
+            ctx.logger.warn(`${PLUGIN_NAME}: 遗留的探测兜底备份无法解码，已丢弃（不撤任何预声明）`)
+            await clearProbeBackup(ctx)
+            return 0
+        }
         const changed = await restoreProviders(ctx, backup)
         await clearProbeBackup(ctx)
         if (changed > 0) ctx.logger.warn(`${PLUGIN_NAME}: 检测到上次探测式填充未收尾，已撤掉 ${changed} 个模型的预声明档位`)
