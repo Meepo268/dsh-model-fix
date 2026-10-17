@@ -4,10 +4,11 @@
 
 ## 命令
 
-`pnpm build` / `typecheck` / `lint` / `test` / `pack:release`；提交前必跑。
+`pnpm typecheck` / `lint` / `test` / `build`；提交前必跑。**只认这些已定义脚本，禁止裸命令**——不得绕开 pnpm 直跑 `tsc` / `eslint` / `tsdown` 等 bin：脚本是参数与配置发现的唯一收口（`tsdown --config tsdown.test.config.ts`、`eslint.config.ts` 经 jiti 读取都挂在脚本上），裸跑漏一个开关就与提交前验证不等价。
 
 ## 工具链陷阱
 
+- **pnpm 脚本必须直接在 shell 里跑，不得经 Node 子进程包裹**：沙箱（workspace-write）下从 Node 的 `child_process` 启动 `pnpm` 会被拦——Node 侧报 `spawn EPERM`。
 - `pnpm test` 走专用单对象配置 `tsdown.test.config.ts`；**禁止指回数组主配置**（CLI 参数会合并进每一项、浏览器半的工厂 banner 会污染测试产物）。
 - **TS 7 与 ESLint 并存靠 npm 别名**：TS 7 原生版无 JS API，typescript-eslint 见之即抛错。故 `typescript` = `npm:@typescript/typescript6@^6.0.2`（bin 为 `tsc6`），TS 7 挂别名 `@typescript/native`。
 - `pnpm lint` 走 `eslint.config.ts`（ESLint 靠 devDep `jiti` 读 TS 配置，脚本保持 `eslint .`）：只排除 `lib/`（构建产物，非本仓源码），其余目录交给 ESLint 默认忽略。硬约束五条——禁相对导入、`consistent-type-imports`，加上三条跨半纯度自定义规则（`AGENTS.md`「导入与打包」有细则）。根目录的 `tsdown.config.ts` / `tsdown.test.config.ts` 与本配置自身都在 lint 范围内。

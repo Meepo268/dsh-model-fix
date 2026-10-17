@@ -68,7 +68,7 @@ Node.js（ESM）+ `@deepseek-ai/cordis`；tsdown 双配置构建到 `lib/`（Nod
 
 ## 命令
 
-`pnpm build` / `typecheck` / `lint` / `test` / `pack:release`；提交前必跑。测试范围见 [`docs/workflow.md`](docs/workflow.md) 的「测试规范」。
+`pnpm typecheck` / `lint` / `test` / `build`；提交前必跑。**只认这些已定义脚本、不得裸跑 bin，且必须直接在 shell 里执行、不得经 Node 子进程包裹 pnpm**（细则见 [`docs/workflow.md`](docs/workflow.md)「工具链陷阱」）。测试范围见 [`docs/workflow.md`](docs/workflow.md) 的「测试规范」。
 
 ## 专题文档
 
