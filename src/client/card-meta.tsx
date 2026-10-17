@@ -3,9 +3,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 /**
  * 卡片末尾的联系行（浏览器半）：仓库地址 + 版本标记 + 两个跳转键。
  *
- * 抽出来的理由是它自成一体——一行里没有任何卡片状态，只有几个常量、四个图标和一次文案合成，
- * 却把图标 path 与版本号内联声明都压进了卡片组件所在的文件。地址与图标各自有独立的出处
- * （README 的安装段、Octicons 图标集），随卡片状态一起读代码时只会互相干扰。
+ * 自成一体——一行里没有任何卡片状态，只有几个常量、四个图标和一次文案合成，故从卡片组件里抽出来。
  */
 
 /** 项目仓库与反馈入口：仓库地址与 README「安装」段同源，改地址只改这两行 */
@@ -14,11 +12,11 @@ const ISSUES_URL = `${REPO_URL}/issues/new`
 /** 行内展示的短地址（去掉协议前缀，不重复手写字面量） */
 const REPO_LABEL = REPO_URL.replace(/^https?:\/\//, '')
 
-/** 插件版本号：由 tsdown 构建期从 package.json 读入并 define 内联（浏览器半读不到磁盘，见 tsdown.config.ts） */
+/** 插件版本号：由 tsdown 构建期从 package.json 读入并 define 内联（见 tsdown.config.ts） */
 declare const __PLUGIN_VERSION__: string
 const PLUGIN_VERSION = __PLUGIN_VERSION__
 
-// ---------- 行内项目链接行的图标：Octicons（GitHub 官方图标集，MIT、可商用、纯 path 单色），统一 16×16 / viewBox 0 0 16 16 / `fill="currentColor"`（随 .dsh-mf-linkIcon 取宿主令牌色） ----------
+// ---------- 行内项目链接行的图标：Octicons（GitHub 官方图标集，MIT），统一 16×16 / viewBox 0 0 16 16 / `fill="currentColor"` ----------
 
 /** 仓库图标：Octicons mark-github-16（https://primer.style/octicons/mark-github-16/） */
 function IconGitHub() {

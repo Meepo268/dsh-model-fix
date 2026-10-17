@@ -2,9 +2,8 @@
  * 「探测式填充」的崩溃兜底备份：探测开始前把**探测目标的档位表原值**存进自有段，
  * 启动末尾若还留着它，说明上一轮探测没能收尾，按这份备份把那些档位表撤回去。
  *
- * 备份只覆盖预声明动过的那一个字段：崩溃回退的唯一目的是「撤掉预声明」，故既不碰其他模型、
- * 也不碰同一模型的其他字段，更不会复活用户在探测期间删掉的模型（理由见 docs/decisions.md）。
- * 设计裁决（只备探测范围的理由、顶层键不进快照、收尾窗口代价）见 docs/decisions.md「探测式填充」。
+ * 备份只覆盖预声明动过的那一个字段：既不碰其他模型、也不碰同一模型的其他字段，更不会复活
+ * 用户在探测期间删掉的模型。设计裁决见 docs/decisions.md「探测式填充」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
@@ -54,8 +53,7 @@ export function captureProbeBackup(
     return backup
 }
 
-/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩——内容只有几批目标模型的档位表，
- * 压不动多少；base64 是为了让段里存的是一行无引号无换行的纯文本，而非整段转义 JSON。 */
+/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩，理由见 docs/decisions.md「探测式填充」 */
 export function encodeProbeBackup(backup: ProbeBackup): string {
     return Buffer.from(JSON.stringify(backup), 'utf8').toString('base64')
 }
@@ -87,7 +85,7 @@ export function decodeProbeBackup(text: unknown): ProbeBackup | undefined {
  *
  * @returns `{ modelOps, changed }`，`changed` 为被撤掉预声明的模型数
  */
-export function planProbeRestore(
+function planProbeRestore(
     backup: ProbeBackup,
     providers: Record<string, unknown>,
 ): { modelOps: SettingsPathOp[]; changed: number } {
@@ -135,8 +133,7 @@ async function mutateOwn(ctx: Context, ops: readonly SettingsPathOp[]): Promise<
 }
 
 /**
- * 探测开始前落备份。**失败即中止整轮**：没有退路就不动用户配置（预声明一旦写下就可能来不及收回）。
- * 调用方（`probeAndFill`）已持有事件流守卫，本函数不碰守卫。
+ * 探测开始前落备份。**失败即中止整轮**：没有退路就不动用户配置。调用方（`probeAndFill`）已持有事件流守卫。
  *
  * @param targets - 本轮探测的目标清单：备份范围就是它
  */
@@ -177,11 +174,9 @@ async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<numb
 }
 
 /**
- * 启动末尾的崩溃回退：段里没有备份即无事可做（本轮没探测过，或上一轮正常收尾）；
- * 有则按备份撤掉预声明并清掉备份，返回被撤的模型数（0 = 无可撤或本就一致）。
- * 回退全程持事件流守卫——写回触发的段变更事件必须被入口拦下：撤预声明那次被放过去，`fix` 会把预声明又填回来；
- * 解不出内容时只有清备份这一次写回，放过去同样白跑一轮自愈、填充与记忆剪枝，故守卫在解码前就置位。
- * **回退成功才清备份**：清除失败只是下次启动再撤一次（幂等、零 op），反过来先清则备份永久丢失。
+ * 启动末尾的崩溃回退：段里没有备份即无事可做；有则按备份撤掉预声明并清掉备份，返回被撤的模型数。
+ * 回退全程持事件流守卫（撤预声明那次若被放过去，`fix` 会把预声明又填回来）。
+ * 理由见 docs/decisions.md「探测式填充」。
  */
 export async function restoreProbeBackup(ctx: Context): Promise<number> {
     const section = ownSection(ctx)

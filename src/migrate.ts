@@ -66,13 +66,11 @@ export function pruneOps(
 /**
  * 当前版本快照的规范化 op：以「当前生效值」物化规范完整快照（`resolveConfig` → `toStored`），
  * 与盘上当前版本键逐键比较；不一致才产出 set op，幂等——第二轮同值零写入即收敛。
- * 仅在 migrateConfig 的「当前版本已存在」分支调用（当前版本键缺失时由迁移分支直接写规范快照）。
+ * 仅在 migrateConfig 的「当前版本已存在」分支调用。
  *
- * 覆盖三类重写动因：
- * - 非法：`parseSnapshot(onDisk)` 判 undefined（如用户手改坏、或快照为非对象）——`resolveConfig` 回落到段内最高可解析快照或默认；
- * - 残缺：`parseSnapshot` 对缺失字段一律补默认，会把只有 `efforts` 的 `{efforts:{…}}` 判为合法完整配置，
- *   单纯「非法才自愈」不足以保证盘上是规范完整快照；此处按规范化结果比对，残缺即重写（保留 efforts/excludes 现值，补齐四组默认与 configVersion）；
- * - 多余键：当前版本键含当前 schema 未知的键时，`toStored` 物化只保留已知键，比对不一致即剥离重写。
+ * 覆盖三类重写动因：**非法**（`parseSnapshot` 判 undefined）、**残缺**（`parseSnapshot` 对缺失字段
+ * 一律补默认，会把只有 `efforts` 的段判为合法完整配置，故须按规范化结果比对）、**多余键**
+ * （`toStored` 物化只保留已知键，比对不一致即剥离重写）。
  */
 export function canonicalizeCurrentOp(section: VersionedSection | undefined): SettingsPathOp[] {
     if (!section) return []
@@ -84,7 +82,7 @@ export function canonicalizeCurrentOp(section: VersionedSection | undefined): Se
 
 /**
  * 0.1.7 现代栈下本插件 Config schema 命名空间由宿主 Loader 异步登记，晚于 apply——启动时 describe() 可能尚未含本 NS。
- * 有界轮询等待其出现后再迁移（dsh-settings 无"命名空间注册"事件或 ready promise，settings/document-updated 只在 RAW 段变更时发、且 provider 首次 publish 早于本插件 apply 故监听器错过）。
+ * 有界轮询等待其出现后再迁移（dsh-settings 无「命名空间注册」事件或 ready promise）。
  */
 const MIGRATE_POLL_MS = 50
 const MIGRATE_WAIT_MS = 2000
@@ -92,14 +90,11 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 /**
  * 启动时配置迁移：
- * - 有当前版本快照 → 规范化校验：以当前生效值物化规范完整快照，与盘上当前版本键逐键比较；不一致（非法 / 字段残缺 / 含多余键）即重写自愈
- *   （幂等——第二轮同值零写入即收敛），两阶段清理低版本旧快照：先清低于最低支持版本，再清低于当前版本且超出上限的 excess（高版本快照保留）
- * - 无当前版本 → 段内所有 ≥ 最低支持版本中取最高可解析快照：高版本降级解析（按当前 schema，多余键忽略、efforts 宽松保留）、
- *   低版本走升级链；均不可解析或段内无版本则视为全新用户，直接写入规范默认快照，确保后续读取必有当前版本
- * - 写回带 `SETTINGS_CONFLICT` 限次重试：启动期自有段并非只有迁移链在写（浏览器半一连上记忆监听就可能直写 efforts、
- *   适配器拓扑事件触发的记忆剪枝同样写），冲突即本轮迁移写回丢失（新配置项不落盘，只剩一条难以察觉的 warn）。
- *   重试时**重读描述并重算 op**，绝不回放：按旧段算出的整段 set 若只换新 revision 回放，会盖掉并发写入者刚落的内容；
- *   重读后重算，他方已补齐的字段让 op 自然收敛为零
+ * - 有当前版本快照 → 规范化校验（不一致即重写自愈），并两阶段清理低版本旧快照（先清低于最低支持版本，
+ *   再清低于当前版本且超出上限的 excess；高版本快照保留）
+ * - 无当前版本 → 段内所有 ≥ 最低支持版本中取最高可解析快照：高版本降级解析、低版本走升级链；
+ *   均不可解析或段内无版本则视为全新用户，直接写入规范默认快照
+ * - 写回带 `SETTINGS_CONFLICT` 限次重试，且**重读描述并重算 op**、绝不回放（理由见 docs/decisions.md「写回端点」）
  */
 export async function migrateConfig(ctx: Context): Promise<void> {
     // 轮询等待 describe() 含本 NS；超时/卸载即放弃，按当前生效配置继续
@@ -173,8 +168,7 @@ export async function migrateConfig(ctx: Context): Promise<void> {
 /**
  * 从当前版本快照算出去重写回 op：仅当 `excludes` 经 Set 收窄后**变短**（即存在重复项）才产出，
  * 保留首次出现；无重复返回 []（一个字节都不写，这是 onChange 自愈的终止条件，防反馈循环）。
- * 元素含非字符串即整段非法，同样返回 []——parseSnapshot 口径为整段回退默认，不去洗半合法段。
- * 存储侧不做静默去重是 UI 录入端已拦截重复的前提下的兜底——重复只可能来自手改配置文件。
+ * 元素含非字符串即整段非法，同样返回 []。存储侧不做静默去重是 UI 录入端已拦截重复的前提下的兜底。
  */
 export function dedupeExcludesOp(snapshot: unknown): SettingsPathOp[] {
     if (!isPlainObject(snapshot)) return []
@@ -188,7 +182,7 @@ export function dedupeExcludesOp(snapshot: unknown): SettingsPathOp[] {
 
 /**
  * 自有配置的通用自愈入口（onChange 调用）：读 user 层当前版本快照，逐条套用自愈规则，
- * 有 op 才写入（各规则的零写入条件即反馈循环的终止条件）。当前唯一规则：excludes 去重（手改兜底）。
+ * 有 op 才写入。当前唯一规则：excludes 去重（手改兜底）。
  */
 export async function selfHealConfig(ctx: Context): Promise<void> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

@@ -21,23 +21,13 @@ const VERIFY_REJECT_MESSAGE = `${PLUGIN_NAME}: 验证请求不合法（模型条
  * 顺序跑完一组的验证请求（组内零并发）。
  *
  * 每模型**至多一次基线探测**：带档位的模型在验它第一条之前，先发一次不带档位的请求作对照——
- * 判「某档位不被支持」只能靠它（理由见 `isEffortRejection`）。基线不是被验对象：它不进明细、
- * 不计任何统计、跑通时也不留记录（用户看到的每一条都该是被验的那一次）。
- * 唯一的例外是**基线失败并据此短路**：那一条档位请求根本没发出去，用户无从得知，只能靠这条记录交代。
- *   瞬态失败（限流 / 超时）不留这种短路——它们只否定了这一次，随后照常逐档位验（见下）。
- * 两种模型没有基线：关掉档位开关时全部请求本就不带参数，以及模型没有声明任何档位时——
- * 那一次不带档位的请求本身就是被验对象（`needTest` 为假），故基线与它无从分开。
+ * 判「某档位不被支持」只能靠它。基线不是被验对象（不进明细、不计统计、跑通不留记录），
+ * 唯一例外是**基线失败并据此短路**：那条档位请求根本没发出去，只能靠一条模型级记录交代。
  *
- * 两级短路，判据只有一条：**能断定后续请求必然失败**（判据本体在 `@/probe-engine`，与「探测式填充」共用）：
- * - **provider 级**（`providerBlockReason`）：同一提供方共用同一 url 与同一把 key，这次过不了后面同样过不了。
- *   端点不通 / 凭据无效，外加**本组首个请求超时**——url 不可达、端点服务中断或本地网络不通，成因都落在
- *   请求之外，后续只会是同样无意义的超时。基线探测也算「本组的请求」，故首个请求常常正是它。
- * - **模型级**：档位请求上只有**额度耗尽**够格（`shouldSkipModelTail`）——同一把 key 的额度用完，
- *   换多少档都是同样结果。**基线请求**不带档位，失败天生与档位无关，故多认「被厂商确定性拒绝」一种
- *   （`shouldSkipModelTailAfterBaseline`）：模型不存在、参数被拒、无权限，换档位发出去的还是同一个请求。
- *   限流与超时两者都不算（`isTransientOutcome`）：它们只否定了这一次，否不了下一次——冷启动与限流窗口
- *   都可能让下一次反而跑通。实测限流挡掉的那一档，隔一会儿就通了。
- * 外部中止同样在此早停：只断在途请求而不停循环，后续请求会带着已中止的信号跑出一串假失败。
+ * 两级短路判据只有一条：**能断定后续请求必然失败**（判据本体在 `@/probe-verdict`）——
+ * provider 级：端点不通 / 凭据无效 / 本组首个请求超时；模型级：档位请求上只有额度耗尽，
+ * 基线请求另多认「被厂商确定性拒绝」。外部中止在此早停（只断在途请求而不停循环）。
+ * 理由展开见 docs/decisions.md「验证」。
  */
 const runGroup: GroupRunner = async (
     llm: Pick<LlmRuntime, 'stream'>,
@@ -91,9 +81,7 @@ const runGroup: GroupRunner = async (
                 // 中止没有结论：不发记录、不短路。外部中止就此整组停下；上游中止照常往下验
                 if (signal.aborted) break
             } else {
-                // 限流与超时只否定了这一次：冷启动、限流窗口都可能让下一次反而跑通，断不得。
-                // 留一条模型级记录（不带档位——没有哪一档被验过）交代基线为什么没过，随后照常逐档位验：
-                // 用户要的正是「哪一档行」，宁可多烧几次额度也不能替他把答案省掉
+                // 限流与超时只否定了这一次：留一条模型级记录交代基线为什么没过，随后照常逐档位验
                 // 附注帧：基线不是被验对象，不占进度位
                 emitProbe({ provider: probe.provider, model: probe.model }, testVerdict, { settled: 0 })
             }
@@ -114,7 +102,7 @@ const runGroup: GroupRunner = async (
             failure: verdict.failure,
         })
         // 两级短路的「剩余未发出的条数」在此一并算出：provider 级断到组尾，模型级只断到该模型自己的档位尾。
-        // 消费方据此交代「还剩几条没验」，被跳过的请求不进 results，故 probed 少于 planned
+        // 被跳过的请求不进 results，故 probed 少于 planned（口径见共享层 `VerifySummary`）
         let skipped: number
         const blockReason = providerBlockReason(outcome, sent === 1)
         if (blockReason !== undefined) {
@@ -134,7 +122,7 @@ const runGroup: GroupRunner = async (
     }
     // 计划数 = 该组的验证请求数（基线不在清单里）：关档位时等于勾选模型数，开档位时等于档位数之和
     const models = new Set<string>()
-    // 推理级别数只数带档位的条目：没声明档位的模型验的是模型本身，不占级别，故不进「X / Y 个推理级别」的分母
+    // 推理级别数只数带档位的条目（口径见共享层 `VerifyProviderReport`）
     let plannedEfforts = 0
     for (const probe of group.probes) {
         models.add(JSON.stringify([probe.provider, probe.model]))
@@ -151,8 +139,8 @@ const runGroup: GroupRunner = async (
     }
 }
 
-/** 验证的可选控制项；不传即静默跑完，行为与引入进度帧之前完全一致 */
-export type VerifyOptions = ProbeRunOptions
+/** 验证的可选控制项；不传即静默跑完 */
+type VerifyOptions = ProbeRunOptions
 
 /**
  * 执行一次验证：按用户勾选展开成清单、按提供方分组、逐组跑、逐组汇报并求和。

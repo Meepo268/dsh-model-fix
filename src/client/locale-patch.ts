@@ -2,17 +2,12 @@
  * 宿主词典运行时 patch：开关开时把宿主 model 命名空间 zh 词典里的
  * `effort.providerDefault` 词条从 'Default' 改成 '默认'（`showOriginalEfforts` 开着则改成 '默认 · Default'）。
  *
- * 为什么这样做：Default 是宿主 ModelSelect.tsx 自己合成的伪菜单项（L127/L133），
- * 它取的是浏览器半 locale 服务的 `t('effort.providerDefault')` 词条，不是数据层——
- * Node 半遮蔽 `resolveModelInfo` 碰不到这里。而宿主 LocaleRuntime 的 `register` 禁止同
- * ns+locale 重复注册，故只能直接 mutate 已注册的词典对象里的词条值，然后手动调 publish
- * bump revision 让 localeSeat 缓存失效、t 函数换新引用、已挂载的 outlet 重渲染。
+ * Default 是宿主 ModelSelect.tsx 自己合成的伪菜单项，取的是浏览器半 locale 服务的词条，不是数据层——
+ * Node 半遮蔽 `resolveModelInfo` 碰不到这里。而宿主 LocaleRuntime 的 `register` 禁止同 ns+locale 重复注册，
+ * 故只能直接 mutate 已注册的词典对象里的词条值，再手动调 publish bump revision 让缓存失效、outlet 重渲染。
  *
- * 三态与 Node 半 `localizeEffortNames` 同一形态（见 docs/decisions.md「本地化推理级别」）：
- * 不换名 → 'Default'；换名不带原档位 → '默认'；都开 → '默认 · Default'。
- *
- * 卸载时恢复原状、再 publish 一次；宿主自身的 register disposer 仍会调一次 publish，
- * 那次是幂等的（revision 再涨一次、词条值已是原始值），不冲突。
+ * 三态与 Node 半 `localizeEffortNames` 同一形态（见 docs/decisions.md「宿主与卡片」）。
+ * 卸载时恢复原状、再 publish 一次。
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -37,7 +32,7 @@ const TARGET_KEY = 'effort.providerDefault'
 /** LocaleRuntime.localeKey() 是 toLowerCase，直接用小写 'zh' */
 const ZH_LOWER = 'zh'
 
-/** 宿主 locales.ts 里 zh 词典的原始值（和 en 一样写的 'Default'）；中文译名取自共享词表，与 EFFORT_NAMES_ZH 同源 */
+/** 宿主 locales.ts 里 zh 词典的原始值（和 en 一样写的 'Default'）；中文译名取自共享词表 */
 const ORIGINAL = 'Default'
 const LOCALIZED = EFFORT_NAMES_ZH[ORIGINAL]
 
@@ -51,8 +46,7 @@ function valueOf(localized: boolean, showOriginal: boolean): string {
 }
 
 /**
- * 设置 zh 词典里目标词条的值；值未变时跳过 publish（revision 保持不变，已挂载的 outlet
- * 不需要重渲染——词条值没变嘛）。
+ * 设置 zh 词典里目标词条的值；值未变时跳过 publish（词条值没变，已挂载的 outlet 不需要重渲染）。
  */
 function patchZhDict(runtime: LocaleRuntimeHack, localized: boolean, showOriginal: boolean): void {
     const zhDict = runtime.dicts.get(MODEL_NS)?.get(ZH_LOWER)

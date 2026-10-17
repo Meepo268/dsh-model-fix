@@ -19,8 +19,7 @@ interface CompatRule {
 }
 
 /**
- * 规则表：新增兼容性配置在此追加一条（同组新增键向后兼容，形态不推动 CONFIG_VERSION 递增）。
- * 只写路由级、不写模型级；协议 gate（COMPAT_APIS）由 fix.ts 判，本纯函数只决定写什么。
+ * 规则表：新增兼容性配置在此追加一条。只写路由级、不写模型级；协议 gate（COMPAT_APIS）由 fix.ts 判。
  */
 const RULES: readonly CompatRule[] = [
     { key: 'disableDeveloper', field: DEVELOPER_COMPAT_FIELD, value: false },
@@ -32,8 +31,8 @@ type CompatPlan = { op: 'set'; value: Record<string, unknown> } | { op: 'unset' 
 
 /**
  * 依据当前兼容性规则计算某路由 compat 应写入的形态；与现值一致（或本就无需 compat 段）时返回 undefined。
- * 与模型参数填充的关键差异：**关闭的规则是「移除该字段」而非「保留不管」**，
- * 因此移除后不留空对象——目标形态无任何字段时整段 unset，残留的 `{}` 空壳同样清理（宿主语义上空对象等同未声明）。
+ * 与模型参数填充的关键差异：**关闭的规则是「移除该字段」而非「保留不管」**，故移除后不留空对象——
+ * 目标形态无任何字段时整段 unset（宿主语义上空对象等同未声明）。
  * @param compat - 生效的兼容性规则组。
  * @param current - 用户段 `providers.<id>.compat` 原值（非纯对象按无处理，但不清理非本组管辖的脏值）。
  */

@@ -27,7 +27,7 @@ export interface EffortApply {
 }
 
 /** 写入计划的结果：ops 与增删条数（口径见 `planEffortApply` 的 `baseline`） */
-export interface EffortApplyPlan {
+interface EffortApplyPlan {
     modelOps: SettingsPathOp[]
     models: number
     added: number

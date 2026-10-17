@@ -14,8 +14,6 @@ import { isPlainObject } from '@/shared/types'
  * 台阶写法约定（见 docs/versioning.md）：
  * - `upgradeToN` 只负责把低一级的配置升到 N：输入下限 N-1，低于即转交 upgradeToN-1。
  * - 当前链只有两级：upgradeTo8 → upgradeTo7（最低一级，校验 MIN_SUPPORTED_VERSION）。
- * - 未来形态不兼容时：追加新冻结类型 V8* 与台阶 upgradeTo9（输入下限 8，低于即转交 upgradeTo8），
- *   并让 upgradeConfig 改指它；届时 MIN_SUPPORTED_VERSION 抬到 8、v7 台阶与冻结类型一并移除。
  *
  * 当前版本的规范化、旧快照清理与自愈不在这里，见 src/migrate.ts。
  */
@@ -65,7 +63,6 @@ const V7ConfigSchema: z<Omit<V7PluginConfigSnapshot, 'configVersion' | 'efforts'
 /**
  * 同组新增键在 v8 形态内落地（未递增 CONFIG_VERSION），台阶侧补字面量默认值。
  * 写字面量而不引用当前版本的 DEFAULT_CONFIG——台阶产物形态必须恒定，否则默认演进会改写历史台阶语义。
- * 取值与当前出厂默认一致。
  */
 const V8_FOLLOW_PARENT_DEFAULT = false
 const V8_SELF_TUNE_DEFAULT = false
@@ -100,8 +97,7 @@ const upgradeTo7 = upgradeToMinVersion
 
 /**
  * 升到 v8。输入按 v7 冻结 schema 解析（非法整体回退 v7 默认）；efforts 经 parseEfforts 宽松保留；
- * 补 compat.disableStore、userExperience 的 followParent/selfTune/hideOfficial/localizeEfforts/showOriginalEfforts 默认值，
- * 以及 v8 形态内新增的 behavior 段（四项全开）。
+ * 补 compat.disableStore、userExperience 的五个新键默认值，以及 behavior 段（四项全开）。
  *
  * 输入下限是 7：低于 7 交给 upgradeTo7。
  */

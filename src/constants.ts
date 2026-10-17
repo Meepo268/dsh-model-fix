@@ -24,7 +24,7 @@ export const LEVELS: ReadonlySet<string> = new Set(EFFORT_LEVELS)
 
 /**
  * compat 组开关共同管辖的协议：只作用于 OpenAI Chat Completions 风格的路由（自定义端点的主流形态）。
- * 宿主只在 `openai-completions` offer 这两个字段（`COMPLETIONS_COMPAT_GATE`，见 docs/host-api.md），其余协议的写入被宿主按协议 gate 静默跳过。
+ * 宿主只在 `openai-completions` offer 这两个字段，其余协议的写入被宿主按协议 gate 静默跳过。
  */
 export const COMPAT_APIS = new Set(['openai-completions'])
 /** disableDeveloper 对应的 provider 路由 compat 字段名（开启写 false，关闭删键） */

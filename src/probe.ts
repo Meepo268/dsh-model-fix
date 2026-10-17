@@ -3,7 +3,6 @@
  * 按结论**收敛**成最终档位表并写回。全过程只由用户主动发起，且在途全程持有事件流守卫。
  *
  * 设计裁决（预声明必要性、收敛口径、两级短路判据、中止整轮还原、配额、兜底备份）见 docs/decisions.md「探测式填充」。
- * 本文件独有的口径：flagsOf 的开关缺省语义——`dropUnsupported` 缺省为关，`autoWrite` 缺省为开。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -52,8 +51,7 @@ const runProbeGroup: GroupRunner = async (
         if (verdict.outcome === 'aborted') continue
         if (verdict.outcome === 'usable') usable.add(probe.model)
         // 判「这一档不被支持」要两个条件：宿主判为「参数不正确」，且该模型已有更低档跑通
-        // （更低的档已跑通 ⇒ 端点、凭据、额度、网络与模型名都无碍，唯一剩下的变量就是这一档）。
-        // 第二个条件正是本功能与验证的分野：验证有专门的不带档位基线，这里没有，只能拿已跑通的更低档顶替
+        // （本功能没有基线对照，故拿已跑通的更低档顶替，见 docs/decisions.md「探测式填充」）
         const outcome = probe.effort !== undefined && usable.has(probe.model) && isEffortRejection(verdict.failure)
             ? 'unsupported-effort'
             : verdict.outcome
@@ -65,16 +63,14 @@ const runProbeGroup: GroupRunner = async (
             failure: verdict.failure,
         })
         // 两级短路的「剩余未发出的条数」在此一并算出：provider 级断到组尾，模型级只断到该模型自己的档位尾。
-        // 消费方据此交代「还剩几条没探」，被跳过的请求不进 results，故该模型的 probed 少于 planned
+        // 被跳过的请求不进 results，故该模型的 probed 少于 planned（口径见共享层 `VerifySummary`）
         let skipped = 0
         const blockReason = providerBlockReason(outcome, sent === 1)
         if (blockReason !== undefined) {
             blockedBy = blockReason
             skipped = group.probes.length - index - 1
         } else if (shouldSkipModelTail(outcome, verdict.failure) || outcome === 'rate-limit') {
-            // 额度耗尽共用判据：与档位无关且必然复现。限流是本功能自有的追加判据：限流不分档位，
-            // 同一把 key 在同一限流窗口里换档只会同样 429，而没跑满的模型本就会被整轮还原
-            // （档位表不动、无误杀），短到模型尾只是省下白烧的请求；超时仍不作判据（见 probe-verdict.ts）
+            // 额度耗尽共用判据；限流是本功能自有的追加判据（超时不算，见 docs/decisions.md「探测式填充」）
             skipped = sameModelTail(group.probes, index)
         }
         if (skipped > 0) index += skipped
@@ -120,8 +116,7 @@ function flagsOf(payload: unknown): { dropUnsupported: boolean; autoWrite: boole
  * 收敛结论：逐模型算出最终档位表（只算不写，是否落盘由 probeAndFill 按「自动写入」决定）。
  *
  * 结论是否生效有两道闸，任一不过即原样还原预声明之前的档位表——半截结论不足以动用户配置：
- * 1. 本轮被中止（`aborted`）：**整轮**还原，不按模型逐个判。用户按「停止」要的就是原样停下，
- *    不是「探到一半、填一半」；与「探到多少补多少」相比，全丢更可预期，也更不会把半截结论写成定论。
+ * 1. 本轮被中止（`aborted`）：**整轮**还原，不按模型逐个判。
  * 2. 该模型自己的请求没拿满（被 provider 级或模型级短路连带）：只还原它，其余模型照常收敛。
  */
 function convergeEntries(
@@ -208,13 +203,10 @@ function count(target: Map<string, number>, key: string): void {
  * 跑一轮探测式填充：预声明 → 逐档探测 → 收敛写回 → 发终帧。
  *
  * 三个开关（`ignoreExcludes` / `dropUnsupported` / `autoWrite`）随载荷走而不走参数：它们与模型清单同为
- * 浏览器半的声明，走载荷才与「入参按不可信输入校验」同一处收口；`autoWrite` 缺省为开，
- * 不带该键的旧前端行为不变。
+ * 浏览器半的声明，走载荷才与「入参按不可信输入校验」同一处收口。
  *
- * 事件流守卫**全程持有**（预声明到收敛之间不放开）：放开的话，用户或别的插件在这几分钟里改一次配置就会
- * 触发 `fix`，把预声明按 models.dev 改回去，探测剩余的请求会被宿主本地拒绝、结论全错。
- * 代价是一轮探测期间本插件的其它写回端点被拒、自动填充暂停——一轮探测本就是用户主动发起的，
- * 且带着未收敛的写回，放开守卫的风险比让出这段时间更大。
+ * 事件流守卫**全程持有**（预声明到收敛之间不放开）：放开的话，中途改一次配置就会触发 `fix` 把预声明
+ * 改回去，探测剩余的请求会被宿主本地拒绝、结论全错。理由与代价见 docs/decisions.md「探测式填充」。
  */
 export async function probeAndFill(
     ctx: Context,
@@ -247,8 +239,7 @@ export async function probeAndFill(
             const { models, added, removed } = await convergeProbeEfforts(ctx, entries, preexisting)
             fill = { models, added, removed }
         } else {
-            // 「自动写入」关闭：结论只算不写——写回端走整轮还原（与中止同一形态），
-            // 把预声明之前的档位表原样写回，统计交给 plannedFillOf
+            // 「自动写入」关闭：结论只算不写——写回端走整轮还原（与中止同一形态），统计交给 plannedFillOf
             fill = plannedFillOf(entries, preexisting)
             const restore: EffortApply[] = []
             for (const target of targets) {
@@ -257,13 +248,11 @@ export async function probeAndFill(
             }
             await convergeProbeEfforts(ctx, restore, preexisting)
         }
-        // 收敛已落盘即可撤掉兜底备份；撤不掉只告警（下次启动会把这轮补全回退掉，多探一次而已），
-        // 不因清理失败把已经成功的补全报成失败
+        // 收敛已落盘即可撤掉兜底备份；撤不掉只告警，不把已成功的补全报成失败（见 docs/decisions.md「探测式填充」）
         await clearProbeBackup(ctx).catch((error: unknown) => {
             ctx.logger.warn(`${PLUGIN_NAME}: 探测兜底备份清理失败（下次启动会回退本轮补全）：${errorText(error)}`)
         })
-        // 终帧最后发：写回已经落盘，消费方拿到 done 时看到的已是最终配置。
-        // `fill` 一律携带：开启即已写入的补全统计，关闭即「可补全」的假设统计，浏览器半据此选措辞
+        // 终帧最后发：写回已经落盘，消费方拿到 done 时看到的已是最终配置。`fill` 两义见 `ProbeFillResult`
         const filled: VerifySummary = { ...summary, fill }
         finishRun(filled, options)
         return filled

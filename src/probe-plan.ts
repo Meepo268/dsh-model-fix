@@ -22,10 +22,9 @@ export interface ProviderProbeGroup {
  * 一轮请求的两条硬闸：真正会发出的**请求数**与计划里的**模型数**。
  *
  * 上限约束的是烧掉的额度，故超出即拒绝而非静默截断——截断会让用户以为「全查过了」。
- * 验证按用户勾选展开（档位累加），探测式填充按模型展开（至多 7 档/模型，off 仅已声明时才探测），量级差一个数量级，
- * 故两者各给一份配额；入参校验本身共用一份实现（`planProbes`），只有上限不同。
+ * 两个功能各给一份配额（量级差一个数量级），入参校验共用一份实现（`planProbes`），只有上限不同。
  */
-export interface ProbeLimits {
+interface ProbeLimits {
     /** 真正会发出的请求数上限（含不带档位的基线探测） */
     maxProbes: number
     /** 计划模型数上限（按「提供方 / 模型」去重） */
@@ -40,10 +39,9 @@ export const PROBE_LIMITS: ProbeLimits = { maxProbes: 1400, maxModels: 200 }
 /**
  * 校验并展开请求载荷为清单：按模型序遍历，每个模型带上它自己要试的那些档位。
  *
- * 清单里只有**被验对象**：每个档位一条请求；模型没有档位可验时，那一条不带 `reasoningEffort` 的请求
- * 本身就是被验对象。`needTest` 为真的模型另需一次不带档位的**基线探测**作对照（判「某档位不被支持」全靠它，
- * 上游对这类报错的格式千差万别），但基线不进清单——它在执行阶段按需现发，不被统计、也不产出记录。
- * 任何非法条目或超出 `limits` 一律拒绝（返回 undefined）。
+ * 清单里只有**被验对象**：模型没有档位可验时，那一条不带 `reasoningEffort` 的请求本身就是被验对象。
+ * `needTest` 为真的模型另需一次不带档位的**基线探测**作对照，但基线不进清单——它在执行阶段按需现发
+ * （口径见共享层 `VerifyProbe`）。任何非法条目或超出 `limits` 一律拒绝（返回 undefined）。
  */
 export function planProbes(payload: unknown, limits: ProbeLimits = VERIFY_LIMITS): VerifyProbe[] | undefined {
     if (!isPlainObject(payload)) return
@@ -68,7 +66,7 @@ export function planProbes(payload: unknown, limits: ProbeLimits = VERIFY_LIMITS
         }
     }
     // 请求数算的是真正会发出的那些（含基线）：它约束的是烧掉的额度，清单长度只是它的一部分。
-    // 基线每模型至多一条，故按模型去重后再计数（同一模型的若干档位只多算一条）
+    // 基线每模型至多一条，故按模型去重后再计数
     const plannedModels = new Set<string>()
     let requests = probes.length
     for (const probe of probes) {
@@ -98,8 +96,8 @@ export function groupProbesByProvider(probes: readonly VerifyProbe[]): ProviderP
 /**
  * 校验并展开未信任载荷，按提供方分组返回待跑清单；入参非法即抛出。
  *
- * 与执行拆成两步是有原因的：`done` 帧必须等**整轮**结束才发，而探测式填充的「整轮」含收敛写回——
- * 写回结果要随终帧一起交回浏览器半，故计划得先交到调用方手里（它还要拿模型清单去写配置）。
+ * 与执行拆成两步：`done` 帧必须等**整轮**结束才发，而探测式填充的「整轮」含收敛写回，
+ * 故计划得先交到调用方手里（它还要拿模型清单去写配置）。
  *
  * @param payload 未信任的请求载荷（浏览器半发的模型清单）
  * @param limits 本轮的两条硬闸（请求数 / 模型数），验证与探测式填充各用一份

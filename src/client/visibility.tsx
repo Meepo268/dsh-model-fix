@@ -2,16 +2,13 @@
  * 「UI 与行为」组（`behavior`）的执行面：把四个可隐匿部件按开关做**真正的挂载 / 卸载**。
  *
  * 为什么必须是装卸而非组件内显隐：`settings.plugins.tab` 的 tab 头由宿主按**注册账本**画出，
- * 组件返回 `null` 只会让内容空掉、tab 头照旧——用户看到的是一个点进去空白的选项卡。
- * 撤销 `ctx.slots.register` 的 disposer 才是让部件真正从宿主账本里消失的唯一途径。
+ * 组件返回 `null` 只会让内容空掉、tab 头照旧。撤销 `ctx.slots.register` 的 disposer 才是让部件从宿主账本里消失的唯一途径。
  *
  * 为什么注册动作写在 `ctx.slots.inject` 的回调里：向未声明的 slot 直接 `register` 会抛
- * `slot "..." is not declared`（`ui-slots/src/index.ts`），而声明到达前本席不能注册。
- * 回调由宿主在声明到达后才执行，内部自建订阅做装卸——`ctx.effect` 会把回调返回的清理函数
+ * `slot "..." is not declared`，而声明到达前本席不能注册。`ctx.effect` 会把回调返回的清理函数
  * 挂进该次声明的 effect 生命周期，故 fiber 卸载或声明坍缩时最后挂载的条目一并撤销。
  *
- * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），
- * list 席位按 `id` 记账、id 不同可并存，两条各由 `behavior` 的一个开关支配。
+ * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），list 席位按 `id` 记账、id 不同可并存。
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -37,6 +34,14 @@ interface Part {
 
 /** 卡片入参的共有部分：scope / providersScope 由本文件补齐，其余字段逐席相同故只传一份 */
 type SharedCardProps = Omit<CardProps, 't' | 'scope' | 'providersScope'>
+
+/** 模型页 footer 席位的 order：取足够小的值以排在全部既有条目之前（list 渲染器按 order 单键重排） */
+const FOOTER_ORDER = -999999
+/** 内置插件选项卡席位的 order：落在官方条目之后 */
+const TAB_ORDER = 20
+/** 输入框工具行两枚 chip 的 order：模型优化在前、跟随灯在后 */
+const COMPOSER_ORDER = 5
+const FOLLOW_ORDER = 6
 
 /**
  * 挂上装卸编排：每个部件在所属 slot 声明到达后按开关决定挂不挂，之后每次配置变更重算。
@@ -65,8 +70,7 @@ export function applySlotVisibility(
             mount: () => ctx.slots.register({
                 name: 'settings.models.footer',
                 id: MODEL_FIX_NS,
-                // footer 以 order 排最前（list 渲染器按 order 单键重排）
-                order: -999999,
+                order: FOOTER_ORDER,
                 locale: CARD_NS,
             }, (props) => <Card {...card} {...props} />),
         },
@@ -77,7 +81,7 @@ export function applySlotVisibility(
             mount: () => ctx.slots.register({
                 name: 'settings.plugins.tab',
                 id: MODEL_FIX_NS,
-                order: 20,
+                order: TAB_ORDER,
                 // tab label 走 thunk，section 每次读账本时求值、切语言即跟随
                 label: () => t('tabLabel'),
                 locale: CARD_NS,
@@ -90,7 +94,7 @@ export function applySlotVisibility(
             mount: () => ctx.slots.register({
                 name: 'conversation.input.left',
                 id: `${MODEL_FIX_NS}-entry`,
-                order: 5,
+                order: COMPOSER_ORDER,
                 locale: CARD_NS,
             }, (props) => <ComposerEntry {...props} {...composerProps} cardProps={card} />),
         },
@@ -98,19 +102,17 @@ export function applySlotVisibility(
             slot: 'conversation.input.left',
             key: 'followLamp',
             flag: 'showFollowStatus',
-            // 排在模型优化之后（渲染点按 order 排全部条目）
             mount: () => ctx.slots.register({
                 name: 'conversation.input.left',
                 id: `${MODEL_FIX_NS}-follow`,
-                order: 6,
+                order: FOLLOW_ORDER,
                 locale: CARD_NS,
             }, (props) => <FollowLamp {...props} {...composerProps} cardProps={card} />),
         },
     ]
 
     /**
-     * 目标态与已挂载态不一致才动：这是幂等的全部依据。
-     * 只处理 `key` 这一个部件。
+     * 目标态与已挂载态不一致才动：这是幂等的全部依据。只处理 `key` 这一个部件。
      */
     const reconcileOne = (key: string): void => {
         const part = parts.find((p) => p.key === key)
@@ -127,8 +129,7 @@ export function applySlotVisibility(
 
     for (const slot of new Set(parts.map((p) => p.slot))) {
         const keys = parts.filter((p) => p.slot === slot).map((p) => p.key)
-        // 宿主在声明到达后执行本回调（同一 slot 只需等一次声明，旗下各部件共用它）；
-        // 返回的清理函数随该次声明的 effect 生命周期走
+        // 宿主在声明到达后执行本回调（同一 slot 只需等一次声明，旗下各部件共用它）
         ctx.slots.inject(slot, () => {
             for (const key of keys) reconcileOne(key)
             // subscribe 只推失效通知、不推首值，故上面已按当前快照补跑一遍

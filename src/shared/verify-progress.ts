@@ -7,7 +7,7 @@
  *
  * 两个功能共用同一份形状而不另立一套：探测的请求维度与验证完全一致（同样是「模型 × 推理级别」各一次最小请求，
  * 同样按 `block-start` 判受理、同样只按 `code` 分类、同样 provider 间并发 / provider 内串行），
- * 故进度帧与汇总逐字段同形，浏览器半也只需一个 SSE 读取器。真正的分岔在「每组怎么跑」那一步（Node 半的执行器）。
+ * 真正的分岔在「每组怎么跑」那一步（Node 半的执行器）。
  */
 
 import { isPlainObject } from '@/shared/types'
@@ -21,18 +21,16 @@ export interface VerifyProbe {
     model: string
     effort?: string
     /**
-     * 该模型是否需要一次不带 `reasoningEffort` 的**探测**请求作对照。
-     *
-     * 判定「某档位不被支持」只能靠这个对照：上游对「这一档不被支持」的报错格式千差万别，
-     * 不比对就没法把失败归因到档位本身。两种情形不需要它——关掉档位开关时全部请求本就不带参数，
-     * 以及模型没有声明任何档位时——此时那一次不带档位的请求**本身就是被验对象**，不是对照。
-     * 它是否要发由浏览器半在规划时声明（`needTest`），Node 半不替它反推。
+     * 该模型是否需要一次不带 `reasoningEffort` 的**探测**请求作对照。判「某档位不被支持」只能靠它
+     * （上游对这类报错的格式千差万别）。两种情形不需要：关掉档位开关时全部请求本就不带参数，
+     * 以及模型没有声明任何档位时——那一次不带档位的请求**本身就是被验对象**，不是对照。
+     * 由浏览器半在规划时声明，Node 半不替它反推。
      */
     needTest: boolean
 }
 
 /**
- * 单次探测的判定结果。分类只依据宿主 `LlmFailure` 的 `code` 与 `status`——宿主明令
+ * 单次探测的判定结果。分类只依据宿主 `LlmFailure` 的 `code`——宿主明令
  * 「route on `code`, never by parsing `message`」，故两侧都不做文案比对。
  */
 export type ProbeOutcome =
@@ -63,7 +61,7 @@ export type ProbeOutcome =
  *
  * - `unreachable` / `credential`：同一提供方共用同一 url 与同一把 key，一次过不了后面同样过不了。
  *   额度耗尽不在其列（额度可能只覆盖其中某个模型），理由见 `quota` 那一支。
- * - `timeout`：**仅当它就是本组的首个请求**才成立（判据见 `@/probe-engine` 的 `providerBlockReason`），
+ * - `timeout`：**仅当它就是本组的首个请求**才成立（判据见 `@/probe-verdict` 的 `providerBlockReason`），
  *   故它不由本类型自己判定。单看一次超时只是「这次没跑成」，什么也断定不了。
  */
 export type ProviderBlockReason = 'unreachable' | 'credential' | 'timeout'
@@ -80,9 +78,8 @@ export function isProviderBlocking(outcome: ProbeOutcome): outcome is Exclude<Pr
 /**
  * 该结果是否只是本次没跑成（限流 / 超时），而非模型或档位本身的缺陷。
  *
- * 这类结论既不算不可用，也**不能用来短该模型的后续档位**：控制变量法的前提是变量已知失败，
- * 而限流与超时恰恰说明这次结果不可外推；把它们当失败等于把一次偶发抖动固化成「这个档位不可用」。
- * 中止不在其列：它压根没跑成，由执行层直接不入账。
+ * 这类结论既不算不可用，也**不能用来短该模型的后续档位**：把它们当失败等于把一次偶发抖动
+ * 固化成「这个档位不可用」。中止不在其列：它压根没跑成，由执行层直接不入账。
  */
 export function isTransientOutcome(outcome: ProbeOutcome): boolean {
     return outcome === 'rate-limit' || outcome === 'timeout'
@@ -121,21 +118,15 @@ export interface ProviderProbeOutcome {
     results: VerifyProbeResult[]
     /**
      * 探测结论（实际发出的那些）。它不是被验对象，故不进 `results`、不计任何计数，
-     * 但真发出去过就能证伪端点与凭据，故单列：漏掉它会把「探测撞上额度 / 不可达」误报成「端点可达、凭据有效」。
+     * 但真发出去过就能证伪端点与凭据，故单列。
      */
     tests: VerifyProbeResult[]
     blockedBy: ProviderBlockReason | undefined
-    /**
-     * 计划验证请求数（**不含探测**：探测是判据不是被验对象）。
-     * 故等于「带档位的请求数 + 不带档位且 `needTest` 为假的请求数」。
-     */
+    /** 计划验证请求数（**不含探测**，探测是判据不是被验对象） */
     planned: number
-    /**
-     * 计划推理级别数（**不含探测**）：计划里带档位的条目数。模型没声明档位时它验的是模型而非级别，
-     * 那一条算进 `planned` 但不算进这里——「X / Y 个推理级别」的分母只该是级别。
-     */
+    /** 计划推理级别数（**不含探测**）：计划里带档位的条目数（模型没声明档位时验的是模型，不占级别） */
     plannedEfforts: number
-    /** 计划验过的模型数（按「提供方 / 模型」去重）：即该组里用户勾了几个，取自计划而非明细——模型若被短路到一条未发，明细里就没有它 */
+    /** 计划验过的模型数（按「提供方 / 模型」去重）：取自计划而非明细——模型若被短路到一条未发，明细里就没有它 */
     tested: number
 }
 
@@ -171,8 +162,8 @@ export interface VerifyProviderReport {
 /**
  * 一个「提供方 / 模型」下的某个推理级别被判为**不被支持**。
  *
- * 只收**明确**判为不支持的：超时、限流、额度耗尽、端点不可达都只是没能验成，不是不支持，
- * 拿它们去剔除用户填的配置就是误伤。
+ * 只收**明确**判为不支持的；超时、限流、额度耗尽、端点不可达都只是没验成，不在此列
+ * （判据见 docs/decisions.md「验证」）。
  */
 export interface UnsupportedEffort {
     provider: string
@@ -183,9 +174,7 @@ export interface UnsupportedEffort {
 /**
  * 一个「提供方 / 模型」下的某个推理级别被判为**确实可用**（收到 `block-start`）。
  *
- * 与 `UnsupportedEffort` 对称的一只：探测式填充要把可用档位**写回配置**，那就得逐条定位，
- * 与剔除同理——只给聚合数字的话，浏览器半就得自己从 `results` 里重筛一遍，
- * 筛选口径一旦与执行器分叉就会漏填或多填。
+ * 与 `UnsupportedEffort` 对称的一只：探测式填充要把可用档位**写回配置**，故同样得逐条定位。
  * 只收带档位的条目：不带档位的那次请求验的是模型本身，没有「哪一档可用」可言。
  */
 export interface UsableEffort {
@@ -216,21 +205,19 @@ export interface VerifySummary {
     /** 逐条探测明细，顺序为「组序 → 组内探测序」，可重复消费 */
     results: readonly VerifyProbeResult[]
     /**
-     * 明确判为不被支持的档位明细。统计值前端可直接用 `tested` / `models` / `efforts` / `plannedEfforts`，
-     * 但剔除要写配置就得逐条定位，故这块不聚合、只给明细——省得前端再从 `results` 里自己筛一遍，
-     * 筛选口径一旦与执行器分叉就会漏剔或多剔。
+     * 明确判为不被支持的档位明细：统计值前端直接用 `tested` / `models` / `efforts` / `plannedEfforts`，
+     * 但剔除要写配置就得逐条定位（理由见 `UnsupportedEffort`）。
      */
     unsupportedEfforts: readonly UnsupportedEffort[]
     /**
-     * 判为可用的档位明细（`usableEfforts` 与上面的 `unsupportedEfforts` 同源同构，一对「确实可用 / 确实不支持」的明确状态）。
-     * 探测式填充据此写回补全档位；验证侧也能直接用它（不必从 `results` 里自己筛）。
+     * 判为可用的档位明细（与 `unsupportedEfforts` 同源同构）。探测式填充据此写回补全档位；
+     * 验证侧也能直接用它。
      */
     usableEfforts: readonly UsableEffort[]
     /**
      * 收敛结论的增删统计：**只有探测式填充给出**（验证只读、不碰配置，故此字段恒缺省）。
-     * 它随终帧一起回到浏览器半，因为收敛发生在整轮探测之后、终帧之前——
-     * 消费方拿到终帧时看到的已经是最终配置。「自动写入」开启即已写入的补全统计；
-     * 关闭时写回端整轮还原，这里是「可补全」的假设统计（结论若写入的增删），浏览器半据此换措辞汇报。
+     * 它随终帧一起回到浏览器半，因为收敛发生在整轮探测之后、终帧之前。「自动写入」开启即已写入的
+     * 补全统计；关闭时这里是「可补全」的假设统计，浏览器半据此换措辞汇报。
      */
     fill?: ProbeFillResult
     /** 本次验证的模型数（按「提供方 / 模型」去重），即用户勾了几个；取自计划而非明细，故被短路的模型也在内 */
@@ -256,21 +243,17 @@ export interface VerifySummary {
  * 随后每完成一条探测发一条 `probed`，最后收于唯一一条终帧（`done` 或 `failed`）。
  *
  * 中途被中止（用户点停止、关窗、连接断开）时**不发终帧**——收到流自然结束却没等到终帧，
- * 消费方即知这轮没跑完，据此决定是保留进度还是标错误。
- *
- * 刻意不加的字段：`seq`（单条连接天然保序，编号是为可重放观察者准备的）、`elapsedMs`
- * （交由终端节点自持，别让传输格式随渲染需求膨胀）。
+ * 消费方即知这轮没跑完。
  */
 export type VerifyProgressFrame =
     /** 开流即发的第一条：让 UI 立刻知道总共几项，而不是对着空白等第一条结果 */
     | { type: 'opened'; total: number }
     /**
      * 一条探测出结果。`done`/`total` 是跨提供方并行的进度位置，可直接显示为进度：
-     * `total` 是计划条目数（不含基线探测——它不是被验对象，与 `planned`/`probed` 同口径），
-     * `done` 是已了结的条目数（被短路而未发出的计入），故 `done ≤ total` 恒成立、整轮跑完即两者相等；
+     * `total` 是计划条目数（不含基线探测，与 `planned`/`probed` 同口径），
+     * `done` 是已了结的条目数（被短路而未发出的计入），故 `done ≤ total` 恒成立；
      * 交代基线为什么没过的**附注帧不推进 `done`**。
-     * `skipped` 在该结论短路了后续请求时出现（provider 级或模型级，含探测不通导致的短路），
-     * 值为未发出的条数。`effort` 缺省即模型级结论：探测不通时那一条档位请求根本没发出去，没有哪一档被验过。
+     * `skipped` 在该结论短路了后续请求时出现，值为未发出的条数。`effort` 缺省即模型级结论。
      */
     | {
         type: 'probed'
@@ -286,9 +269,7 @@ export type VerifyProgressFrame =
     | { type: 'done'; summary: VerifySummary }
     /**
      * 终帧：整轮没能开跑（入参非法、超配额等）或执行中途异常，`message` 是 Node 半给出的中文原因。
-     *
-     * 与「中止」的区别：中止**没有**终帧（消费方据「流结束却无终帧」判中止），而这条是明确的失败，
-     * 消费方须原样展示 `message`——裸报「已停止」会把「勾选超出上限」这类原因整个吞掉。
+     * 与「中止」的区别：中止**没有**终帧，消费方据「流结束却无终帧」判中止。
      */
     | { type: 'failed'; message: string }
 
@@ -302,8 +283,9 @@ export type VerifyProgressUpdate = Exclude<VerifyProgressFrame, { type: 'done' |
 const DATA_PREFIX = 'data: '
 
 /**
- * 把一帧编成线上文本。内容类型刻意用 `text/event-stream`：宿主的 gzip 中间件显式跳过它
- * （`DSH/packages/host/webserver/src/index.ts`），普通内容类型可能被压缩缓冲住——一缓冲，流式就没了。
+ * 把一帧编成线上文本（单行 `data: ` + 空行分帧）。
+ *
+ * 内容类型取 `text/event-stream` 的缘由（宿主 gzip 中间件显式跳过它）见 `src/rpc.ts` 与 docs/host-api.md。
  */
 export function encodeProgressFrame(frame: VerifyProgressFrame): string {
     return `${DATA_PREFIX}${JSON.stringify(frame)}\n\n`
@@ -312,8 +294,7 @@ export function encodeProgressFrame(frame: VerifyProgressFrame): string {
 /**
  * 解析一条 `data: ` 行；SSE 注释帧（`: …` 心跳）与非法 JSON 一律返回 undefined，调用方跳过即可。
  *
- * 逐字段校验而非 `JSON.parse` 了事：这条流的终点 `done.summary` 直接驱动卡片上的统计数字，
- * 形状不对却当成合法帧用，等于把空值当结果展示。
+ * 逐字段校验而非 `JSON.parse` 了事：这条流的终点 `done.summary` 直接驱动卡片上的统计数字。
  */
 export function decodeProgressFrame(line: string): VerifyProgressFrame | undefined {
     if (!line.startsWith(DATA_PREFIX)) return undefined
@@ -339,7 +320,7 @@ function isProgressFrame(value: unknown): value is VerifyProgressFrame {
     }
     // failed 帧只校验消费方会读的那个字段：整轮结局的原因要原样展示，文案缺失即无信息可用
     if (value.type === 'failed') return typeof value.message === 'string'
-    // done 帧只校验消费方会读的四个计数（收尾那行文案要用）；其余字段（逐提供方汇报与明细）此刻还没人用
+    // done 帧只校验收尾那行文案要用的四个计数；其余字段不做深度校验
     return value.type === 'done' && isPlainObject(value.summary)
         && typeof value.summary.tested === 'number' && typeof value.summary.models === 'number'
         && typeof value.summary.efforts === 'number' && typeof value.summary.plannedEfforts === 'number'

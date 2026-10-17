@@ -2,8 +2,6 @@
  * 「模型 × 推理级别」最小请求的执行引擎：验证与探测式填充共用。
  *
  * 设计裁决（四级分层、受理判据、失败分类、短路判据、并发与中止语义）见 docs/decisions.md「验证」与「探测式填充」。
- * 本文件独有的口径：收到首个 `block-start` 即判该「模型 × 档位」可用，随即中断；`PROBE_TIMEOUT_MS` 定软超时，
- * 其后 `PROBE_TIMEOUT_GRACE_MS` 内适配器仍不收尾即硬兜底——probeOnce 无论如何返回，整轮必然收尾。
  */
 
 import type { LlmRuntime, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -20,7 +18,7 @@ const PROBE_PROMPT = 'Just say OK'
 const PROBE_TIMEOUT_MS = 30_000
 /**
  * 软超时后的宽限（毫秒）：软超时只发中止信号、等适配器自己收尾并回报真实失败事实，宽限期满即硬兜底。
- * 兜底与「读流」赛跑而非只等它——适配器即使忽略 `signal`（宿主回归），probeOnce 也必然返回。
+ * 兜底与「读流」赛跑而非只等它——适配器即使忽略 `signal`，probeOnce 也必然返回（理由见 docs/decisions.md「验证」）。
  */
 const PROBE_TIMEOUT_GRACE_MS = 3_000
 /** 同时在跑的**提供方**数（不是单提供方并发数——后者恒为 1，由分组串行保证） */
@@ -33,12 +31,10 @@ function failureFacts(failure: LlmFailure): VerifyFailureFacts {
 
 /**
  * 发一次探测并判定：收到首个 `block-start` 即判「受支持」；否则读到终止块、据其失败事实分类。
- * 中止（外部或上游）没有结论，单列 `'aborted'`；我方超时归 `'timeout'`——都不能误判成端点不可达。
+ * 中止（外部或上游）没有结论，单列 `'aborted'`；我方超时归 `'timeout'`。
  *
- * **到点必然返回，不依赖适配器配合**：软超时只发中止信号（等适配器自己收尾、回报真实失败事实），
- * 宽限期满由 `giveUp` 赢下与读流的赛跑，本函数无论如何都返回；赛跑的对象是**每一次 `next()`**
- * 而非整段循环，到点即不再调用 `next()`，被放弃的那条循环不可能继续消费分片。
- * 为什么这层兜底是必须的、为何随后要 detached 关闭迭代器，见 docs/decisions.md「验证」的超时条目。
+ * **到点必然返回，不依赖适配器配合**：宽限期满由 `giveUp` 赢下与读流的赛跑，赛跑的对象是
+ * **每一次 `next()`** 而非整段循环，到点即不再调用 `next()`。理由与收尾方式见 docs/decisions.md「验证」。
  *
  * @param timeoutMs 软超时（毫秒）：到点只发中止信号、不判结论；仅测试传更小的值，生产取 `PROBE_TIMEOUT_MS`
  * @param graceMs 软超时后的宽限（毫秒）：期满即硬兜底返回；同样仅测试为缩短等待而传
@@ -70,8 +66,8 @@ export async function probeOnce(
         signal: AbortSignal.any([signal, controller.signal]),
     })[Symbol.asyncIterator]()
     try {
-        // 只认 block-start——它证明适配器已真正开始产出内容块（宿主 isVisibleChunk 同样把 usage / finish 排除在「内容」之外）。
-        // 不能沿用「首个非 finish 块即成功」：额度耗尽的 key 也会先来一条 usage，那不是受理信号。
+        // 只认 block-start——它证明适配器已真正开始产出内容块。不能沿用「首个非 finish 块即成功」：
+        // 额度耗尽的 key 也会先来一条 usage（实测踩过，见 docs/decisions.md「验证」）。
         // 命中即返回，随后的 finally 中断请求、不再消耗生成额度
         while (true) {
             const step = await Promise.race([iterator.next(), giveUp])
@@ -110,8 +106,6 @@ export async function probeOnce(
         controller.abort()
         // 收尾：请求关闭迭代器，被放弃的循环不再继续消费分片。**不 await**——适配器若忽略 signal，
         // `return` 会排在未决的 `next()` 之后永不 settle，await 等于把刚兜底回来的函数又挂回去
-        // （与宿主 pi-ai 适配器对被放弃需求的收尾同款）。完全不理会 signal 的适配器只能靠自身的
-        // 看门狗或 TCP 超时释放底层资源——JS 无法强杀一个不 settle 的 promise
         const close = iterator.return?.bind(iterator)
         if (close !== undefined) void close().catch(() => {})
     }
@@ -123,10 +117,9 @@ const NEVER_ABORTED = new AbortController().signal
 /**
  * 一帧的进度交代：`settled` 是进度增量（`done` 只数计划条目），`skipped` 是因短路而未发出的条数。
  *
- * 恒有 `settled === skipped + (当前条目确已发出 ? 1 : 0)`：基线探测不是被验对象、占不了进度位，
- * 而被短路而未发出的条目同样计入——它们不会再被验，进度就该在这一帧走完，否则整轮跑完停在 `done < total`。
+ * 恒有 `settled === skipped + (当前条目确已发出 ? 1 : 0)`（口径见共享层 `VerifyProgressFrame`）。
  */
-export interface ProbeFrameProgress {
+interface ProbeFrameProgress {
     /** 本帧了结的计划条目数；0 即附注帧，不推进 `done` */
     settled: number
     /** 因短路而未发出的条数；无则缺省 */

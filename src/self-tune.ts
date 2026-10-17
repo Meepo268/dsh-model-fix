@@ -1,16 +1,13 @@
 /**
  * 推理档位自调（Node 半）：按 `userExperience.selfTune` 开关向宿主注入两枚工具与一段系统提示词，
- * 让 AI 按任务难度自主调节当前会话的推理档位——规划转执行可降档、探索设计可升档。
+ * 让 AI 按任务难度自主调节当前会话的推理档位。
  *
- * 设置走 UI 同款入口：`sessionController.selectModel`（与用户手动在模型选择器里选档完全同一条链路，
+ * 设置走 UI 同款入口 `sessionController.selectModel`（与用户手动在模型选择器里选档完全同一条链路，
  * 宿主会做适配器元数据校验并落 `model/selection` 事件），不是改请求参数。查询走 `llm.resolveModelInfo`，
- * 全量提供方里的当前模型都能查（不限于本插件填充的 llm-pi-ai 模型）。档位值一律用 `efforts[].id`
- * 的实际值；AI 只做升/降两向调整（保持 = 不发起请求），查询与设置的工具出参都不出现「默认档位」
- * 的痕迹——AI 读到的每个字段都该有用处，无解释的字段只会污染注意力。
+ * 全量提供方里的当前模型都能查（不限于本插件填充的 llm-pi-ai 模型）。档位值一律用 `efforts[].id` 的实际值。
  *
- * 插件零状态：档位状态全在宿主（pending selection + durable projection），开关切换只是装/卸注入面，
- * HMR 无损。工具失败原样透传宿主文案（不支持档位、会话被拒等），不分类不改写；「先查后设」与
- * 失败处理都靠提示词软指引而非硬校验——路由可能被外部切换，让 AI 看返回值自行决定重试或保持。
+ * 插件零状态：档位状态全在宿主，开关切换只是装/卸注入面，HMR 无损。工具失败原样透传宿主文案，
+ * 不分类不改写；「先查后设」与失败处理都靠提示词软指引而非硬校验。理由见 docs/decisions.md「档位自调」。
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -25,9 +22,7 @@ import { PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
  * 原因：`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/dsh-system-prompt` 不在 devDep 清单里，且
  * `dsh-tools` 的类型面会把 `@deepseek-ai/dsh-agent` / `@deepseek-ai/dsh-session` 的**包根**类型拉进
  * 整个 typecheck 程序，顶掉浏览器半 `ctx.sessions` 的 `ISessions` 增补（同 `src/subagent.ts` 的裁决，
- * 详见 [`docs/host-api.md`](docs/host-api.md)）。`sessionController` / `sessionProjections` 虽然
- * 在 devDep 里，但服务在 `ctx.inject` 子 fiber 回调内经 `(child.get as …)('…')` 取用，一并契约复制可让本文件零宿主类型导入。
- * 升级宿主时按 [`docs/host-api.md`](docs/host-api.md) 的对应条目复核。
+ * 详见 [`docs/host-api.md`](docs/host-api.md)）。升级宿主时按该文档的对应条目复核。
  */
 
 /** 宿主 `Agent` 的只读面（工具执行上下文里的调用方；同 `src/subagent.ts` 的 `SubagentHost` 裁决） */
@@ -97,11 +92,10 @@ function isRouted(route: ToolRoute | null | undefined): route is { provider: str
 
 /**
  * 当前会话「下一次请求该用的路由」：投影的待生效选择优先（UI 换档后即刻可读，不必等请求消费），
- * 其次 `lastUsed`（最近一次请求用过的），再回落请求头（最新一次请求的配置；`adapterDefaults.reasoningEffort
- * === true` 是适配器兜底值而非用户所选，档位视作未选），最后回落 Agent 自身 options（尚无任何请求时）。
+ * 其次 `lastUsed`，再回落请求头（`adapterDefaults.reasoningEffort === true` 是适配器兜底值而非用户所选，
+ * 档位视作未选），最后回落 Agent 自身 options。
  *
- * 取不到路由即 undefined，含读宿主投影/请求头抛错——读失败与「没有路由」同归，两枚工具据此回
- * `no-route`，不让异常冒泡出 `execute`。
+ * 取不到路由即 undefined，含读宿主投影/请求头抛错——两枚工具据此回 `no-route`，不让异常冒泡出 `execute`。
  */
 function resolveCurrentRoute(agent: ToolAgent, projections: HostSessionProjections | undefined): ResolvedRoute | undefined {
     try {
@@ -128,12 +122,12 @@ function resolveCurrentRoute(agent: ToolAgent, projections: HostSessionProjectio
     }
 }
 
-/** 工具出参的渲染：JSON 文本块（与官方工具的极简渲染同款；出参本身就是给 AI 读的结构化结果） */
+/** 工具出参的渲染：JSON 文本块（出参本身就是给 AI 读的结构化结果） */
 function renderJson(_args: unknown, value: unknown): ReadonlyArray<{ type: 'text'; text: string }> {
     return [{ type: 'text', text: JSON.stringify(value) }]
 }
 
-/** 系统提示词段：与两枚工具同装同卸；只保留必要语义（升/降 + 先查后设 + 失败处理），硬校验由宿主在 selectModel 内做 */
+/** 系统提示词段：与两枚工具同装同卸；只保留必要语义（升/降 + 先查后设 + 失败处理） */
 const EFFORT_PROMPT = `You have two tools for reasoning effort tuning:
 - query_reasoning_efforts(): returns the current effort and the efforts available for the current model
 - set_reasoning_effort({effort}): switches the current session's model to the given effort
@@ -146,11 +140,9 @@ Usage:
 
 /**
  * 装上「档位自调」：四个宿主服务经 `ctx.inject` 子 fiber 声明——四者**全部就绪**才执行回调，
- * 任一缺席时子 fiber PENDING（静默，不拖累插件其余功能），服务后来注册时自动执行。
- * 激活后按当前配置即刻装/卸，随后跟随自有段变更热更（开关转开即装、转关即卸）。
+ * 任一缺席时子 fiber PENDING（静默，不拖累插件其余功能）。激活后按当前配置即刻装/卸，随后跟随自有段变更热更。
  *
- * 工具与提示词的 disposer 挂在宿主服务自己的 ctx 上，子 fiber 卸载**不会**自动清理，
- * 必须经 `ctx.effect` 手动调。
+ * 工具与提示词的 disposer 挂在宿主服务自己的 ctx 上，子 fiber 卸载**不会**自动清理，必须经 `ctx.effect` 手动调。
  */
 export function installSelfTune(ctx: Context): void {
     ctx.inject(['tools', 'systemPrompt', 'sessionController', 'sessionProjections'], (child) => {
@@ -168,7 +160,7 @@ export function installSelfTune(ctx: Context): void {
             promptDisposer = null
         }
 
-        /** 装载注入面（已加载则幂等跳过，无任何操作）；注册中途抛错（如同名工具冲突）时回滚已注册部分，保持无痕 */
+        /** 装载注入面（已加载则幂等跳过）；注册中途抛错（如同名工具冲突）时回滚已注册部分 */
         function load(): void {
             if (promptDisposer) return // 已加载
             try {

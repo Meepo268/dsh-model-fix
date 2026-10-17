@@ -1,9 +1,8 @@
 /**
  * 浏览器半调 Node 半的唯一出口：四个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
  *
- * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与
- * Node 半一一对应；散在入口里改一个端点名，要翻两个文件才找得到另一处。卡片只消费
- * 本文件产出的 `RpcCarrier`，自己不发起请求。
+ * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与 Node 半一一对应。
+ * 卡片只消费本文件产出的 `RpcCarrier`，自己不发起请求。
  */
 
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
@@ -59,8 +58,7 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(WRITEBACK_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
-    // 剔除不被支持的推理级别：走 Node 半而非浏览器半直写，因为这条写回必须经事件流守卫，
-    // 而守卫是 Node 半的模块级标志，浏览器半跨不过半纯度门禁
+    /** 剔除不被支持的推理级别：走 Node 半而非浏览器半直写，因为这条写回必须经事件流守卫，而守卫是 Node 半的模块级标志 */
     const pruneEfforts = (targets: readonly UnsupportedEffort[]) =>
         rpc.call(channel, ENDPOINT_PRUNE_EFFORTS, { targets }, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
@@ -68,12 +66,9 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
      * 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
      *
      * 用 `fetch` + `getReader()` 而非 `EventSource`：后者自动重连，而重连等于把整轮重新跑一遍。
-     * 非 2xx 时优先用响应体文案（Node 半两条流都会给一句中文原因，如「另一操作进行中」），
-     * 裸状态码对用户无意义。
+     * 非 2xx 时优先用响应体文案（Node 半两条流都会给一句中文原因）。
      *
-     * @returns 整轮汇总；被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败。
-     *   收于 `failed` 终帧时抛错，文案取 Node 半给的 `message`——裸报「已停止」会把
-     *   「勾选超出上限」这类原因整个吞掉
+     * @returns 整轮汇总；被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败
      */
     const streamSummary = async (
         url: string,
@@ -122,22 +117,17 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
         }
     }
     /**
-     * 验证模型：载荷是卡片按勾选收敛好的「提供方 / 模型 / 各自档位列表 / 是否需要探测」计划，Node 半只按它逐档位展开；探测由 Node 半在执行阶段现发。
+     * 验证模型：载荷是卡片按勾选收敛好的「提供方 / 模型 / 各自档位列表 / 是否需要探测」计划；探测由 Node 半在执行阶段现发。
      *
-     * 走独立的进度流端点而非 channel RPC——一次调用要回持续多帧的响应，RPC 的「一次调用 = 一个
-     * JSON 结果」装不下。用文档相对路由（去掉前导斜杠）是宿主对浏览器侧的约定，服务端 key 保持绝对，
-     * 两侧同取 `src/shared/constants.ts` 的同一常量。
+     * 走独立的进度流端点而非 channel RPC——一次调用要回持续多帧的响应。用文档相对路由（去掉前导斜杠）
+     * 是宿主对浏览器侧的约定，两侧同取 `src/shared/constants.ts` 的同一常量。
      */
     const verifyModels = (models: readonly VerifyTarget[], onFrame: (frame: VerifyProgressUpdate) => void, signal: AbortSignal) =>
         streamSummary(VERIFY_STREAM_URL, { models }, onFrame, signal)
     /**
-     * 探测式填充：载荷与验证同形（每个模型一份「要试哪几档」的清单），另带三个开关。
-     *
-     * 三个开关必须与 Node 半共用同一个值：「忽略排除」若只在这边放开而那边仍跳过排除，
-     * 等于白探测一轮；「剔除不支持」决定收敛口径（`可用 ∪ 原有` 还是 `可用 ∪ (原有 − 不支持)`）；
-     * 「自动写入」关闭时 Node 半在探测结束后只把预声明原样收回（与中止同一形态）。
-     * 终帧里的 `summary.fill` 一律是收敛结论的增删统计——开启即已写入的补全，关闭即「可补全」的
-     * 假设统计；收敛发生在整轮探测之后、终帧之前。
+     * 探测式填充：载荷与验证同形，另带三个开关。三个开关必须与 Node 半共用同一个值——
+     * 「忽略排除」若只在这边放开而那边仍跳过，等于白探测一轮；「剔除不支持」决定收敛口径；
+     * 「自动写入」关闭时 Node 半在探测结束后只把预声明原样收回。
      */
     const probeEfforts = (
         models: readonly VerifyTarget[],

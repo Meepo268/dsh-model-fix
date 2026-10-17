@@ -1,30 +1,19 @@
 /**
- * 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。五个挂载席位（模型页 footer / 插件详情页 /
- * 组件实例详情页 / 内置插件选项卡 / 输入框工具行弹层）共用同一外壳，差异只有折叠态策略（`defaultOpen`：
- * 弹层与三处详情席位默认展开且保存后不自动收起，footer 席默认收起、保存后自动收起；输入框弹层另禁用折叠）；
- * 详情页仍自绘自己的图标 / 面包屑 / 开关，卡片头部只管本卡。
+ * 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。五个挂载席位共用同一外壳，
+ * 差异只有折叠态策略（`defaultOpen` 与保存后是否自动收起）与是否允许折叠（输入框弹层禁用）。
+ *
  * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发）：五张布尔矩阵瓦片（自动填充 / 允许更新 / 兼容性 /
- * 用户体验 / UI 与行为）+ 一张动态集合瓦片（排除提供方，summary 尾区为「N 命中」徽标，0 命中也常驻、不得画成错误色）
- * 。「UI 与行为」组内另有一条恒定展示行排在真键之前（插件管理，不绑配置、不可关闭——关掉就没有任何界面可以重新打开）。
- * 瓦片手风琴：默认收起、同时只开一个。
- * 布尔瓦片的每一行标题带一个说明键：悬停或键盘聚焦时经宿主 Tooltip 气泡给出该设置项释义（组释义在首行、项释义在气泡）。
- * footer 左侧为强制更新 / 重置推理级别（危险键）/ 恢复备份（次级键）/ 验证模型（次级键）/ 探测式填充（次级键），右侧为取消（仅未保存时渲染）/ 保存；
- * 三把写回键与「清空记忆」均先弹宿主 Modal 二次确认，再经 Connection RPC 或 settings scope 请求 Node 半。
- * 「验证模型」则弹一个自带确认的候选框（逐条照官方 models 页「获取可用模型」的候选框，减去其搜索/全选工具条）：
- * 按提供方分组多选模型，配「验证推理级别」开关，对每个勾选模型声明的每个推理级别发起真实探测；
- * 结论只留在该弹层内（实时记录区的末行），不写卡片状态行——验证即用即弃，不留任何配置痕迹。
- * 「探测式填充」是它的写回版：没有候选框（范围由「探测所有 / 探测未填充」两键与「忽略排除」开关决定，
- * 模型列表取**点按钮那一刻**的最新值并当场冻结），正文依次是「探测范围一句 → 额度提示 → 实时记录区 → 三个开关」，
- * 两个范围的大小由那句提示交代（分别对应「探测所有 / 探测未填充」两键，键文本保持短）；
- * footer 只留 关闭 / 探测所有 / 探测未填充 三键（由宽到窄）；
- * 跑完把结果留在记录区并**不自动关窗**（由用户自行关窗），
- * 「自动写入」开启时同一份补全结果另落卡片状态行。
+ * 用户体验 / UI 与行为）+ 一张动态集合瓦片（排除提供方）。「UI 与行为」组内另有一条恒定展示行
+ * 排在真键之前（插件管理，不绑配置、不可关闭）。瓦片手风琴：默认收起、同时只开一个。
+ *
+ * footer 左侧为五个动作键，右侧为取消（仅未保存时渲染）/ 保存；写回键先弹二次确认，再经 Connection RPC
+ * 或 settings scope 请求 Node 半。「验证模型」与「探测式填充」各弹一个弹层（本体见 `verify-dialog.tsx` /
+ * `probe-dialog.tsx`），卡片只递状态与回调。
+ *
  * 编辑只改本地草稿，「保存」才经 settings scope 原子写当前版本快照键（efforts 取写入当刻实时值，
- * 卡片不拥有该字段）；草稿跨折叠存活（header 挂「未保存」胶囊），写失败保持展开可重试。
- * 除验证外的操作结果一律走卡片内联状态行（挂在条件展开体之外，折叠不丢在途结果）。
- * 弹层不在本文件：样式表与它的注入、说明气泡宽度上限、两处展示数值统一见 card-styles.ts；末尾联系行（仓库地址 / 版本标记 / 反馈入口）见 card-meta.tsx；
- * 「验证模型」弹层（候选列表 + 记录区 + 档位开关 + 发跑/停止）见 verify-dialog.tsx，
- * 「探测式填充」弹层（两个范围键 + 记录区 + 三个开关）见 probe-dialog.tsx，卡片只递状态与回调。本文件只管卡片的状态与编排。
+ * 卡片不拥有该字段）；草稿跨折叠存活。除验证外的操作结果一律走卡片内联状态行。
+ *
+ * 样式数值见 `card-styles.ts`，末尾联系行见 `card-meta.tsx`。行为细节见 docs/decisions.md「宿主与卡片」。
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -73,8 +62,7 @@ const { Tag } = primitives
 
 /** 宿主 TerminalBlock 的展示文案（该包无语言回退，整份照官方 terminalLabels(t) 提供）。
  *  0.2.1-alpha.2 起新增必填字段 `commandLine`，而 devDep 停在 0.1.7-rc.2、编译面看不到它，
- *  故并入期望类型：既避开 excess-property 检查，又保住其余字段的必填校验；
- *  多带该字段在 0.1.7-rc.2 上被静默忽略，两端兼容。详见 docs/host-api.md */
+ *  故并入期望类型以避开 excess-property 检查。详见 docs/host-api.md */
 type TerminalLabels = TerminalBlockLabels & { commandLine: (line: number) => string }
 
 function terminalLabelsOf(t: TranslateNS<'settings.modelFix'>): TerminalLabels {
@@ -144,9 +132,12 @@ interface Notice {
     tone: 'success' | 'error'
 }
 
-/** 截断失败信息：RPC 与异常消息可能极长（含 URL、响应片段），截断以保持状态行可读 */
+/** 状态行文案的截断上限（字符）：RPC 与异常消息可能极长（含 URL、响应片段），截断以保持可读 */
+const NOTICE_MAX_CHARS = 120
+
+/** 截断失败信息：超长即截到上限并补省略号 */
 function truncateMessage(value: string): string {
-    return value.length > 120 ? `${value.slice(0, 119)}…` : value
+    return value.length > NOTICE_MAX_CHARS ? `${value.slice(0, NOTICE_MAX_CHARS - 1)}…` : value
 }
 
 /** 写回超时不是失败原因而是「没等到结果」，状态行另给中文；`DOMException` 不继承 `Error`，不能按 `Error` 判 */
@@ -160,7 +151,7 @@ export function Card(props: CardProps) {
     const scope = props.scope
     const { t } = props
     const snap = useSyncExternalStore(scope.subscribe, scope.getSnapshot, scope.getSnapshot)
-    // 提供方 id 来源 scope：只消费其 user 层（宿主 describe mirror 保证快照引用稳定，memo 只在文档变更时重算）
+    // 提供方 id 来源 scope：只消费其 user 层（宿主 describe mirror 保证快照引用稳定）
     const providersScope = props.providersScope
     const providersSnap = useSyncExternalStore(providersScope.subscribe, providersScope.getSnapshot, providersScope.getSnapshot)
     const providerIds = useMemo(
@@ -174,17 +165,14 @@ export function Card(props: CardProps) {
     )
     // draft === null 表示未编辑、跟随已存值；首次点击即冻结当前显示值为草稿
     const [draft, setDraft] = useState<Flags | null>(null)
-    // 全部写操作（保存 / 强制更新 / 重置 / 恢复 / 清空记忆 / 验证 / 探测 / 剔除）共用单一互斥标志：
-    // 一者 in-flight 时其余入口与按钮全禁
+    // 全部写操作共用单一互斥标志：一者 in-flight 时其余入口与按钮全禁
     const [busy, setBusy] = useState<'save' | 'force' | 'reset' | 'restore' | 'clear' | 'verify' | 'probe' | 'prune' | null>(null)
-    // 不可折叠席位（输入框弹层）恒展开：面板尺寸固定、内容可滚，折叠无从触发
     const collapsible = props.collapsible !== false
-    // 折叠态为卡片本地状态（读姿而非配置）：初始值取 defaultOpen（缺省收起、与官方插件卡一致）；草稿跨折叠存活
+    // 折叠态为卡片本地状态（读姿而非配置）；草稿跨折叠存活
     const [open, setOpen] = useState(collapsible ? (props.defaultOpen ?? false) : true)
-    // 保存后自动收起只对默认收起的席位有意义：默认展开的三席（插件详情页 / 组件实例详情页 / 内置插件选项卡）
-    // 保存后保持展开，否则用户刚配完就被收起、还得再点一次才看得见结果
+    // 保存后自动收起只对默认收起的席位有意义：默认展开的席位保存后保持展开，否则用户刚配完就被收起
     const autoCollapse = props.defaultOpen !== true
-    // 瓦片折叠态：官方手风琴语义（同时只开一个、默认全收起；各瓦片展开高度不同，同开两列底部参差）
+    // 瓦片折叠态：官方手风琴语义（同时只开一个、默认全收起）
     const [tileOpen, setTileOpen] = useState<string | null>(null)
     // 内联结果提示：常驻至下一次操作（官方 .savedNotice 无定时器，故不设自动淡出）
     const [notice, setNotice] = useState<Notice | null>(null)
@@ -192,24 +180,21 @@ export function Card(props: CardProps) {
     const [confirmOpen, setConfirmOpen] = useState(false)
     const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
     const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
-    // 「记住推理级别」关掉时的确认：是否清空已有记忆（前端直写，不走 RPC）
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
-    // 剔除确认的目标：验证明细里**明确**被判「档位不支持」的条目，由 Node 半直接给出，
-    // 浏览器半不自己从 results 里筛——两处口径一旦分叉就会漏剔或多剔。
+    // 剔除确认的目标：验证明细里**明确**被判「档位不支持」的条目，由 Node 半直接给出，浏览器半不自己筛。
     // 中止 / 出错 / 无此类结论时保持空数组，空数组即不弹窗
     const [pruneTargets, setPruneTargets] = useState<readonly UnsupportedEffort[]>([])
     // 「验证模型」弹层：勾选集（键见 verifyKey）、是否逐个档位验证；默认不预选——每次验证都花真实额度
     const [verifyOpen, setVerifyOpen] = useState(false)
     const [verifyPicked, setVerifyPicked] = useState<ReadonlySet<string>>(() => new Set())
     const [verifyEfforts, setVerifyEfforts] = useState(false)
-    // 验证记录区：逐行追加探测结论，发起时清空；总项数取自 opened 帧，供记录区抬头显示
+    // 验证记录区：逐行追加探测结论，发起时清空；总项数取自 opened 帧
     const [verifyLines, setVerifyLines] = useState<readonly string[]>([])
     const [verifyTotal, setVerifyTotal] = useState(0)
-    // 本轮是否以中止收场：跑完与失败都留在窗内，只有停止键会中止，故记录区的 settle 措辞按它分「完成 / 已停止」
+    // 本轮是否以中止收场：记录区的 settle 措辞按它分「完成 / 已停止」
     const [verifyStopped, setVerifyStopped] = useState(false)
     // 在途的 AbortController：点停止、关窗与组件卸载都靠它中止——中止经 signal 传导到 Node 半的执行循环
     const verifyAbort = useRef<AbortController | null>(null)
-    // 卸载即中止在途验证：连接随之断开，宿主 Connection 把断开传导成 request.signal，执行循环随即早停
     useEffect(() => () => { verifyAbort.current?.abort() }, [])
     // 中止不落宿主那个 error 态的「失败」——用户主动停止不是失败，故改 done 态 + 中性措辞「已停止」
     const verifyTerminalLabels = useMemo<TerminalBlockLabels>(
@@ -219,12 +204,11 @@ export function Card(props: CardProps) {
     const saveStarted = useRef(false)
 
     // 「探测式填充」弹层：三个开关 + 点开弹层那一刻冻结的候选清单（两个键各一份）+ 记录区。
-    // 候选清单冻结在点开时而非渲染时：模型列表要取**点按钮那一刻**的最新值，
-    // 弹层开着期间用户改了配置也不影响本轮（否则记录区的总项数与实际发的不一致）
+    // 候选清单冻结在点开时而非渲染时：弹层开着期间用户改了配置也不影响本轮
     const [probeOpen, setProbeOpen] = useState(false)
     const [probeIgnoreExcludes, setProbeIgnoreExcludes] = useState(false)
     const [probeDropUnsupported, setProbeDropUnsupported] = useState(false)
-    // 「自动写入」默认开启，且每次开窗重置为开（见 onProbe）——它是本轮「探完写不写」的模式选择
+    // 「自动写入」默认开启，且每次开窗重置为开（见 onProbe）
     const [probeAutoWrite, setProbeAutoWrite] = useState(true)
     const [probePlan, setProbePlan] = useState<{ unfilled: readonly VerifyTarget[]; all: readonly VerifyTarget[] } | null>(null)
     // 本轮跑的是哪个键：在途那个键就地变「停止」，故得记住发起时的选择
@@ -232,9 +216,7 @@ export function Card(props: CardProps) {
     const [probeLines, setProbeLines] = useState<readonly string[]>([])
     const [probeTotal, setProbeTotal] = useState(0)
     const [probeStopped, setProbeStopped] = useState(false)
-    // 在途的 AbortController：点停止、关窗与组件卸载都靠它中止
     const probeAbort = useRef<AbortController | null>(null)
-    // 卸载即中止在途探测（与验证同一条纪律）
     useEffect(() => () => { probeAbort.current?.abort() }, [])
     const probeTerminalLabels = useMemo<TerminalBlockLabels>(
         () => ({ ...terminalLabelsOf(t), done: probeStopped ? t('verifyStopped') : t('terminalDone') }),
@@ -245,16 +227,15 @@ export function Card(props: CardProps) {
     const shown = draft ?? saved ?? DEFAULT_CONFIG
     const ready = snap.status === 'ready' && saved !== undefined
     const canWrite = ready && snap.writable === true
-    // 五个动作键共用一个占用态：三个写回端点与两个弹层都牵动模型配置，任一处在途或任一弹层开着，其余四个一并禁用
+    // 五个动作键共用一个占用态：任一处在途或任一弹层开着，其余四个一并禁用
     const configLocked = busy !== null || verifyOpen || probeOpen
     const dirty = draft !== null && saved !== undefined && isDirty(draft, saved)
-    // 命中集合按草稿算（编辑中即所见即所得），未命中项同样生效，只是当前无同名提供方
+    // 命中集合按草稿算（编辑中即所见即所得）
     const hits = useMemo(() => resolveHits(shown.excludes, providerIds), [shown.excludes, providerIds])
-    // 两个探测键各自的模型数（点开弹层时冻结的那份计划）：为 0 的键禁用，不做「点了没反应」
+    // 两个探测键各自的模型数（点开弹层时冻结的那份计划）：为 0 的键禁用
     const unfilledCount = probePlan?.unfilled.length ?? 0
     const allCount = probePlan?.all.length ?? 0
-    // 保存成功（保存结束且 dirty 归 false）后自动收起，仅限默认收起的席位；
-    // 写失败保留草稿与展开态可重试。其余动作的 busy 起止不触碰 saveStarted，不会误收起
+    // 保存成功（保存结束且 dirty 归 false）后自动收起，仅限默认收起的席位；写失败保留草稿与展开态可重试
     useEffect(() => {
         if (busy === 'save') {
             saveStarted.current = true
@@ -282,11 +263,11 @@ export function Card(props: CardProps) {
 
     /**
      * 四个写回动作的结果汇报同形：成功按条数出一句、失败取原因出一句、传输层 reject 与 `ok:false` 走同一条展示路径、
-     * 收尾一律清占用态。差异只有文案键与那条数怎么插值，故收在一处，各动作只给文案。
+     * 收尾一律清占用态。差异只有文案键与那条数怎么插值，故收在一处。
      *
      * @param call - 已经发出去的那次 RPC
      * @param ok - 成功回调，入参是 Node 半回的条数（强制更新 / 重置 / 恢复给 `changed`，剔除给 `pruned`）
-     * @param failed - 失败回调，入参是原因原文（截断与插值由调用点的文案键决定）
+     * @param failed - 失败回调，入参是原因原文
      * @param settled - 收尾额外做的事（剔除那条还要关掉两层弹层，否则结果写在状态行上用户看不到）
      */
     const reportWriteback = (
@@ -326,8 +307,7 @@ export function Card(props: CardProps) {
         setNotice(null)
         commitDraft(toggleCell(shown, group, key))
     }
-    // 整组总控：显示值取 masterValue（全开才显示开，部分选中显示关，点击即补全为开）；点击取反并把该组全部行设为同一值
-    // （总开关无对应存储，只是批量操作）
+    // 整组总控：显示值取 masterValue（全开才显示开，部分选中显示关）；点击取反并把该组全部行设为同一值
     const onMaster = (group: Group) => {
         setNotice(null)
         commitDraft(applyGroup(shown, group, !masterValue(shown, group)))
@@ -350,11 +330,11 @@ export function Card(props: CardProps) {
         setNotice(null)
         setBusy('save')
         // 写入成功由宿主回推新 value（dirty 自动归 false，触发自动收起）；失败由 scope 重读恢复，保持 dirty 可重试。
-        // efforts 取写入当刻的实时值：卡片不拥有该字段，用草稿副本会把「开卡后切过模型」的记忆覆盖回去
+        // efforts 取写入当刻的实时值：卡片不拥有该字段，用草稿副本会覆盖「开卡后切过模型」的记忆
         const liveEfforts = scope.getSnapshot().value?.efforts
         void scope.set(VERSION_KEY, toStored({ ...shown, efforts: liveEfforts ?? shown.efforts }))
             .then(() => {
-                // 官方 card-form 范式：写后读回核对，未落地不算成功（保持「未保存」态，不误报）
+                // 官方 card-form 范式：写后读回核对，未落地不算成功
                 const latest = scope.getSnapshot().value
                 if (latest !== undefined && !isDirty(shown, latest)) {
                     setNotice({ text: t('saveDone'), tone: 'success' })
@@ -419,7 +399,7 @@ export function Card(props: CardProps) {
         )
     }
     // 验证模型：弹层自身已含 warn 提示与 warn 语义的确认键，构成自确认，故不再叠加二次确认弹层。
-    // 只清掉上一次操作的结果、结果本身留在弹层内（那行挂在条件展开体之外，折叠不丢在途结果）
+    // 只清掉上一次操作的结果、结果本身留在弹层内
     const onVerify = () => {
         if (!ready || busy) return
         setNotice(null)
@@ -429,7 +409,7 @@ export function Card(props: CardProps) {
         if (busy) return
         // 记下本次的档位开关取值：结果回来时不能现读，否则用户在途中拨了开关，文案就会张冠李戴
         const allEfforts = verifyEfforts
-        // 每次发起都清空记录，免得上一轮（尤其被用户停止的那轮）的残留行混进这一轮
+        // 每次发起都清空记录，免得上一轮的残留行混进这一轮
         setVerifyLines([])
         setVerifyTotal(0)
         setVerifyStopped(false)
@@ -449,19 +429,16 @@ export function Card(props: CardProps) {
                     setVerifyStopped(true)
                     return
                 }
-                // 两档口径各取各的数：关档位时只有模型数可言，开档位时级别分母取 plannedEfforts——
-                // 没声明档位的模型验的是模型本身、不占级别，用 planned（含它那条）会让分母虚高。
-                // 而档位开关开着却一个级别都没计划时（勾选的模型都没声明档位），级别那行只会显示「[0/0]」，故退回模型口径
+                // 两档口径各取各的数：关档位时报模型数，开档位时级别分母取 plannedEfforts（没声明档位的模型不占级别）；
+                // 档位开关开着却一个级别都没计划时退回模型口径，免得那行只显示「[0/0]」
                 const stats = t(allEfforts && summary.plannedEfforts > 0 ? 'verifyDoneLevels' : 'verifyDoneModels', {
                     models: summary.models,
                     tested: summary.tested,
                     efforts: summary.efforts,
                     levels: summary.plannedEfforts,
                 })
-                // 结论只留在弹层内，不写卡片状态行：弹层跑完不关、结论又追加成记录区末行，
-                // 用户当场就看得见；同步到卡片是「渗透」——关窗即随记录一起丢弃，那行反馈没有归属
-                // 明细由 Node 半直接给出（只收明确判为不支持的），前端不自己从 results 里筛——
-                // 两处口径一旦分叉就会漏剔或多剔。中止时压根到不了这里，故不会误弹
+                // 结论只留在弹层内，不写卡片状态行：弹层跑完不关、结论追加成记录区末行，用户当场就看得见。
+                // 明细由 Node 半直接给出（只收明确判为不支持的），前端不自己从 results 里筛
                 setPruneTargets(summary.unsupportedEfforts)
                 setVerifyLines((current) => [...current, t('verifyFinished', { result: stats })])
             })
@@ -474,10 +451,8 @@ export function Card(props: CardProps) {
                 setBusy(null)
             })
     }
-    // 停止：中止在途验证。连接随之断开，Node 半的执行循环随即早停，不再消耗额度。
-    // 不顺手关窗——已验到哪一步值得留在记录里，用户看完可以原地重跑
-    // 与探测弹层的 stopProbe 同一处理：「停止」是唯一不关窗的中止方式（关窗那几种记录随弹窗一起丢），
-    // 故按下即在记录区留一行——中止这件事要落在日志里，而不只是 TerminalBlock 那个改了就改了的「已停止」状态标签
+    // 停止：中止在途验证。连接随之断开，Node 半的执行循环随即早停，不再消耗额度；不顺手关窗——已验到哪一步值得留在记录里。
+    // 「停止」是唯一不关窗的中止方式（关窗那几种记录随弹窗一起丢），故按下即在记录区留一行
     const stopVerify = () => {
         if (verifyAbort.current === null) return
         verifyAbort.current.abort()
@@ -506,21 +481,15 @@ export function Card(props: CardProps) {
         setProbeAutoWrite(true)
         setProbeOpen(true)
     }
-    // 切「忽略排除」要重算计划：探测范围随它变，两个键上标的模型数与记录区的总项数不跟着变，
-    // 用户看到的数字就和实际会探的模型对不上了
+    // 切「忽略排除」要重算计划：探测范围随它变，两个键上的模型数与记录区的总项数都得跟着变
     const toggleIgnoreExcludes = (value: boolean) => {
         setProbeIgnoreExcludes(value)
         setProbePlan(probePlanOf(value))
     }
     /**
-     * 跑一轮探测式填充。
-     *
-     * 跑完不关窗：结论追加进记录区后留在窗内由用户自行关窗。
-     * 「自动写入」开启时，Node 半在终帧之前已把档位按结论收敛写回（终帧的 `summary.fill` 带增删统计），
-     * 补全结果追加进记录区并另落卡片状态行；关闭时 Node 半只把预声明原样收回（与中止同一形态），
-     * `fill` 是「可补全」的假设统计，这里换措辞报一行「可补全多少、未执行写入」，不落状态行——没写回就没有「已补全」可言。
-     * 在途被中止则两者都不做：未跑完的模型已被 Node 半还原成本轮开始前的形态，
-     * 留在窗里让用户看见「探到哪一步」比报一个半截结论诚实。
+     * 跑一轮探测式填充。跑完不关窗：结论追加进记录区后留在窗内由用户自行关窗。
+     * 「自动写入」开启时 Node 半已在终帧之前收敛写回，补全结果另落卡片状态行；关闭时 Node 半只把预声明
+     * 原样收回，这里换措辞报一行「可补全多少、未执行写入」。在途被中止则两者都不做。
      */
     const runProbe = (unfilledOnly: boolean) => {
         if (busy !== null || probePlan === null) return
@@ -535,8 +504,8 @@ export function Card(props: CardProps) {
         setProbeScope(unfilledOnly ? 'unfilled' : 'all')
         // 记下本次的「自动写入」取值：结果回来时不能现读，否则收尾文案会张冠李戴
         const autoWrite = probeAutoWrite
-        // 「剔除不支持」只对「探测所有」有意义：未填充的模型本来就没声明过档位，判不支持的那些
-        // 压根不会写进去，没什么可剔。故这一档在这里被强制按关处理，不把用户的选择悄悄带进下一轮
+        // 「剔除不支持」只对「探测所有」有意义：未填充的模型本来就没声明过档位，没什么可剔，
+        // 故这一档强制按关处理，不把用户的选择悄悄带进下一轮
         props.probeEfforts(models, { ignoreExcludes: probeIgnoreExcludes, dropUnsupported: unfilledOnly ? false : probeDropUnsupported, autoWrite }, (frame) => {
             if (frame.type === 'opened') {
                 setProbeTotal(frame.total)
@@ -587,20 +556,15 @@ export function Card(props: CardProps) {
                 setBusy(null)
             })
     }
-    // 停止：中止在途探测。连接随之断开，Node 半的执行循环随即早停，不再消耗额度。
-    // 不顺手关窗——已探到哪一步值得留在记录里。
-    // 「停止」是唯一不关窗的中止方式（关窗那几种记录随弹窗一起丢），故按下即在记录区留一行：
-    // 中止这件事要落在日志里，而不只是 TerminalBlock 那个改了就改了的「已停止」状态标签
+    // 停止：中止在途探测；不顺手关窗——已探到哪一步值得留在记录里。
+    // 「停止」是唯一不关窗的中止方式，故按下即在记录区留一行
     const stopProbe = () => {
         if (probeAbort.current === null) return
         probeAbort.current.abort()
         setProbeLines((current) => [...current, t('probeStoppedLine')])
     }
-    // 关闭即丢弃本轮记录与计划，「忽略排除 / 剔除不支持」一并复位（下次打开回到「关」的初始态）；
-    // 「自动写入」不在关闭时复位——它每次开窗时重置为开（见 onProbe）。
-    // 与验证弹层同一处理：开关是本轮的模式选择，留着会让下次打开时的模型数
-    // 与用户当下看到的开关状态对不上——尤其「忽略排除」直接决定候选范围。
-    // 在途时关窗同时中止；遮罩 / Escape / × / 「取消」键四种关闭都汇到 Modal 的 onClose 与该键
+    // 关闭即丢弃本轮记录与计划，两个范围开关一并复位；「自动写入」每次开窗重置为开（见 onProbe）。
+    // 开关是本轮的模式选择，留着会让下次打开时的模型数与用户当下看到的开关状态对不上
     const closeProbe = () => {
         probeAbort.current?.abort()
         setProbeOpen(false)
@@ -612,9 +576,7 @@ export function Card(props: CardProps) {
         setProbeIgnoreExcludes(false)
         setProbeDropUnsupported(false)
     }
-    // 关闭即丢弃本次勾选与记录，并把档位开关一并复位（下次打开回到未预选、无记录、开关关闭的初始态）
-    // 在途时关窗同时中止：验证即用即弃，用户已经离开就没必要继续烧额度。
-    // 遮罩 / Escape / × 三种关闭都汇到 Modal 的 onClose，故中止只此一处；跑完后控制器已置空，是空操作
+    // 关闭即丢弃本次勾选与记录，并把档位开关一并复位；在途时关窗同时中止（跑完后控制器已置空，是空操作）
     const closeVerify = () => {
         verifyAbort.current?.abort()
         setVerifyOpen(false)
@@ -628,12 +590,9 @@ export function Card(props: CardProps) {
     /**
      * 剔除不被支持的推理级别：经 Node 半写回。
      *
-     * 读取最新配置、revision 围栏与冲突重试、只认目标里当前仍在档位表中的那些、事件流守卫——全在那边，
-     * 浏览器半只负责发请求与展示结果；剔除条数照实显示，为 0 也不例外——目标在剔除期间已被用户改掉，
-     * 或其提供方正在排除列表里（排除提供方在 `planPruneEfforts` 中整组跳过，不撤销已写入的内容）。
-     *
-     * 无论成败都关掉两层弹层（剔除确认 + 其下的验证弹层）：结果写在卡片状态行上，
-     * 弹层不关用户看不到，那条反馈等于没有。
+     * 读取最新配置、revision 围栏与冲突重试、`excludes` 跳过、事件流守卫全在那边，浏览器半只负责发请求与展示结果；
+     * 剔除条数照实显示，为 0 也不例外。无论成败都关掉两层弹层（剔除确认 + 其下的验证弹层），
+     * 否则结果写在卡片状态行上用户看不到。
      */
     const pruneEfforts = () => {
         if (busy) return
@@ -655,13 +614,12 @@ export function Card(props: CardProps) {
             return next
         })
     }
-    // 分组全选：点击方向与按钮文案同走 groupAllPicked（判据只此一处，两边各判一次会反直觉）
+    // 分组全选：点击方向与按钮文案同走 groupAllPicked（判据只此一处）
     const toggleVerifyGroup = (models: readonly VerifyCandidate[]) => {
         setVerifyPicked((current) => toggleGroupPicks(current, models))
     }
-    // 清空记忆：前端经自有 NS 的 settings scope 直写（与「保存」同一条写通道，立即生效、草稿不动）；
-    // 失败要显式提示——否则开关已关而记忆未清，无从察觉。与保存共用 busy 互斥：
-    // 保存整段写含 efforts 实时值，两者并发时后落者会把先落者覆盖掉
+    // 清空记忆：前端经自有 NS 的 settings scope 直写（与「保存」同一条写通道）；失败要显式提示。
+    // 与保存共用 busy 互斥：保存整段写含 efforts 实时值，并发时后落者会覆盖先落者
     const clearEfforts = () => {
         if (busy) return
         setClearConfirmOpen(false)

@@ -31,7 +31,7 @@ interface StubSection {
     revision: number
 }
 
-export interface StubCtxOpts {
+interface StubCtxOpts {
     /** llm-pi-ai 段值（通常 {providers: {...}}） */
     api?: Record<string, unknown>
     /** tikaflow-model-fix 段值（版本快照容器，需存在以使 efforts 写回的 revision 围栏可用） */

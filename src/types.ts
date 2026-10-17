@@ -1,8 +1,8 @@
 /**
  * Node 半类型定义与纯类型守卫。
  *
- * 本文件只保留 Node 专属：models.dev 目录类型（`ModelEntry`/`CacheRecord`/…）、`isCapacity`、
- * 冻结历史版本（当前只剩 v7）快照形态。跨半共享类型与守卫单一来源在 `src/shared/types.ts`，两半均直连。
+ * 本文件只保留 Node 专属：models.dev 目录类型、`isCapacity`、冻结历史版本（当前只剩 v7）快照形态。
+ * 跨半共享类型与守卫单一来源在 `src/shared/types.ts`，两半均直连。
  */
 
 import { CAPACITY_UNLIMITED } from '@/constants'
@@ -51,9 +51,8 @@ export interface IndexEntry {
 /**
  * 按 provider 分组的内存索引，供 lookup 复用。
  *
- * `ids` 存的是经 `normalizeId` 归一后的**匹配键**（目录 id 保留原始大小写与命名空间前缀，
- * 如 `tencent/Hy3`；三级匹配一律在归一空间进行，故键须先归一），供三级匹配逐位扫描。
- * `byId` 是归一键到条目的直查表，匹配命中后由它反查条目本体；同组内归一后重复时保留首个。
+ * `ids` 存经 `normalizeId` 归一后的匹配键（三级匹配一律在归一空间进行，故键须先归一），
+ * `byId` 是归一键到条目的直查表；同组内归一后重复时保留首个。口径见 docs/decisions.md「参数来源」。
  */
 export interface ProviderGroup {
     ids: string[]
@@ -71,21 +70,21 @@ export function isCapacity(value: unknown): value is number {
     return typeof value === 'number' && Number.isInteger(value) && value > 0 && value !== CAPACITY_UNLIMITED
 }
 
-// ---------- 历史版本（v7）冻结形态：引入 subagent 之前的快照（三组布尔 + compat + excludes + efforts + userExperience{rememberEfforts, defaultHigh, forgetRemoved}），定义不随代码演进 ----------
+// ---------- 历史版本（v7）冻结形态：定义不随代码演进（引入 subagent 之前的快照） ----------
 
-/** 历史版本(v7)：字段规则（与当前 FieldRules 同形，独立声明以冻结形态） */
+/** 历史版本(v7)：字段规则（冻结形态，独立声明） */
 export interface V7FieldRules {
     reasoning: boolean
     context: boolean
     image: boolean
 }
 
-/** 历史版本(v7)：兼容性规则（与当前 CompatRules 同形，独立声明以冻结形态） */
+/** 历史版本(v7)：兼容性规则（冻结形态，独立声明；只含 disableDeveloper） */
 export interface V7CompatRules {
     disableDeveloper: boolean
 }
 
-/** 历史版本(v7)：用户体验规则（与当前 UserExperienceRules 同形，独立声明以冻结形态） */
+/** 历史版本(v7)：用户体验规则（冻结形态，独立声明；只含三键） */
 export interface V7UserExperienceRules {
     rememberEfforts: boolean
     defaultHigh: boolean

@@ -1,8 +1,8 @@
 /**
  * 跨半共享的类型声明与纯类型守卫（零 Node 依赖、零 schemastery、零非基线 `@deepseek-ai/*`）。
- * 两半均**直连**本层（统一经 `@/shared/types` 别名导入），不经任何 facade 中转；
- * Node 专属类型（`ModelEntry` / `CacheRecord` / 冻结历史 v3–v7 / `isCapacity` 等）留在 `src/types.ts`。
- * 宿主类型面（Connection RPC 契约等）一律 type-only 导入 devDep 的宿主包（构建期擦除），不在本仓另行声明。
+ * 两半均直连本层（统一经 `@/shared/types` 别名导入）；
+ * Node 专属类型（`ModelEntry` / `CacheRecord` / 冻结历史 v7 / `isCapacity` 等）留在 `src/types.ts`。
+ * 宿主类型面一律 type-only 导入 devDep 的宿主包（构建期擦除），不在本仓另行声明。
  */
 
 /** 判断是否为普通数据对象（非数组、非 null、非类实例） */
@@ -24,7 +24,6 @@ export function providersOf(user: unknown): Record<string, unknown> | undefined 
 
 /** 按字段分别控制的规则开关 */
 export interface FieldRules {
-    /** 推理级别字段 */
     reasoning: boolean
     /** 上下文窗口与输出上限，二者一体受此开关控制 */
     context: boolean
@@ -34,7 +33,7 @@ export interface FieldRules {
 
 /**
  * 兼容性规则：每条对应宿主 provider 路由 compat 下的一个字段。
- * 同组新增键对既有形态只是「多一个可选字段」，向后兼容，因此不需要递增 CONFIG_VERSION（升级版本只因真不兼容，见 docs/versioning.md）。
+ * 组内新增键向后兼容，不递增 CONFIG_VERSION（见 docs/versioning.md）。
  */
 export interface CompatRules {
     /**
@@ -70,11 +69,9 @@ export interface UserExperienceRules {
      */
     defaultHigh: boolean
     /**
-     * 模型/提供方被删除时随之忘记该模型的推理级别记忆：开启时**按宿主全量模型列表剪枝**
-     * （`src/memory.ts`，Node 半）——列表里不再存在的 provider / model 条目一律删除
-     * （缺席即删除，故也覆盖 llm-pi-ai 之外的模型）；单个提供方目录读失败时其条目原样保留
-     * （读不到 ≠ 不存在）。关闭则完全不剪枝，已删除模型的记忆原样保留（若后来重建同名模型会恢复该记忆）。
-     * 默认 true。
+     * 模型/提供方被删除时随之忘记该模型的推理级别记忆：开启时按宿主全量模型列表剪枝
+     * （`src/memory.ts`，Node 半），列表里不再存在的条目一律删除、目录读失败的原样保留。默认 true。
+     * 口径见 docs/decisions.md「推理级别记忆」。
      */
     forgetRemoved: boolean
     /**
@@ -115,7 +112,6 @@ export interface UserExperienceRules {
  * UI 可见性规则：控制本插件各 UI 部件在宿主各处的挂载。
  * 与其余组不同，这组不改变插件行为，只决定 UI 在不在——关闭某项即卸载对应席位的注册，
  * 功能本体（填充 / compat / 跟随等 Node 半逻辑）照常运行。
- * 同组新增键对既有形态只是「多一个可选字段」，向后兼容，因此不需要递增 CONFIG_VERSION（见 docs/versioning.md）。
  */
 export interface BehaviorRules {
     /** 在「设置 → 模型」页脚显示配置卡片；关闭即卸载该席位的注册 */

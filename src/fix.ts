@@ -20,7 +20,7 @@ function toInputValue(image: boolean | undefined): string[] | undefined {
 }
 
 /** 填充计划：`llm-pi-ai` 段的写回 op（纯计算产物，不含 revision 与日志文案） */
-export interface FillPlan {
+interface FillPlan {
     readonly ops: SettingsPathOp[]
     readonly changes: number
     readonly compatChanges: number
@@ -31,18 +31,15 @@ export interface FillPlan {
  * 纯计划函数：遍历提供方，算出模型参数 op 与路由 compat op（零 ctx、可单测）。
  * 两类 op 在 `llm-pi-ai` 的**同一批 mutate** 内提交（二者互不影响）：
  * - 模型参数：缺失推理级别/容量/图片模态且有目录数据则填充（受 autoFill 对应字段控制），
- *   allowUpdate（force 时单次绕过，不落存储）开启则按目录最新值同步——含缺失补写与已有覆盖
- *   （旧值缺失经 deepEqualJson 判为不一致，见 docs/decisions.md），并剔除空壳字段
- *   （`reasoningEfforts`/`input`/`compat`，判据唯一处在 src/empty.ts，缺失补写也按清理后的值为准）。
- *   读 descriptor.user（原始字段），按 provider 整段覆盖 models（不依赖路径 op 是否支持数组下标，
- *   value 为全量重建的数组，未变更元素原样保留）；数据无档位不删除已有配置。
- * - 路由 compat：按 compat 规则组为 openai-completions 路由添加或**移除**字段（与模型填充不同，关闭即移除，
- *   见 src/compat.ts），只写路由级、不写模型级；非目标协议（如已从 completions 切到 responses）无论开关如何
- *   仅做残留清理（只删不加），避免协议迁移后的 compat 字段永久残留。
- * - 提供方排除：`excludes` 命中的 providerId 在循环入口即整条跳过，填充/compat/force 一律不作用其上
- *   （等效于对该提供方关闭插件；预防性——已写入的值原地保留，见 docs/decisions.md）。
- * - `efforts` 记忆**不在此处理**：存取在浏览器半、失效清理在 `src/memory.ts`（判据是全量模型
- *   列表而非 llm-pi-ai，覆盖面是 UI 选型可见的全部模型），见 docs/decisions.md。
+ *   allowUpdate（force 时单次绕过，不落存储）开启则按目录最新值同步；并剔除空壳字段
+ *   （判据唯一处在 src/empty.ts，缺失补写也按清理后的值为准）。读 descriptor.user（原始字段），
+ *   按 provider 整段覆盖 models；数据无档位不删除已有配置。
+ * - 路由 compat：按规则组为 openai-completions 路由添加或**移除**字段（见 src/compat.ts），只写路由级；
+ *   非目标协议无论开关如何仅做残留清理（只删不加）。
+ * - 提供方排除：`excludes` 命中的 providerId 在循环入口即整条跳过（已写入的值原地保留）。
+ * - `efforts` 记忆**不在此处理**：存取在浏览器半、失效清理在 `src/memory.ts`。
+ *
+ * 理由展开见 docs/decisions.md「解析与填充」「排除与列表」「参数来源」。
  */
 export function planFill(
     cfg: PluginConfig,
@@ -144,15 +141,11 @@ export function planFill(
 /**
  * 填充与写回的编排体：读最新段 → `planFill` 出计划 → 写 `llm-pi-ai` → 返回变更模型数。
  *
- * 只写 `llm-pi-ai` 一段：本函数完全不碰自有 NS。`efforts` 记忆的存取在浏览器半、失效清理在
- * `src/memory.ts`（都按全量模型列表、与填充解耦），本函数不参与记忆生命周期（见 docs/decisions.md）。
- * 模型写回失败
- * （冲突重试用尽等）先告警再抛出，由调用方决定后续处理（RPC 转失败结果回传，事件侧吞掉 rejection）。
- * 冲突重试时重读整段以取最新 revision。返回变更模型数（不含路由 compat 计数，保持 RPC 契约）。
+ * 只写 `llm-pi-ai` 一段，完全不碰自有 NS，也不参与记忆生命周期。模型写回失败先告警再抛出，
+ * 由调用方决定后续处理（RPC 转失败结果，事件侧吞掉 rejection）。冲突重试时重读整段以取最新 revision。
+ * 返回变更模型数（不含路由 compat 计数，保持 RPC 契约）。
  *
- * 本函数**不走** `src/writeback.ts` 的写回外壳：守卫不由它托管，与四个写回端点的骨架不同形
- * （理由见该文件的文件头注释）；只复用 `isSettingsConflict`（`src/writeback.ts`）与
- * `errorText`（`src/shared/errors.ts`）两个判定函数。
+ * 本函数**不走** `src/writeback.ts` 的写回外壳：守卫不由它托管，骨架与四个写回端点不同形（理由见该文件头）。
  */
 export async function fix(ctx: Context, force = false): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

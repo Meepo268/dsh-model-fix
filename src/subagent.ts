@@ -8,14 +8,13 @@ import { PLUGIN_NAME } from '@/shared/constants'
 /**
  * 子智能体推理级别的注入面：在宿主 `agent/request` 瀑布里改写子 Agent 本次请求的调用配置。
  *
- * 宿主只为**主** Agent 提供推理级别入口，子 Agent 没有同类设置面；而每次委派真正落地的那份
- * 调用配置就流经这道瀑布——本模块按 `userExperience.followParent` 开关在 `next()` 之后
- * 改写它，等价于替子 Agent 选定档位，宿主随后照常做适配器元数据校验（不支持的档位由宿主抛
- * `UNSUPPORTED_REASONING_EFFORT`，不在这里预检、不静默降级）。
+ * 子 Agent 没有推理级别设置面，而每次委派真正落地的那份调用配置就流经这道瀑布——本模块按
+ * `userExperience.followParent` 开关在 `next()` 之后改写它，宿主随后照常做适配器元数据校验
+ * （不支持的档位由宿主抛 `UNSUPPORTED_REASONING_EFFORT`，不在这里预检、不静默降级）。
  *
- * 每请求现算、不缓存结果：父 Agent 的档位与子智能体实际拿到的模型都可能在本会话内变动。
- * 取的是父会话「下一次请求该用的路由」——UI 的待生效选择优先，其次才是最近一次请求头，
- * 所以切换后子智能体的下一次请求与主智能体同步生效。
+ * 每请求现算、不缓存：父 Agent 的档位与子智能体实际拿到的模型都可能在本会话内变动。
+ * 取的是父会话「下一次请求该用的路由」——UI 的待生效选择优先，其次才是最近一次请求头。
+ * 设计裁决见 docs/decisions.md「子智能体」。
  */
 
 /**
@@ -72,15 +71,11 @@ type SubagentRequestListener = (
  * 装上「跟随父智能体」：单个 `agent/request` 监听覆盖全部 Agent（含 fork/workflow 等
  * 一并归入 `origin === 'subagent'` 的会话），作用域随插件 ctx 销毁而自动卸载。
  *
- * 本文件只服务 `userExperience.followParent` 这一个开关——它没有独立的配置组，判定读的就是
- * 该键；文件名沿用「子智能体」这一话题域。
- *
- * 三个宿主服务（`agents` / `sessionProjections` / `subagentModelSelection`）经 `ctx.inject`
- * 子 fiber 注入：全就绪才注册监听，任一缺席则子 fiber PENDING 静默（监听不注册）。
+ * 本文件只服务 `userExperience.followParent` 这一个开关。三个宿主服务经 `ctx.inject`
+ * 子 fiber 注入：全就绪才注册监听，任一缺席则子 fiber PENDING 静默。
  *
  * 监听用 `prepend` 钉成最外层：`agent/request` 的监听者由外而内依次执行，最外层 `next()`
- * 拿到的即宿主（含会话级模型切换）全部改写完成后的最终配置，父 Agent 的档位因此是「当前
- * 生效值」而非某个中间态。
+ * 拿到的即宿主（含会话级模型切换）全部改写完成后的最终配置。
  */
 export function installSubagentFollowParent(ctx: Context): void {
     // 三个宿主服务经子 fiber 注入：全就绪才注册监听，任一缺席则 PENDING 静默（不注册监听）
@@ -134,7 +129,6 @@ function hostSelectionEnabled(service: HostSelectionService): boolean {
 
 /**
  * 父 Agent 下一次请求该用的路由：先取父会话「待生效的选择」，没有才取会话日志的请求头，再无则回落 Agent 自身 options。
- *
  * 设计裁决（路由回落链、adapterDefaults 标记、maxTokens 合并）见 docs/decisions.md「子智能体」。
  */
 function resolveFollow(agents: HostAgentRegistry, projections: HostSessionProjections, agent: SubagentHost): FollowRoute | undefined {
@@ -148,7 +142,6 @@ function resolveFollow(agents: HostAgentRegistry, projections: HostSessionProjec
 /**
  * 父会话待生效的选择：UI 的每次切换都落一条 `model/selection` 事件，投影据此置 `pending`，
  * 直到匹配的那次请求把它消费掉。该投影未注册时读不到，按「没有待生效选择」处理。
- * `reasoningEffort` 缺项表示用户选了模型但没选档位。
  */
 function pendingFollow(projections: HostSessionProjections, session: SubagentHost['session']): FollowRoute | undefined {
     const pending = projections.stateOf(session, 'modelSelection')?.pending
@@ -189,10 +182,9 @@ interface FollowRoute {
 const BUDGET_SCALE = 0.8
 
 /**
- * 输出预算的合并：继承值（父当前那份）不大于现值（子智能体原本要用的那份）即取继承值；
- * 继承值更大时只抬升差值的八成（`现值 + (继承值 − 现值) × BUDGET_SCALE`，向下取整）——
- * 切到输出上限更大的模型后，旧的小预算会限制发挥，但直接顶到新值时部分端点会拒绝请求，
- * 「刚切模型就报 400」比发挥受限更糟。缺项视作不限，故只有一方给出时即取那一方，两方都没有则不写该键。
+ * 输出预算的合并：继承值不大于现值即取继承值；继承值更大时只抬升差值的八成——
+ * 切到输出上限更大的模型后，旧的小预算会限制发挥，但直接顶到新值时部分端点会拒绝请求。
+ * 缺项视作不限，故只有一方给出时即取那一方，两方都没有则不写该键。
  */
 function mergedBudget(current: number | undefined, inherited: number | undefined): number | undefined {
     if (current === undefined) return inherited

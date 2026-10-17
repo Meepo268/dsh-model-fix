@@ -1,17 +1,11 @@
 /**
  * 浏览器↔宿主 channel 路由：由本插件自注册前缀路由，而不是用宿主 `connection.rpc.handle`。
  *
- * 不用宿主通道的原因：`handle` 在**服务自己的 ctx** 上求值 `owner.webServer`
- * （`get rpc() { const owner = this.ctx }`，与调用方 fiber 无关），而 connection 插件的
- * `inject` 自 0.1.5 起不再含 webServer，故 `owner.webServer` 必抛
- * `cannot get property "webServer" without inject`，通道无从挂上。
+ * 不用宿主通道的原因：`handle` 在**服务自己的 ctx** 上求值 `owner.webServer`，而 connection 插件的
+ * `inject` 不再含 webServer，故 `owner.webServer` 必抛 `cannot get property "webServer" without inject`。
  *
- * 与宿主通道对齐的部分：同一把信任围栏（`connection.requestRejection`）+ 同一套信封字段与两条错误文案
- * （照宿主 `rpcFetchHandler`），故浏览器半的 `connection.rpc.call` 无需感知。已知差异（浏览器半同样感知不到）：
- * 404/415/400 回空体而宿主带说明文本；endpoint 在读体后才判定而宿主先判；bad-request 的 `details` 恒空
- * 而宿主填 zod issues；另有本实现独有的 413 请求体上限。
- * 类型面直接取宿主 devDep：请求/响应是 node:http 原生类型，RPC 信封与围栏类型
- * 来自 `@deepseek-ai/dsh-client-connection`（全部 type-only，构建期擦除）。
+ * 与宿主通道对齐的部分：同一把信任围栏（`connection.requestRejection`）+ 同一套信封字段与两条错误文案。
+ * 类型面直接取宿主 devDep（全部 type-only，构建期擦除）。
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -123,7 +117,7 @@ export function createChannelRoute(
             return
         }
         try {
-            // signal 为占位：node:http 侧无处传播客户端中断，本实现不主动 abort（端点 handler 当前亦不消费）
+            // signal 为占位：node:http 侧无处传播客户端中断，端点 handler 当前亦不消费
             respond(res, 200, JSON.stringify(serverResponse(request.rpcId, await handler(endpoint, request.payload, new AbortController().signal))))
         } catch (error) {
             res.writeHead(500)

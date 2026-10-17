@@ -1,16 +1,11 @@
 /**
  * 浏览器半的推理级别记忆监听：订阅会话的模型选择投影，把每次切换翻译成两件事——
- * 换模型时按记忆恢复级别（`userExperience.rememberEfforts`），换级别时存回记忆
- * （外加 `userExperience.defaultHigh` 的自动设置）。
+ * 换模型时按记忆恢复级别，换级别时存回记忆（外加 `defaultHigh` 的自动设置）。
  *
- * 这里只管记忆的存取，不管整理：失效清理（`userExperience.forgetRemoved`）在 Node 半按
- * 宿主的全量模型列表执行（`src/memory.ts`），本文件不读模型目录列表、也不剪任何条目。
- * 存取覆盖面与 UI 选型一致——宿主模型目录里的全部模型（llm-pi-ai、官方提供方、插件
- * adapter 注册的模型）都参与，与 Node 半只管 llm-pi-ai 参数的职责互不重叠。
+ * 这里只管记忆的存取，不管整理：失效清理在 Node 半按宿主的全量模型列表执行（`src/memory.ts`）。
+ * 存取覆盖面与 UI 选型一致——宿主模型目录里的全部模型都参与。
  *
- * 单独成文件是因为它与卡片不共享任何状态：卡片管的是用户点开设置页时看见的那份配置，
- * 本文件管的是所有活着的会话在后台发生了什么。留在入口里，入口就得同时承担
- * 「注册 UI」与「维持运行时行为」两种职责。
+ * 单独成文件是因为它与卡片不共享任何状态：卡片管的是设置页看见的那份配置，本文件管的是所有活着的会话在后台发生了什么。
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -37,9 +32,8 @@ import { isSettingsConflict } from '@/shared/errors'
  * @param scope - 本插件命名空间的 decode 后段视图（记忆经它直写）
  */
 export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScope<Flags>): void {
-    // 记忆写入带三条护栏：
-    // 1. 段未 ready 放弃——ConfigForm loading 时 value 回落 DEFAULT_CONFIG（efforts={}），
-    //    以此整段 set 等于清空全部记忆，宁丢勿误清。
+    // 记忆写入带三条护栏（理由见 docs/decisions.md「推理级别记忆」）：
+    // 1. 段未 ready 放弃——ConfigForm loading 时 value 回落 DEFAULT_CONFIG（efforts={}），整段 set 等于清空全部记忆。
     // 2. expectedRevision 围栏——与 Node 半 updateMemory 对称。
     // 3. SETTINGS_CONFLICT 重读重算——按旧段回放会抹掉他方刚写入的记忆。
     const rememberEffort = (provider: string, model: string, effort: string | null): void => {
@@ -61,8 +55,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
 
     // 记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用）：纯监听，只订阅会话投影；
     // 自动设置经宿主公开 directory.select，保存经自有 NS 的 settings scope 直写
-    ctx.inject(['sessions', 'modelDirectories'], (subCtx) => {
-        const sessions = subCtx.sessions
+    ctx.inject(['sessions', 'modelDirectories'], (subCtx) => {        const sessions = subCtx.sessions
         const modelDirectories = subCtx.modelDirectories
 
         subCtx.effect(() => {
@@ -99,8 +92,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                     return
                 }
                 const dirState = dir.store.getSnapshot()
-                // 开关仅门控「保存」；恢复用的记忆始终取真实 efforts（是否清空由卡片交互决定）
-                // 兜底取共享层默认（单一来源，段值不可用时与「全新用户」行为一致）
+                // 开关仅门控「保存」；恢复用的记忆始终取真实 efforts。兜底取共享层默认（段值不可用时与「全新用户」行为一致）
                 const flags = scope.getSnapshot().value
                 const rememberEfforts = flags?.userExperience.rememberEfforts ?? DEFAULT_CONFIG.userExperience.rememberEfforts
                 const defaultHigh = flags?.userExperience.defaultHigh ?? DEFAULT_CONFIG.userExperience.defaultHigh
@@ -110,8 +102,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                 if (transition.kind === 'model-change') {
                     if (transition.resolved.reasoningEffort !== next.reasoningEffort) {
                         entry.pendingAutoSet = transition.resolved
-                        // select 拒绝时清掉守卫：残留会让后续恰好同值的投影变化被误吞（跳过记忆保存）；
-                        // 与投影守卫竞态两序皆安全（幂等清空），untracked 的 entry 上清空亦无害
+                        // select 拒绝时清掉守卫：残留会让后续恰好同值的投影变化被误吞（跳过记忆保存）
                         void dir.select(transition.resolved).catch(() => { entry.pendingAutoSet = null })
                     }
                 } else if (transition.kind === 'effort-change' && rememberEfforts) {
@@ -129,8 +120,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                 const retainInfo = sessions.retainInfo(id)
                 const syncRetain = (): void => {
                     if (retainInfo.getSnapshot().referenceCount <= 0) {
-                        // retain 归零即解除投影订阅：未保留会话不应触发 handleProjection；
-                        // lastNext / pendingAutoSet 保留，重保留时首帧据此正确消化自动设置回声
+                        // retain 归零即解除投影订阅：未保留会话不应触发 handleProjection
                         entry.projectionUnsub?.()
                         entry.projectionUnsub = null
                         return
@@ -145,8 +135,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                     handleProjection(id, entry, readNext())
                 }
                 entry.retainUnsub = retainInfo.subscribe(syncRetain)
-                // subscribe 只订阅失效通知、不推首值：立即按当前快照补一遍，
-                // 已 retain 的会话（track 前就已保留）即刻挂上投影订阅
+                // subscribe 只订阅失效通知、不推首值：立即按当前快照补一遍
                 syncRetain()
             }
 
@@ -169,8 +158,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                 }
             }
             const listUnsub = sessions.list.subscribe(syncList)
-            // subscribe 只订阅失效通知、不推首值：立即按当前快照补一遍，
-            // 插件激活时已存在的会话同样进入追踪（否则要等 list 下次变化）
+            // subscribe 只订阅失效通知、不推首值：立即按当前快照补一遍
             syncList()
 
             return () => {

@@ -4,13 +4,12 @@ import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 const { Button, Modal } = primitives
 
 /**
- * 一次操作的二次确认层：宿主 Modal + Button 原语（官方同页删除 provider 同款）。
+ * 一次操作的二次确认层：宿主 Modal + Button 原语。
  *
- * 卡片里有五层同形的二次确认，差别只有标题、说明、两键文案、红 tint 语义与在途禁用。
+ * 卡片里有五层同形的二次确认，差别只有标题、说明、两键文案、红 tint 语义与在途禁用，
  * 把这五处差异显式列成 props，比五份并排的 JSX 更容易看出它们本该一样。
  *
- * 取消键标 `data-modal-autofocus`：焦点落在可安全退出的一侧（React autoFocus 抢在宿主模态层
- * 存触发控件之前，会毁掉关闭后的回焦）。
+ * 取消键标 `data-modal-autofocus`：焦点落在可安全退出的一侧（React autoFocus 会毁掉关闭后的回焦）。
  */
 export function ConfirmModal(props: {
     open: boolean

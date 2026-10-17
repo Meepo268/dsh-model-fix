@@ -4,10 +4,8 @@ import { AsyncLocalStorage } from 'node:async_hooks'
  * 宿主 HMR 事务感知的通用执行原语：把 task 从宿主事务的 AsyncLocalStorage 上下文中摘出执行，
  * 无论从哪条链调用（事件响应、RPC、启动链）都不会因事务嵌套失败。
  * hmr 服务经 `src/index.ts` 的子 fiber 注入，而其装载是异步的——注入落地前的写回若直接降级，
- * 就会裸跑进宿主事务的上下文（写入判定抖动窗口）。故首个写回在收口处**有界等待**注入落地：
- * 落地（值缺席也算落地，降级判定在等待之后）即放行；等待有单一上限，超时（hmr 被禁用等）才降级
- * 为裸 task()，且只等这一次、绝不挂死——hmr 不进组件级 inject（PENDING 无超时），依赖面与
- * 超时后的降级行为均与历史一致。裁决见 docs/decisions.md「写回端点」。
+ * 就会裸跑进宿主事务的上下文。故首个写回在收口处**有界等待**注入落地：落地即放行，
+ * 超时才降级为裸 task()，且只等这一次。裁决见 docs/decisions.md「写回端点」。
  */
 
 let _hmrExecuting: unknown | undefined

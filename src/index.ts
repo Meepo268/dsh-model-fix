@@ -38,11 +38,9 @@ function pruneMemory(ctx: Context): void {
     void updateMemory(ctx).catch(swallowMemoryError)
 }
 
-/** 自有段变更：先自愈（排除列表去重，有重复才写，自愈写回再触发一轮零写入而收敛）再重新填充；
- * 插件写回（重置/恢复/强制更新）期间（守卫开启）整条链短路，防止把刚删的字段重新填回。
- * 用户改「用户体验」组（尤其实验性地开关 forgetRemoved）后在此补一次记忆整理：
- * 开关一旦转开，被删模型留下的记忆当场归零，不必等下一个模型列表变更事件。
- * 剪枝写回本身也走自有段，会再触发一轮——那轮整理已是零变更、不写回，故收敛。 */
+/** 自有段变更：先自愈（排除列表去重）再重新填充；插件写回（重置/恢复/强制更新）期间（守卫开启）整条链短路，
+ * 防止把刚删的字段重新填回。用户改「用户体验」组后在此补一次记忆整理：开关一旦转开，被删模型留下的记忆
+ * 当场归零，不必等下一个模型列表变更事件。剪枝写回本身也走自有段，会再触发一轮——那轮已是零变更、不写回，故收敛。 */
 function refillAfterOwnChange(ctx: Context): void {
     if (isIgnoreAll()) return
     void selfHealConfig(ctx)
@@ -70,10 +68,9 @@ function refillAfterApiChange(ctx: Context): void {
         .catch(swallowFixError)
 }
 
-/** 探测式填充的崩溃兜底：上一轮若崩在「预声明」与「收敛」之间（进程被杀、断电），
- * 自有段会留下整段兜底备份，配置里留着「声称支持七档」的半截形态。启动链末尾据此回退，
- * 回退后再补一轮 fill——否则被撤掉预声明的模型会停在未填充态，本插件的主功能就失效了。
- * 无备份时 restoreProbeBackup 直接返回 0，不做多余的写入与填充。 */
+/** 探测式填充的崩溃兜底：上一轮若崩在「预声明」与「收敛」之间，自有段会留下兜底备份，
+ * 启动链末尾据此回退，回退后再补一轮 fill——否则被撤掉预声明的模型会停在未填充态。
+ * 无备份时 restoreProbeBackup 直接返回 0。 */
 async function recoverProbeBackup(ctx: Context): Promise<void> {
     try {
         const changed = await restoreProbeBackup(ctx)
@@ -94,8 +91,7 @@ function readVolatile(config: unknown): unknown {
  *
  * 迁移必须最先：否则旧格式的 `version-N` 快照会被填充按当前 schema 误解析。
  * 填充分两步走：先用缓存即刻生效，再异步刷新目录（`refreshIfStale` 的 ts 初始 0 必过期 ⇒ 启动必拉取），
- * 与事件路径同构（fix → refreshIfStale → 拉取结算后再 fix）。每个续体前都判一次 `isDisposed`：
- * 卸载后不读缓存、不触碰已销毁上下文。
+ * 与事件路径同构。每个续体前都判一次 `ctx.fiber.store`：卸载后不读缓存、不触碰已销毁上下文。
  */
 function runStartupChain(ctx: Context): void {
     void migrateConfig(ctx)
@@ -132,11 +128,10 @@ export function apply(ctx: Context, config?: unknown): void {
     ctx.inject(['hmr'], (child) => {
         setHmrExecuting((child.get('hmr') as { executing?: unknown } | undefined)?.executing)
     })
-    // 备份仅此一次，且必须早于一切写回（接线即起异步 fix）——晚了备份的就是被填充过的内容；
-    // 此刻注册与文档装载都先于 apply，describe() 已含 API_NS，必可读
+    // 备份仅此一次，且必须早于一切写回（接线即起异步 fix）——晚了备份的就是被填充过的内容
     captureBackup(ctx)
     // 配置源取 apply 第二参的实时引用——.get() 必须在工厂内、不得在 apply 时刻取走，
-    // 否则卡片保存后的新值读不进来；段变更走 settings/document-updated（0.1.7 唯一段级事件），按 ns 分流
+    // 否则卡片保存后的新值读不进来；段变更走 settings/document-updated，按 ns 分流
     setConfigSource(() => resolveConfig(readVolatile(config)))
     ctx.on('settings/document-updated', (ns) => {
         if (ns === PLUGIN_NS) refillAfterOwnChange(ctx)

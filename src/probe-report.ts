@@ -13,10 +13,8 @@ import type { ProviderProbeOutcome, UnsupportedEffort, UsableEffort, VerifyProbe
  * 单组结论 -> 汇报：可用模型按「提供方 / 模型」去重；档位不可用单独计数，不与其它失败混计。
  * 可达 / 凭据取自**全程**结果（被验请求与基线探测一并计入）而非首个。
  *
- * **只认能否定整个提供方的失败**：端点不通翻 `reachable`，凭据无效翻 `keyValid`。
- * 额度耗尽两者都不翻——它多半是**按模型**设的额度（有的厂商给某个模型单独限额），
- * 拿一个模型的额度去否定整把 key 正是「层级错配」，它已由模型级短路压到该模型尾，
- * 要看出了什么事得看该模型自己的明细条目（那里记着 `quota`）。
+ * **只认能否定整个提供方的失败**：端点不通翻 `reachable`，凭据无效翻 `keyValid`，额度耗尽两者都不翻
+ * （它多半是按模型设的额度，属模型级事实）。理由见 docs/decisions.md「验证」。
  */
 export function reportProvider(result: ProviderProbeOutcome): VerifyProviderReport {
     const usable = new Set<string>()
@@ -26,8 +24,7 @@ export function reportProvider(result: ProviderProbeOutcome): VerifyProviderRepo
     let keyRejected = false
     for (const item of result.results) {
         if (item.outcome === 'usable') {
-            // 可用**档位**数只计带档位的请求；不带档位的那条要么是对照（基线探测，不计），
-            // 要么本身就是被验对象（模型无档位可验），后者计模型数、不计档位数
+            // 可用**档位**数只计带档位的请求；不带档位的那条要么是对照（基线探测），要么本身即被验对象（计模型数）
             if (item.effort !== undefined) efforts++
             usable.add(JSON.stringify([item.provider, item.model]))
         } else if (item.outcome === 'unsupported-effort') {
@@ -39,8 +36,7 @@ export function reportProvider(result: ProviderProbeOutcome): VerifyProviderRepo
         }
     }
     // 基线探测同样能证伪端点与凭据（它也是真发出去的一次请求），故一并纳入；只是它不产明细、不计任何计数
-    for (const item of result.tests) {
-        if (item.outcome === 'unreachable') unreachable = true
+    for (const item of result.tests) {        if (item.outcome === 'unreachable') unreachable = true
         else if (item.outcome === 'credential') keyRejected = true
     }
     return {
@@ -81,9 +77,8 @@ export function summarizeProviders(
         probed += report.probed
         tested += report.tested
     }
-    // 两种明确状态的档位明细（可用 / 不支持）：只认带档位的条目（不带档位的请求走不到这两个结论），
-    // 且与上面的聚合同源，不另算一套口径，免得两处分叉。带档位的逐条明细才是要写回配置的那份——
-    // 浏览器半不自己从 results 里重筛一遍。
+    // 两种明确状态的档位明细（可用 / 不支持）：只认带档位的条目，且与上面的聚合同源、不另算一套口径。
+    // 带档位的逐条明细才是要写回配置的那份——浏览器半不自己从 results 里重筛一遍（见共享层 `VerifySummary`）
     const usableEfforts: UsableEffort[] = []
     const unsupportedEfforts: UnsupportedEffort[] = []
     for (const item of results) {

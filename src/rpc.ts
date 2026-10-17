@@ -1,10 +1,9 @@
 /**
- * Connection RPC 端点（前后端通信通道）：forceUpdate / resetModels / restoreModels / pruneEfforts 四个写回端点
+ * Connection RPC 端点：forceUpdate / resetModels / restoreModels / pruneEfforts 四个写回端点
  * 与 reportLocale 语言上报端点，写回共用同一守卫做互斥；验证与探测式填充的进度各开一条 `connection.fetch` 的 exact 路由。
  *
- * 设计裁决（守卫互斥、两条进度流、各写回端点语义）见 docs/decisions.md「写回端点」与「验证」。
- * 路由由本插件自注册而不走宿主 `connection.rpc.handle`：后者在**服务自己的 ctx** 上求值 `owner.webServer`，
- * 而 connection 插件自 0.1.5 起不再注入 webServer，故它必然抛错（详见 rpc-route.ts）。
+ * 路由由本插件自注册而不走宿主 `connection.rpc.handle`（后者在服务自己的 ctx 上求值 `owner.webServer`，
+ * 而 connection 插件不再注入 webServer，必然抛错，详见 rpc-route.ts）。设计裁决见 docs/decisions.md「写回端点」。
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -145,17 +144,13 @@ export function installRpc(ctx: Context): void {
  * 进度流的 Fetch 实现：请求体是模型清单，响应是以 SSE 分帧的进度。
  *
  * 走 `connection.fetch.register` 而非 `webServer.register` 是刻意的：前者由 Connection 代管信任围栏、
- * 浏览器认证与**客户端断开 → `request.signal`**，后者这些都得自己再搭一遍（见本文件头记的
- * connection 自 0.1.5 起不再注入 webServer 那个坑）。
+ * 浏览器认证与**客户端断开 → `request.signal`**，后者这些都得自己再搭一遍。
  *
- * 验证与探测式填充共用这一份实现：两者的线上形状逐字段同形（同一批帧类型、同一编解码），
- * 差别的只有执行器本身，故它由调用方给。
+ * 验证与探测式填充共用这一份实现：两者的线上形状逐字段同形，差别的只有执行器本身。
  *
- * `needsIdleGuard` 只给会写配置的那条流用：它与写回端点共用事件流守卫做互斥，
- * 故入口先查守卫，已开即拒（409，文案即给前端展示，故不是裸状态码）。
+ * `needsIdleGuard` 只给会写配置的那条流用：它与写回端点共用事件流守卫做互斥，已开即拒（409）。
  *
- * 执行器抛错（入参非法、超配额、中途异常）时收于 `failed` 终帧，把 `errorText` 的原因交给消费方；
- * 客户端已中止则不发——用户点停止不是失败，消费方据「流结束却无终帧」判中止。
+ * 执行器抛错时收于 `failed` 终帧；客户端已中止则不发——用户点停止不是失败。
  */
 export function progressStreamFetch(
     run: ProgressRunner,

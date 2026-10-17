@@ -1,9 +1,7 @@
 /**
- * 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（autoFill / allowUpdate / compat / behavior / userExperience 五组布尔 + excludes 列表）。
- * 跨半共享的常量、类型、解析函数单一来源在 `src/shared/`：浏览器半值导入 `@/shared/*`（经 client 纯度门禁放行，
- * 不引 `src/constants` / `src/types` / `src/config` 的值，避免 `node:path` / schemastery 被打进浏览器包）。
- * 本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生（总控 / 单格 / 脏检测 / 排除项增删 / 命中判定）、
- * 以及验证候选的拍取与目标收敛（卡片「验证模型」弹层消费）。
+ * 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（五组布尔 + excludes 列表）。
+ * 跨半共享的常量、类型、解析函数单一来源在 `src/shared/`（经 client 纯度门禁放行，不引 Node 专属值）。
+ * 本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生、验证与探测候选的拍取与目标收敛。
  */
 
 import type { PluginConfig } from '@/shared/types'
@@ -60,8 +58,8 @@ export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
 /**
  * 某 UI 部件是否应当挂载：读 `behavior` 组对应开关，配置缺席（段未就绪）时按缺省全开处理。
  *
- * 与 `groupValue` 的差别只有缺省方向——本组关闭某项即卸载该 UI，配置读不到时若落 `false` 会让
- * 首屏（段还在 loading）凭空少一块界面，故此处缺省取「可见」。组内取值仍一律按严格布尔判。
+ * 与 `groupValue` 的差别只有缺省方向——配置读不到时若落 `false` 会让首屏凭空少一块界面，
+ * 故此处缺省取「可见」。组内取值仍一律按严格布尔判。
  */
 export function behaviorVisible(flags: Flags | undefined, key: (typeof BEHAVIOR_KEYS)[number]): boolean {
     if (flags === undefined) return true
@@ -69,20 +67,18 @@ export function behaviorVisible(flags: Flags | undefined, key: (typeof BEHAVIOR_
 }
 
 /**
- * 跟随**实际生效**的判据：插件开关开着（`userExperience.followParent`）且宿主「允许 Agent 为子智能体选择模型」
- * 那段设置未开启。宿主那段开启时，子智能体自会按宿主授权表选模型，跟随父智能体的模型/档位反而直接推翻宿主的合法选择——
- * 此时「跟随中」灯应呈灰态（未生效），即使插件开关仍为真。
+ * 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启。
+ * 宿主那段开启时子智能体自会按授权表选模型，跟随反而推翻宿主的合法选择，此时「跟随中」灯应呈灰态。
  *
- * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到（CLI/TUI 组合、或宿主未装配那段）
- * 记 `undefined`＝视为未开启（缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致）。
+ * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启
+ * （缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致）。
  */
 export function followingActive(flags: Flags, hostEnabled: boolean | undefined): boolean {
     return groupValue(flags, 'userExperience', 'followParent') && !hostEnabled
 }
 
 /** 组总控的当前显示值：组内全为开才显示开。判据取 every 而非 any——部分选中显示关，点击即整组补全为开；
- *  若取 any，部分选中会显示成开、点击反而把用户已勾的那几行抹掉。口径与验证弹层分组「全选」一致。
- *  （总开关本身无对应存储，只是个批量操作） */
+ *  若取 any，部分选中会显示成开、点击反而把用户已勾的那几行抹掉。口径与验证弹层分组「全选」一致。 */
 export function masterValue(flags: Flags, group: Group): boolean {
     return GROUP_KEYS[group].every((key) => groupValue(flags, group, key))
 }
@@ -110,8 +106,7 @@ function sameIdList(a: readonly string[], b: readonly string[]): boolean {
     return a.every((id, index) => id === b[index])
 }
 
-/** 布尔组 + 排除列表逐项比较，判断草稿相对已存配置是否有改动
- * （`userExperience.followParent` 是布尔组的一行，随 GROUPS 遍历覆盖；`efforts` 是运行时记忆而非用户配置，不参与比较） */
+/** 布尔组 + 排除列表逐项比较，判断草稿相对已存配置是否有改动（`efforts` 是运行时记忆，不参与比较） */
 export function isDirty(draft: Flags, saved: Flags): boolean {
     for (const group of GROUPS) {
         for (const key of GROUP_KEYS[group]) {
@@ -129,7 +124,7 @@ export function providerIdsOf(user: unknown): string[] {
     return Object.keys(providersOf(user) ?? {})
 }
 
-/** 命中的排除项集合：既决定标签的命中高亮，其 size 即 summary 徽标的命中数（未命中项仍生效，只是当前无同名提供方） */
+/** 命中的排除项集合：既决定标签的命中高亮，其 size 即 summary 徽标的命中数 */
 export function resolveHits(excludes: readonly string[], providerIds: readonly string[]): ReadonlySet<string> {
     const live = new Set(providerIds)
     return new Set(excludes.filter((id) => live.has(id)))
@@ -156,7 +151,6 @@ export const EXCLUDE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 /**
  * 一个待验证的「提供方 / 模型」：附带该模型在配置里声明的推理级别（`reasoningEfforts` 的键，
  * 按 `EFFORT_LEVELS` 由低到高排序去重；无该字段即 `[]`，表示不带档位探测）。
- * 列表项与 RPC 载荷同形，故两者共用这一个类型。
  */
 export interface VerifyCandidate {
     provider: string
@@ -193,13 +187,12 @@ function candidatesOf(user: unknown, keep: (provider: string, candidate: VerifyC
 /**
  * 从 `llm-pi-ai` 的 user 层拍出验证候选（与 Node 半 fix 遍历同一事实源，故列表与实际会填充的模型零漂移）。
  * 不套用 `excludes`：验证是只读诊断，排除语义只约束插件对配置的写入。
- */
-export function verifyCandidatesOf(user: unknown): VerifyCandidate[] {
+ */export function verifyCandidatesOf(user: unknown): VerifyCandidate[] {
     return candidatesOf(user, () => true)
 }
 
 /** 探测式填充的两个开关：只影响「收哪些模型」，不影响请求本身 */
-export interface ProbeCandidateOptions {
+interface ProbeCandidateOptions {
     /** 排除提供方 id（取卡片上的当前值，与「命中」判定同源，故所见即所得） */
     excludes: readonly string[]
     /** 忽略排除：开则连被排除的提供方也一起探测（Node 半的两次写回同时放行，两处必须同一个开关） */
@@ -216,8 +209,7 @@ function isUnfilled(efforts: readonly string[]): boolean {
 /**
  * 探测式填充的候选：与验证候选同源同形，只按两个开关收窄。
  *
- * 「忽略排除」必须同时传给 Node 半的两次写回——只在这边放开而那边仍跳过，等于白探测一轮；
- * 反之只在那边放开则探测范围与写回范围对不上，故两边共用同一个开关值。
+ * 「忽略排除」必须同时传给 Node 半的两次写回——两边共用同一个开关值（理由见 docs/decisions.md「探测式填充」）。
  */
 export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions): VerifyCandidate[] {
     const excluded = new Set(options.excludes)
@@ -227,11 +219,10 @@ export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions)
 
 /**
  * 探测式填充的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**
- * （未声明 off 的模型不补 off——"能通"不等于"能关"，探测出 off 能通不代表能关闭思考）。
+ * （未声明 off 的模型不补 off——"能通"不等于"能关"）。
  *
- * `needTest` 恒假：本功能没有「不带档位的基线对照」这一步——宿主按配置里声明的档位校验，
- * 未声明的档位根本出不了网，故 Node 半会先把候选档位临时预声明进配置（见 `src/probe.ts`），
- * 预声明本身就是那次对照，逐档平推即可。
+ * `needTest` 恒假：本功能没有「不带档位的基线对照」——Node 半会先把候选档位临时预声明进配置（见 `src/probe.ts`），
+ * 预声明本身就是那次对照。
  */
 export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTarget[] {
     return candidates.map((candidate) => ({
@@ -243,8 +234,8 @@ export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTa
 
 /**
  * 一次验证的**请求计划**里的一条：一个待验的「提供方 / 模型」+ 它的档位 + 是否需要先探测一次。
- * 与列表项 `VerifyCandidate` 同形且多一个 `needTest`——`efforts` 为空数组的模型两者相同，
- * 但「空数组」在两种语境下含义不同（列表里是「该模型没声明档位」，计划里是「这次不带档位验」）。
+ * `efforts` 为空数组的模型两者相同，但「空数组」在两种语境下含义不同（列表里是「该模型没声明档位」，
+ * 计划里是「这次不带档位验」）。
  */
 export interface VerifyTarget extends VerifyCandidate {
     /**
@@ -283,7 +274,7 @@ export function verifyTargets(
  * 与官方 `allVisibleCandidatesPicked` 同语义。
  *
  * **按钮文案与点击方向必须共用本函数**：两处各写一遍 `every` 一旦不同步，就会出现
- * 「文案显示取消全选、点击却是全选」的反直觉行为，且不会有任何报错。
+ * 「文案显示取消全选、点击却是全选」的反直觉行为且不报错。
  */
 export function groupAllPicked(picked: ReadonlySet<string>, models: readonly VerifyCandidate[]): boolean {
     return models.every((candidate) => picked.has(verifyKey(candidate.provider, candidate.model)))

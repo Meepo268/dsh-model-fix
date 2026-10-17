@@ -4,8 +4,6 @@
  * 版本常量、键前缀、最低支持版本、旧快照上限、各组键名清单、默认值、解析函数、存储物化函数全部收归此处——
  * 当前形态的**单一入口**，浏览器半 `decodeSection` 与 Node 半 `resolveConfig`/`migrateConfig`/`upgradeConfig` 共用。
  *
- * 版本纪律：只有真不兼容才递增 CONFIG_VERSION（组内新增键一律不升，见 docs/versioning.md）。
- *
  * 解析约定：
  * - 整项缺失 → 落该项默认；存在但非对象、或字段存在但非布尔 → 返回 undefined（整段快照非法）
  * - excludes 缺失落空数组、非数组或元素非字符串判非法；efforts 宽松解析（结构不符回落 {}，不判非法）
@@ -15,7 +13,7 @@
 import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, PluginConfig, PluginConfigSnapshot, UserExperienceRules } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 
-/** 当前代码支持的配置快照版本（新 NS 内 version-N 的 N）；只有不兼容才递增，约定见 docs/versioning.md */
+/** 当前配置快照版本号（段内键 `version-N` 的 N）；只有不兼容才递增，约定见 docs/versioning.md */
 export const CONFIG_VERSION = 8
 
 /** 低于此值的快照视为已失效：运行时不读取、迁移源不选取、清理阶段 unset */
@@ -25,7 +23,7 @@ export const MIN_SUPPORTED_VERSION = 7
 export const MAX_OLD_SNAPSHOTS = 1
 
 /** 版本快照键前缀，段内键形如 version-N */
-export const VERSION_PREFIX = 'version-'
+const VERSION_PREFIX = 'version-'
 
 /** compat 组默认值（整组缺失或字段缺失落此） */
 const COMPAT_DEFAULTS: CompatRules = { disableDeveloper: true, disableStore: true }
@@ -45,8 +43,8 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
 /**
  * behavior 组默认值（整组缺失或字段缺失落此）：四项全开。
  *
- * 全开是唯一与「装本插件但看不见任何 UI」相容的缺省——behavior 整段在 v8 形态内新增，
- * 此前落盘的快照没有这一段，解析时落全开即保持既有观感（新增顶级组属向后兼容，不升版本，见 docs/versioning.md）。
+ * 全开是唯一与「装本插件但看不见任何 UI」相容的缺省；缺段的老快照落此即保持既有观感
+ * （缺省与「该段不存在时的行为」一致，故不升版本，见 docs/versioning.md）。
  */
 const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showInModels: true,

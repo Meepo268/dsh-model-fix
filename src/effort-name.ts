@@ -1,21 +1,14 @@
 /**
  * 「本地化推理级别」的 Node 半实现：开关开启时把 `resolveModelInfo` 返回里的档位显示名换成中文，
- * 可选地在中文名后追加原档位名（`最大 · Max` 格式，`showOriginalEfforts` 开关）。
+ * 可选地在中文名后追加原档位名（`showOriginalEfforts` 开关）。
  *
- * 落点依据：宿主目录的唯一生成链路是 `modelCatalog` 远程 → `buildModelCatalog` → 逐 provider
- * `ctx.llm.listModels` + `ctx.llm.resolveModelInfo`——档位显示名只在 `resolveModelInfo` 的返回里
- * 出现（`listModels` 只给模型 id/name），且 UI 菜单、触发器标题与宿主 subagent 的 list-models 工具
- * 全部取这个名字。遮这一处即全链覆盖，且与 `official-filter` 遮 `listModels` 同一对象、同一形态
- * （`LlmRuntime` 的公开实例方法，赋值遮蔽已验证可行）。
+ * 落点依据：档位显示名只在 `resolveModelInfo` 的返回里出现，且 UI 菜单、触发器标题与宿主 subagent 的
+ * list-models 工具全部取这个名字，遮这一处即全链覆盖（与 `official-filter` 遮 `listModels` 同一形态）。
  *
- * 语言判定（Node 侧没有 `locale` 服务，读不到浏览器探测结果），三路取值、逐级回退：
- * 1. 宿主 settings 文档的 `locale.preference`（用户显式选择，落盘持久）；
- * 2. 浏览器半启动时经 RPC 上报的探测语言（补「未显式选择」的多数场景）；
- * 3. 回退 `en`（不换名）。
+ * 语言判定三路取值、逐级回退：宿主 settings 的 `locale.preference` → 浏览器半经 RPC 上报的探测语言 → `en`。
  *
- * 只换 `efforts[].name`：`id` 与 `defaultEffort` 一律原样——`defaultEffort` 是档位 id 且宿主校验
- * 它必须落在 `efforts[].id` 集合内（`LlmRuntime` 的 INVALID_MODEL_REASONING），翻译即破坏校验与线上值；
- * UI 显示默认档位走「id → 对应档位 name」，那个 name 已被换掉，显示链路自然覆盖。
+ * 只换 `efforts[].name`：`id` 与 `defaultEffort` 一律原样——后者是档位 id 且宿主校验它必须落在
+ * `efforts[].id` 集合内，翻译即破坏校验与线上值。理由见 docs/decisions.md「宿主与卡片」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
@@ -79,9 +72,8 @@ function isZh(locale: string): boolean {
 
 /** 装上档位名本地化：把 `ctx.llm` 的 `resolveModelInfo` 遮成「中文界面下换名、否则直通」的一层
  *
- * 卸载不动服务上的属性（遮蔽是链式的，后装插件记住的 original 正是我们的 wrapped，动属性会抹掉
- * 别人的遮蔽）。wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store`（cordis 原生
- * 活性信号，dispose 即 undefined）作守卫——不通过即直通 original，完全不碰 ctx。
+ * 卸载不动服务上的属性（遮蔽是链式的，动属性会抹掉别人的遮蔽）。wrapped 闭包捕获的 ctx 在 fiber
+ * dispose 后失活，用 `ctx.fiber.store` 作守卫——不通过即直通 original，完全不碰 ctx。
  */
 export function installEffortNameLocale(ctx: Context): void {
     const llm = ctx.llm

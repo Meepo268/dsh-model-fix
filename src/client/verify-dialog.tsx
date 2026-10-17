@@ -1,16 +1,13 @@
 /**
  * 「验证模型」弹层（浏览器半）：两个选项卡（模型列表 / 验证记录）+ 底部动作行。
  *
- * 结构逐条照官方 models 页「获取可用模型」的候选框（title / desc / 候选列表 / 底部取消 + 采用），
- * 按需求去掉其「搜索 — 全选」工具条一行；改为列表下方一条 warn 额度提示，底部左侧加「验证推理级别」开关。
- * 选项卡条则逐条复刻官方「设置 → 内置插件」的插件视图选项卡（PluginsSettingsSection）：记录区是「正在
- * 发生的事」，与「挑哪些模型去验」摆在一屏里只会互相挤，故把它单列一页。
+ * 结构逐条照官方 models 页「获取可用模型」的候选框，去掉其「搜索 — 全选」工具条一行，改为列表下方
+ * 一条 warn 额度提示、底部左侧加「验证推理级别」开关；选项卡条复刻官方「设置 → 内置插件」的插件视图
+ * 选项卡（记录区是「正在发生的事」，与「挑哪些模型去验」摆在一屏里只会互相挤，故单列一页）。
  *
- * 抽出来的理由：弹层是一块自足的展示，它的所有状态与动作都由卡片经 props 递进来
- * （勾选集、档位开关、记录区内容、发跑与中止的回调），自己不碰 Connection 也不发起探测。
- * 留在卡片里只会让那个已经很长的组件再长一百行，且弹层的形态改动（列表密度、选项卡分页）
- * 与卡片的状态机毫无关系。关窗即中止在途验证这条纪律记在 props 上：取消键、遮罩、Escape、×
- * 四者走的是同一个回调，故四者在途都不禁用。
+ * 状态与动作全由卡片经 props 递进来（勾选集、档位开关、记录区内容、发跑与中止回调），自己不碰 Connection。
+ * 关窗即中止在途验证这条纪律记在 `onClose` 上：取消键、遮罩、Escape、× 四者走同一回调。
+ * 理由与样式数值见 docs/decisions.md「验证」与 `card-styles.ts`。
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -35,16 +32,15 @@ const TABS: readonly { id: VerifyTab; label: CardKey }[] = [
 ]
 
 /** 按提供方归组后的候选：一组 = 一个提供方 + 它的候选模型（组内顺序即录入顺序） */
-export interface VerifyGroup {
+interface VerifyGroup {
     readonly provider: string
     readonly models: readonly VerifyCandidate[]
 }
 
-export interface VerifyDialogProps {
+interface VerifyDialogProps {
     t: TranslateNS<'settings.modelFix'>
     open: boolean
-    /** 关窗即中止在途验证：连接一断，Node 半的执行循环随即早停，不会在用户离开之后继续烧额度。
-     *  取消键 / 遮罩 / Escape / × 都落到这一个回调上，故在途也照常可点 */
+    /** 关窗即中止在途验证：连接一断，Node 半的执行循环随即早停。取消键 / 遮罩 / Escape / × 都落到这一个回调上 */
     onClose: () => void
     /** 在途（卡片 busy 判为 verify）：键就地变「停止」，列表与开关全禁 */
     running: boolean
@@ -73,11 +69,11 @@ export function VerifyDialog(props: VerifyDialogProps) {
     const tabsId = useId()
     const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
     const [tab, setTab] = useState<VerifyTab>('models')
-    // 每次开窗都回「模型列表」：关窗已丢弃上一轮的勾选与记录（见卡片 closeVerify），落在空记录页只会让人以为记录还在
+    // 每次开窗都回「模型列表」：关窗已丢弃上一轮的勾选与记录，落在空记录页只会让人以为记录还在
     useEffect(() => { if (props.open) setTab('models') }, [props.open])
     // running 期间等 total>0（TerminalBlock 可渲染）再切记录页，避免先看到空态闪烁
     useEffect(() => { if (props.running && props.total > 0) setTab('records') }, [props.running, props.total])
-    // 按提供方归组渲染：候选本就是「提供方内聚」的录入顺序，取相邻同提供方成组即可，无需再分桶
+    // 按提供方归组渲染：候选本就是「提供方内聚」的录入顺序，取相邻同提供方成组即可
     const groups = useMemo<VerifyGroup[]>(() => {
         const grouped: { provider: string; models: VerifyCandidate[] }[] = []
         for (const candidate of props.candidates) {
@@ -110,9 +106,8 @@ export function VerifyDialog(props: VerifyDialogProps) {
             description={t('verifyDesc')}
             className="dsh-mf-verifyDialog"
             footer={
-                /* 宿主 .footer 是单行 flex、无 wrap、且 justify-content 为 flex-end。弹层加宽后档位开关与两键
-                    并排同一行、开关靠左两键靠右，故在 footer 内自绘容器覆盖宿主那三个数值。
-                    记录区不在这一行下方——它已自成一个选项卡面板（见正文） */
+                /* 宿主 .footer 是单行 flex、无 wrap、justify-content 为 flex-end。弹层加宽后档位开关与两键
+                    并排同一行、开关靠左两键靠右，故在 footer 内自绘容器覆盖宿主那三个数值 */
                 <div className="dsh-mf-verifyActions">
                     <span className="dsh-mf-verifyOption">
                         <Switch
@@ -130,12 +125,9 @@ export function VerifyDialog(props: VerifyDialogProps) {
                         </Tooltip>
                     </span>
                     <div className="dsh-mf-verifyButtons">
-                        {/* 在途不禁用：遮罩 / Escape / × 本就任何时刻都能关窗并中止（宿主 Modal 只管调 onClose），
-                            键若在途禁用，它反成唯一关不掉的出口。点它与那三者同一条路径：
-                            props.onClose → 卡片的 closeVerify 先 abort 再清勾选与记录 */}
+                        {/* 在途不禁用：遮罩 / Escape / × 本就任何时刻都能关窗并中止，键若在途禁用，它反成唯一关不掉的出口 */}
                         <Button variant="outline" data-modal-autofocus onClick={props.onClose}>{t('cancel')}</Button>
-                        {/* 判据为三态，与 probe-dialog.tsx 的两个范围键同形：本键在途 → 放行（它已是「停止」），
-                            其余非空闲一律禁——那时点它会被卡片 runVerify 的 `if (busy) return` 挡下，不做「点了没反应」 */}
+                        {/* 判据为三态：本键在途 → 放行（它已是「停止」），其余非空闲一律禁 */}
                         <Button
                             variant="outline"
                             className="dsh-mf-warn"
@@ -146,8 +138,7 @@ export function VerifyDialog(props: VerifyDialogProps) {
                                 else props.onRun()
                             }}
                         >
-                            {/* 在途指示：宿主 Button 自身即 inline-flex + gap，指示器直接作首个子节点；
-                                StateDot 的 ongoing 态就是侧边栏会话列表项左侧那个转圈（同原语、同动效） */}
+                            {/* 在途指示：宿主 Button 自身即 inline-flex + gap，指示器直接作首个子节点 */}
                             {props.running ? <StateDot state="ongoing" /> : null}
                             {t(props.running ? 'verifyStop' : 'verifyGo')}
                         </Button>
@@ -160,7 +151,7 @@ export function VerifyDialog(props: VerifyDialogProps) {
                 {/* 额度提示对两页都成立，故留在选项卡条之上、不进任何一个面板 */}
                 <p className="dsh-mf-verifyQuota">{t('verifyQuota')}</p>
                 {/* 选项卡条逐条复刻官方 PluginsSettingsSection：role/aria 串、选中态走 data-active、
-                    未选中的页签 tabIndex:-1（只靠方向键进出），指示条的样式见 card-styles.ts */}
+                    未选中的页签 tabIndex:-1（只靠方向键进出） */}
                 <div className="dsh-mf-verifyTabs" role="tablist" aria-label={t('verifyTitle')}>
                     {TABS.map((row, index) => {
                         const selected = row.id === tab
@@ -185,7 +176,7 @@ export function VerifyDialog(props: VerifyDialogProps) {
                     })}
                 </div>
                 {/* 两个面板都常驻挂载、切页只改 hidden（官方那份 visitedIds 的同一用意）：记录区的 TerminalBlock
-                    自带展开/收起状态，卸载即丢；hidden 的面板即 display:none、不是 flex 项，换页不留空段 */}
+                    自带展开/收起状态，卸载即丢；hidden 即 display:none、不是 flex 项，换页不留空段 */}
                 <div
                     id={`${tabsId}-panel-models`}
                     className="dsh-mf-verifyPanel"
