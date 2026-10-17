@@ -13,17 +13,29 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // ctx.connection 服务面（ClientConnectionRpc）
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import { PLUGIN_NS, ENDPOINT_REPORT_LOCALE } from '@/shared/constants'
+import { ENDPOINT_REPORT_LOCALE, MAX_ATTEMPTS, PLUGIN_NS } from '@/shared/constants'
+
+/** 上报失败后的重报间隔（毫秒）：取 2 秒，与宿主「等落定」的既有取值同量级（`HMR_WAIT_MS`、`MIGRATE_WAIT_MS`） */
+const REPORT_RETRY_MS = 2_000
 
 /**
- * 启动时把界面语言上报给 Node 半：子 fiber 声明 `locale` + `connection`，两者装载即上报一次。
- * 上报失败静默——Node 侧会回退 en（不换名），不因这条诊断链影响会话。
+ * 启动时把界面语言上报给 Node 半：`locale` + `connection` 装载即上报，失败隔 `REPORT_RETRY_MS` 重报，至多 `MAX_ATTEMPTS` 次尝试。
  * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：其 fiber 卸载即级联撤销
  */
 export function applyLocaleReporter(ctx: ClientContext): void {
     ctx.inject(['locale', 'connection'], (child) => {
         const locale = child.locale.getSnapshot().active
         const rpc = (child.get('connection') as unknown as { rpc: ClientConnectionRpc }).rpc
-        void rpc.call(`/${PLUGIN_NS}`, ENDPOINT_REPORT_LOCALE, locale).catch(() => {})
+        void (async (): Promise<void> => {
+            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                try {
+                    if ((await rpc.call(`/${PLUGIN_NS}`, ENDPOINT_REPORT_LOCALE, locale)).ok) return
+                } catch {
+                    // 抛错与 `ok: false` 同等：都算没送达
+                }
+                await new Promise((resolve) => setTimeout(resolve, REPORT_RETRY_MS))
+            }
+            console.warn(`report-locale: failed after ${MAX_ATTEMPTS} attempts`)
+        })()
     })
 }

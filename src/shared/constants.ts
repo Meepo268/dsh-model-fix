@@ -73,7 +73,7 @@ export const ENDPOINT_PRUNE_EFFORTS = 'pruneEfforts'
 export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
 
 /**
- * settings 写回冲突重试共用次数（纯数值，跨半共享）。值变更须同步两端——差异直接造成写入行为不一致。
+ * settings 写回冲突与语言上报共用的重试次数（纯数值，跨半共享）。值变更须同步两端——差异直接造成写入行为不一致。
  */
 export const MAX_ATTEMPTS = 3
 
