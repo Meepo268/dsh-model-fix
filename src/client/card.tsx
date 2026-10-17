@@ -159,16 +159,10 @@ export function Card(props: CardProps) {
     useLayoutEffect(() => { ensureStyles() }, [])
     const scope = props.scope
     const { t } = props
-    const snap = useSyncExternalStore(
-        (listener) => scope.subscribe(listener),
-        () => scope.getSnapshot(),
-    )
+    const snap = useSyncExternalStore(scope.subscribe, scope.getSnapshot, scope.getSnapshot)
     // 提供方 id 来源 scope：只消费其 user 层（宿主 describe mirror 保证快照引用稳定，memo 只在文档变更时重算）
     const providersScope = props.providersScope
-    const providersSnap = useSyncExternalStore(
-        (listener) => providersScope.subscribe(listener),
-        () => providersScope.getSnapshot(),
-    )
+    const providersSnap = useSyncExternalStore(providersScope.subscribe, providersScope.getSnapshot, providersScope.getSnapshot)
     const providerIds = useMemo(
         () => providerIdsOf(providersSnap.status === 'ready' ? providersSnap.user : undefined),
         [providersSnap],
