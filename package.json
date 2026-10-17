@@ -29,6 +29,7 @@
     "lint": "eslint .",
     "test": "tsdown --config tsdown.test.config.ts && node .test-dist/index.mjs",
     "pack:release": "pnpm pack --out=\"dist/%s.tgz\"",
+    "hook:git": "nit install && nit check",
     "prepare": "pnpm build"
   },
   "devDependencies": {
@@ -54,6 +55,7 @@
     "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4",
     "@eslint/js": "^10.0.1",
+    "@pyyupsk/nit": "^0.3.0",
     "@types/node": "^26.2.0",
     "@types/react": "~18.3.0",
     "@typescript/native": "npm:typescript@7.0.2",
@@ -172,6 +174,12 @@
         "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-client-ui-conversation"
       ]
+    }
+  },
+  "nit": {
+    "hooks": {
+      "pre-commit": "node scripts/check-version.mjs",
+      "pre-push": "node scripts/check-tag.mjs"
     }
   }
 }

@@ -13,6 +13,16 @@
 - **TS 7 与 ESLint 并存靠 npm 别名**：TS 7 原生版无 JS API，typescript-eslint 见之即抛错。故 `typescript` = `npm:@typescript/typescript6@^6.0.2`（bin 为 `tsc6`），TS 7 挂别名 `@typescript/native`。
 - `pnpm lint` 走 `eslint.config.ts`（ESLint 靠 devDep `jiti` 读 TS 配置，脚本保持 `eslint .`）：只排除 `lib/`（构建产物，非本仓源码），其余目录交给 ESLint 默认忽略。硬约束五条——禁相对导入、`consistent-type-imports`，加上三条跨半纯度自定义规则（`AGENTS.md`「导入与打包」有细则）。根目录的 `tsdown.config.ts` / `tsdown.test.config.ts` 与本配置自身都在 lint 范围内。
 - 宿主包本地依赖全走 devDeps 且须与宿主 latest 同号；一律用 `pnpm add` 变更（`-E` 保精确、`--save-peer` 写 peer）。**升级只能写具体版本号**（各子包的 `latest` tag 陈旧）。
+- **钩子脚本读 stdin 只能异步**：Windows 上 stdin 是管道时 `fs.readFileSync(0)` / `fs.readSync(0)` 会抛 `EOF`（nodejs/node#35997），而 git 正是用管道把 pre-push 清单喂给钩子的，故 `scripts/check-tag.mjs` 走 `process.stdin` 异步迭代。
+
+## Git 钩子
+
+由 `@pyyupsk/nit` 管理：配置写在 `package.json` 的 `nit.hooks`，`.git/hooks/` 下的脚本由 `nit install` 生成两道：
+
+- `pre-commit` → `scripts/check-version.mjs`：README 钉死的 tarball 链接须与 `package.json` 的 version 同号。
+- `pre-push` → `scripts/check-tag.mjs`：一次只允许推一个标签，且它须是 v + 语义化版本并与 version 同号；没有标签要推则静默通过。
+
+发布链（`.github/workflows/release.yml`）**不再重复这两道校验**，只跑 install / lint / typecheck / test / pack，故钩子就是这两条纪律的唯一闸门。
 
 ## 测试规范
 
