@@ -67,7 +67,7 @@ export function GroupTile(props: {
                     type="button"
                     className="dsh-mf-itemToggle"
                     aria-expanded={open}
-                    aria-controls={`${id}-body`}
+                    aria-controls={open ? `${id}-body` : undefined}
                     aria-labelledby={`${id}-title`}
                     onClick={props.onToggle}
                 />
@@ -204,7 +204,7 @@ export function ExcludesTile(props: {
                     type="button"
                     className="dsh-mf-itemToggle"
                     aria-expanded={open}
-                    aria-controls={`${id}-body`}
+                    aria-controls={open ? `${id}-body` : undefined}
                     aria-labelledby={`${id}-title`}
                     onClick={props.onToggle}
                 />
