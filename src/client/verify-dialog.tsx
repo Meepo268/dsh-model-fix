@@ -132,10 +132,12 @@ export function VerifyDialog(props: VerifyDialogProps) {
                             键若在途禁用，它反成唯一关不掉的出口。点它与那三者同一条路径：
                             props.onClose → 卡片的 closeVerify 先 abort 再清勾选与记录 */}
                         <Button variant="outline" data-modal-autofocus onClick={props.onClose}>{t('cancel')}</Button>
+                        {/* 判据为三态，与 probe-dialog.tsx 的两个范围键同形：本键在途 → 放行（它已是「停止」），
+                            其余非空闲一律禁——那时点它会被卡片 runVerify 的 `if (busy) return` 挡下，不做「点了没反应」 */}
                         <Button
                             variant="outline"
                             className="dsh-mf-warn"
-                            disabled={props.idle && props.picked.size === 0}
+                            disabled={props.running ? false : !props.idle || props.picked.size === 0}
                             onClick={() => {
                                 // 发跑由 useEffect 自动跳记录页（等首条记录数据到达再跳）
                                 if (props.running) props.onStop()
