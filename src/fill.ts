@@ -58,11 +58,18 @@ function declaredLevelsOf(value: unknown): readonly string[] {
 }
 
 /**
- * 按档位表物化 `reasoningEfforts` 的取值：**已有键一律保留原取值**（用户的 wire 拼写属用户配置，
- * 如 `xhigh: 'ultra'`、off 的 `none`/`off` 目录拼写），新补的档位取档位名本身（off 无既有拼写可保时取 null）。
+ * 按档位表物化 `reasoningEfforts` 的取值：七档内的键完全由 `levels` 决定——**已有键一律保留原取值**
+ * （用户的 wire 拼写属用户配置，如 `xhigh: 'ultra'`、off 的 `none`/`off` 目录拼写），新补的档位取档位名
+ * 本身（off 无既有拼写可保时取 null），不在 levels 里的即被剔除/还原要删的档位。七档之外的键原样保留
+ * （手改配置文件的残留，宿主读取时忽略），静默删除违背自定义字段保留纪律。
  */
 function effortsValueOf(levels: readonly string[], existing?: Record<string, unknown>): Record<string, string | null> {
     const value: Record<string, string | null> = {}
+    if (existing !== undefined) {
+        for (const [key, wire] of Object.entries(existing)) {
+            if (!EFFORT_LEVELS.includes(key as never)) value[key] = wire as string | null
+        }
+    }
     for (const level of levels) {
         const current = existing?.[level]
         value[level] = typeof current === 'string' ? current : (level === 'off' ? null : level)

@@ -481,6 +481,17 @@ export async function run(): Promise<void> {
             stable(customWritten) === stable([{ id: 'mc', reasoningEfforts: { off: 'none', low: 'low', high: 'ultra', xhigh: 'xhigh' } }]),
             customApply.modelOps,
         )
+        // 七档外的键（宿主 schema 允许、运行期忽略的手改残留）重建时原样保留
+        const strayApply = planEffortApply(
+            { acme: { models: [{ id: 'mc', reasoningEfforts: { off: 'none', ultra: 'ultra' } }] } },
+            [{ provider: 'acme', model: 'mc', levels: ['off', 'high'] }],
+        )
+        const strayWritten = strayApply.modelOps[0]?.op === 'set' ? strayApply.modelOps[0].value : undefined
+        check(
+            '七档之外的键在重建时保留（off:none 与 ultra 原样，high 新补）',
+            stable(strayWritten) === stable([{ id: 'mc', reasoningEfforts: { off: 'none', ultra: 'ultra', high: 'high' } }]),
+            strayApply.modelOps,
+        )
     }
     {
         // 自有段缺失 ⇒ 兜底备份无处可放，整轮中止（预声明一旦写下就可能来不及收回，没有退路就不动用户配置）。
