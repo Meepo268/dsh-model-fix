@@ -11,6 +11,7 @@
  * 「关窗即中止在途探测」这条纪律记在 `onClose` 上。
  */
 
+import { useMemo } from 'react'
 // primitives 由宿主模块表注入
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -54,6 +55,8 @@ export interface ProbeDialogProps {
 
 export function ProbeDialog(props: ProbeDialogProps) {
     const t = props.t
+    // 行数组换引用时才重拼：整轮 1400 帧、每帧一次重渲染，逐帧重拼整段输出是 O(n²)
+    const output = useMemo(() => props.lines.join('\n'), [props.lines])
     /** 探测弹层的两个发起键：在途那个就地变成「停止」，另一个禁用——弹层只有这两个入口，收起它们就只剩关闭 */
     const probeButton = (scope: ProbeScope, count: number) => {
         const running = props.running && props.scope === scope
@@ -112,7 +115,7 @@ export function ProbeDialog(props: ProbeDialogProps) {
                 {props.total > 0 ? (
                     <TerminalBlock
                         command={t('probeCommand', { total: String(props.total) })}
-                        output={props.lines.join('\n')}
+                        output={output}
                         running={props.running}
                         maxLines={VERIFY_TERMINAL_LINES}
                         labels={props.terminalLabels}

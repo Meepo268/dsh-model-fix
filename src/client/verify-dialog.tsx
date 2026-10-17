@@ -67,6 +67,8 @@ export interface VerifyDialogProps {
 
 export function VerifyDialog(props: VerifyDialogProps) {
     const t = props.t
+    // 行数组换引用时才重拼：整轮最多 1400 帧、每帧一次重渲染，逐帧重拼整段输出是 O(n²)
+    const output = useMemo(() => props.lines.join('\n'), [props.lines])
     // 选项卡三件套照官方 PluginsSettingsSection：useId 出前缀、ref 收页签、当前页只作本层状态（不回头写卡片）
     const tabsId = useId()
     const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -241,7 +243,7 @@ export function VerifyDialog(props: VerifyDialogProps) {
                     {props.total > 0 ? (
                         <TerminalBlock
                             command={t('verifyCommand', { total: String(props.total) })}
-                            output={props.lines.join('\n')}
+                            output={output}
                             running={props.running}
                             maxLines={VERIFY_TERMINAL_LINES}
                             labels={props.terminalLabels}
