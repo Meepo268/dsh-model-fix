@@ -220,9 +220,7 @@ export function parseSnapshot(value: unknown): PluginConfig | undefined {
     return { allowUpdate, autoFill, compat, excludes, efforts, behavior, userExperience }
 }
 
-/**
- * 运行时配置 -> 规范 v8 存储快照。各组浅拷贝、excludes 复制、efforts 引用传递。
- */
+/** 运行时配置 -> 规范 v8 存储快照。字段一律拷贝传出，防回落共享的 DEFAULT_CONFIG 被就地改写污染 */
 export function toStored(config: PluginConfig): PluginConfigSnapshot {
     return {
         configVersion: CONFIG_VERSION,
@@ -230,7 +228,7 @@ export function toStored(config: PluginConfig): PluginConfigSnapshot {
         autoFill: { ...config.autoFill },
         compat: { ...config.compat },
         excludes: [...config.excludes],
-        efforts: config.efforts,
+        efforts: { ...config.efforts },
         behavior: { ...config.behavior },
         userExperience: { ...config.userExperience },
     }

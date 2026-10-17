@@ -55,7 +55,7 @@ export interface ProbeDialogProps {
 
 export function ProbeDialog(props: ProbeDialogProps) {
     const t = props.t
-    // 行数组换引用时才重拼：整轮 1400 帧、每帧一次重渲染，逐帧重拼整段输出是 O(n²)
+    // join 按 lines 引用缓存：同份行内容的重复渲染不重拼，也不打断 TerminalBlock 内部对整段文本的解析缓存
     const output = useMemo(() => props.lines.join('\n'), [props.lines])
     /** 探测弹层的两个发起键：在途那个就地变成「停止」，另一个禁用——弹层只有这两个入口，收起它们就只剩关闭 */
     const probeButton = (scope: ProbeScope, count: number) => {
