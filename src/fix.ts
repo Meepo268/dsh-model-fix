@@ -89,8 +89,8 @@ export function planFill(
                 const reasoningFillable = autoRules.reasoning
                     && reasoningEfforts === undefined && !!efforts
                 const reasoningUpdatable = (force || allowRules.reasoning)
-                    && !deepEqualJson(reasoningEfforts, efforts)
                     && isPlainObject(efforts)
+                    && !deepEqualJson(reasoningEfforts, efforts)
                 // 容量新值须为正整数且非哨兵（写 0 会被宿主 schema 拒绝并连累整批写入）
                 const ctxW = entry?.contextWindow
                 const maxT = entry?.maxTokens
