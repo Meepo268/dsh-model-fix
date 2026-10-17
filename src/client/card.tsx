@@ -27,7 +27,7 @@
  * 「探测式填充」弹层（两个范围键 + 记录区 + 三个开关）见 probe-dialog.tsx，卡片只递状态与回调。本文件只管卡片的状态与编排。
  */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 // primitives 由宿主模块表注入
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -156,7 +156,7 @@ function isWritebackTimeout(error: unknown): boolean {
 
 /** 卡片主体 */
 export function Card(props: CardProps) {
-    ensureStyles()
+    useLayoutEffect(() => { ensureStyles() }, [])
     const scope = props.scope
     const { t } = props
     const snap = useSyncExternalStore(
