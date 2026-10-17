@@ -1,7 +1,7 @@
 // 用例覆盖：src/probe-verdict.ts 的失败分类与两级短路判据、src/probe-plan.ts 的请求计划展开（逐模型逐档位 / needTest 声明 /
 // 入参校验与配额）与按提供方分组、src/probe-report.ts 的逐组汇报与汇总求和，以及 src/verify.ts 带桩跑通的整条执行链（基线探测现发 +
 // 分组串行 + 两级短路，含「本组首个请求超时即短整组」与进度帧的 done 不变量），以及 src/probe-engine.ts 的 probeOnce
-// 超时兜底（软超时发中止信号、宽限期满即硬兜底返回、被放弃的循环不再消费分片也不产未处理拒绝）
+// 超时兜底（软超时发中止信号、宽限期满即硬兜底返回、命中即返回时中止先于迭代器关闭发出、被放弃的循环不再消费分片也不产未处理拒绝）
 import { verifyModels } from '@/verify'
 import { probeOnce, runProbeGroups, type GroupRunner } from '@/probe-engine'
 import { groupProbesByProvider, planProbes } from '@/probe-plan'
@@ -76,6 +76,34 @@ const endlessStream = (): { llm: Pick<LlmRuntime, 'stream'>; chunks: () => numbe
         }),
     })
     return { llm: { stream } as unknown as Pick<LlmRuntime, 'stream'>, chunks: () => chunks, closed: () => closed }
+}
+
+/**
+ * 先给一块 `block-start`（命中「已开始产出」的提前返回），此后 `next()` 与迭代器 `return()` 都永不 settle，
+ * 并按发生顺序记录「中止信号发出」与「迭代器被请求关闭」。
+ * 用来钉住 #19：命中时 abort 必须立刻发出——不排在被放弃的迭代器关闭之后，更不等它 settle。
+ * 旧写法（`for await` 的隐式关闭）会一直挂在关闭上，`probeOnce` 永不返回。
+ */
+const hitThenHangStream = (): { llm: Pick<LlmRuntime, 'stream'>; order: string[] } => {
+    const order: string[] = []
+    let nextCalls = 0
+    const stream = (options: { signal?: AbortSignal }): AsyncIterable<StreamChunk> => {
+        options.signal?.addEventListener('abort', () => { order.push('abort') })
+        return {
+            [Symbol.asyncIterator]: () => ({
+                next: (): Promise<IteratorResult<StreamChunk>> => {
+                    nextCalls += 1
+                    if (nextCalls === 1) return Promise.resolve({ done: false, value: BLOCK_START as unknown as StreamChunk })
+                    return new Promise<IteratorResult<StreamChunk>>(() => {})
+                },
+                return: (): Promise<IteratorResult<StreamChunk>> => {
+                    order.push('close')
+                    return new Promise<IteratorResult<StreamChunk>>(() => {})
+                },
+            }),
+        }
+    }
+    return { llm: { stream } as unknown as Pick<LlmRuntime, 'stream'>, order }
 }
 
 /** 等待指定毫秒（真定时器，供「块数停止增长」这类时间相关的断言留出余量） */
@@ -837,6 +865,19 @@ export async function run(): Promise<void> {
             'probeOnce 硬兜底后读流循环不再继续消费分片，且迭代器被请求关闭',
             verdict.outcome === 'timeout' && endless.chunks() === settled && endless.closed(),
             { verdict, settled, after: endless.chunks(), closed: endless.closed() },
+        )
+    }
+    {
+        // #19：命中 block-start 的提前返回路径上，中止信号必须立刻发出——不排在迭代器关闭之后，也不等它 settle。
+        // 这条路径正是「命中即中断请求、省额度」最需要中止生效的场景；旧写法下这里会挂死在关闭上。
+        const hit = hitThenHangStream()
+        const startedAt = Date.now()
+        const verdict = await probeOnce(hit.llm, probeOf(), new AbortController().signal, 30, 10)
+        const elapsed = Date.now() - startedAt
+        check(
+            'probeOnce 命中即返回时中止信号先于迭代器关闭发出，且不等关闭 settle',
+            verdict.outcome === 'usable' && elapsed < 2_000 && hit.order[0] === 'abort' && hit.order.includes('close'),
+            { verdict, elapsed, order: hit.order },
         )
     }
     {
