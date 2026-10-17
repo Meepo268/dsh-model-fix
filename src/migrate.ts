@@ -10,7 +10,7 @@ import type { PluginConfigSnapshot, VersionedSection } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
 import { upgradeConfig } from '@/upgrade'
-import { isSettingsConflict } from '@/shared/errors'
+import { errorText, isSettingsConflict } from '@/shared/errors'
 
 /**
  * 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。
@@ -191,11 +191,22 @@ export function dedupeExcludesOp(snapshot: unknown): SettingsPathOp[] {
  * 有 op 才写入（各规则的零写入条件即反馈循环的终止条件）。当前唯一规则：excludes 去重（手改兜底）。
  */
 export async function selfHealConfig(ctx: Context): Promise<void> {
-    const descriptor = descriptorOf(ctx, PLUGIN_NS)
-    if (!descriptor) return
-    const section = sectionOf(descriptor)
-    const ops = dedupeExcludesOp(section?.[versionKey(CONFIG_VERSION)])
-    if (ops.length === 0) return
-    await queueTask( () => ctx.settings.mutate(PLUGIN_NS, ops, descriptor.revision))
-    ctx.logger.warn(`${PLUGIN_NAME}: 检测到排除列表存在重复项，已保留首次出现去重`)
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!ctx.fiber.store) return
+        const descriptor = descriptorOf(ctx, PLUGIN_NS)
+        if (!descriptor) return
+        const section = sectionOf(descriptor)
+        const ops = dedupeExcludesOp(section?.[versionKey(CONFIG_VERSION)])
+        if (ops.length === 0) return
+        try {
+            await queueTask(() => ctx.settings.mutate(PLUGIN_NS, ops, descriptor.revision))
+        } catch (error) {
+            if (isSettingsConflict(error) && attempt < MAX_ATTEMPTS) continue
+            ctx.logger.warn(`${PLUGIN_NAME}: 排除列表去重写回失败（第 ${attempt}/${MAX_ATTEMPTS} 次）：${errorText(error)}`)
+            throw error
+        }
+        ctx.logger.warn(`${PLUGIN_NAME}: 检测到排除列表存在重复项，已保留首次出现去重`)
+        return
+    }
+    // 不可达：循环内各路径均 return/throw，continue 仅在 attempt < MAX_ATTEMPTS 时发生；仅作类型收敛
 }
