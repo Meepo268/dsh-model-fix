@@ -63,18 +63,30 @@ async function isHiddenNow(ctx: Context, provider: string): Promise<boolean> {
     return isUnconfigured(ctx, provider)
 }
 
+/** 本层遮蔽的品牌标记：`Symbol.for` 全局注册，HMR 重载后同字符串仍是同一 Symbol */
+const HIDDEN_LAYER = Symbol.for('model-fix.official-hidden')
+
+/** 带品牌标记的遮蔽层：`in` 探测与赋值共用这个面 */
+interface HiddenLayer {
+    (provider: string): Promise<LlmModelInfo[]>
+    [HIDDEN_LAYER]?: boolean
+}
+
 /** 装上官方提供方过滤：把 `ctx.llm` 的 `listModels` 遮成「命中隐藏即返回空清单」的一层
  *
- * 卸载不动服务上的属性（遮蔽是链式的，后装插件记住的 original 正是我们的 wrapped，动属性会抹掉
- * 别人的遮蔽）。wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store`（cordis 原生
- * 活性信号，dispose 即 undefined）作守卫——不通过即直通 original，完全不碰 ctx。
+ * 链式遮蔽是特性（与其他插件的遮蔽层共存）：卸载不动服务上的属性（后装插件记住的 original 正是我们的
+ * wrapped，动属性会抹掉别人的遮蔽）。wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store`
+ * （cordis 原生活性信号，dispose 即 undefined）作守卫——不通过即直通 original，完全不碰 ctx。
+ * HMR 重载会整函数重跑，靠品牌标记幂等，避免叠层后一次调用穿 N 遍凭据查询。
  */
 export function installOfficialFilter(ctx: Context): void {
     const llm = ctx.llm
     const original = llm.listModels
-    const wrapped = async (provider: string): Promise<LlmModelInfo[]> => {
+    if (HIDDEN_LAYER in original) return
+    const wrapped: HiddenLayer = async (provider) => {
         if (ctx.fiber.store && await isHiddenNow(ctx, provider)) return []
         return original.call(llm, provider)
     }
+    wrapped[HIDDEN_LAYER] = true
     llm.listModels = wrapped
 }
