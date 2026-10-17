@@ -47,6 +47,7 @@ export default defineConfig([
         fixedExtension: false,
         dts: false,
         clean: true,
+        minify: true,
         // public/ 下的文件逐个平铺复制到 outDir 根
         // copy 传目录条目时会把目录名一起带进 outDir（public → lib/public），故用 glob + 默认 flatten:true 逐文件落位。
         copy: [{ from: 'public/*' }],
@@ -70,6 +71,7 @@ export default defineConfig([
         dts: false,
         // 与 node 半一致：不开 sourcemap（浏览器半 map 会内嵌 sourcesContent 全源码，随包发布只增体积）
         sourcemap: false,
+        minify: true,
         define: {
             // 被 inline 的依赖可能读取 node 惯用环境变量，CJS 产物中必须替换掉
             'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
