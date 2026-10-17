@@ -1,4 +1,4 @@
-import { HINTS } from '@/constants'
+import { HINTS, LEVELS } from '@/constants'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 
 /**
@@ -121,11 +121,12 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
     return found
 }
 
-/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null） */
+/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效） */
 export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string, string | null> | undefined {
     if (!entry) return
     const mapped: Record<string, string | null> = {}
     for (const effort of entry.efforts) {
+        if (effort !== 'none' && !LEVELS.has(effort)) continue
         const level = effort === 'none' || effort === 'off' ? 'off' : effort
         mapped[level] = level === 'off' ? effort : level
     }
