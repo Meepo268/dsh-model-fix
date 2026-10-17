@@ -57,7 +57,8 @@ export function GroupTile(props: {
     lockedRow?: LockedRow
 }) {
     const { group, t, open } = props
-    const id = `dsh-mf-item-${group}`
+    const uid = useId()
+    const id = `${uid}-${group}`
     const title = t(COLUMN_KEYS[group])
     const usePills = GROUP_KEYS[group].length >= PILL_THRESHOLD
     return (
@@ -170,7 +171,8 @@ export function ExcludesTile(props: {
     onRemove: (id: string) => void
 }) {
     const { t, open } = props
-    const id = 'dsh-mf-item-excludes'
+    const uid = useId()
+    const id = `${uid}-excludes`
     const title = t('colExcludes')
     // 输入文本与校验反馈是纯 UI 暂态（不属于配置），故留在瓦片本地
     const [text, setText] = useState('')
