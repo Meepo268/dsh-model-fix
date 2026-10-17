@@ -58,8 +58,8 @@ async function isUnconfigured(ctx: Context, provider: string): Promise<boolean> 
  * 过滤是展示层诉求，判不准时宁可照常显示。每次目录生成时现算，不缓存、不监听事件。
  */
 async function isHiddenNow(ctx: Context, provider: string): Promise<boolean> {
-    if (!getConfig().userExperience.hideOfficial) return false
     if (!HIDDEN_OFFICIAL_PROVIDERS.includes(provider)) return false
+    if (!getConfig().userExperience.hideOfficial) return false
     return isUnconfigured(ctx, provider)
 }
 
