@@ -4,8 +4,8 @@
  *
  * 本文件只做**卡片外壳的编排**：草稿与保存、三个写回动作（强制更新 / 重置 / 恢复）、
  * 四层二次确认、瓦片与 footer 的渲染，以及验证 / 探测两个弹层的状态挂接——两条诊断链的整轮
- * 编排各自内聚在 `card-verify.ts` / `card-probe.ts`（弹层本体见 `verify-dialog.tsx` /
- * `probe-dialog.tsx`），记录区文案层在 `card-records.ts`，状态行助手在 `card-notice.ts`。
+ * 编排各自内聚在 `card-verify.ts` / `card-probe.ts`（弹层外壳见 `diagnose-dialog.tsx`，
+ * 探测仍走旧形态的 `probe-dialog.tsx`），记录区文案层在 `card-records.ts`，状态行助手在 `card-notice.ts`。
  *
  * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发），瓦片手风琴：默认收起、同时只开一个。
  * 编辑只改本地草稿，「保存」才经 settings scope 原子写当前版本快照键（efforts 取写入当刻实时值，
@@ -27,6 +27,7 @@ import {
     VERSION_KEY,
     addExclude,
     applyGroup,
+    groupAllPicked,
     groupValue,
     isDirty,
     masterValue,
@@ -40,7 +41,7 @@ import type { Flags, Group, RowKey } from '@/client/model'
 import { ExcludesTile, GroupTile, TILE_ORDER } from '@/client/tile'
 import { CardMeta } from '@/client/card-meta'
 import { ConfirmModal } from '@/client/confirm'
-import { VerifyDialog } from '@/client/verify-dialog'
+import { DiagnoseDialog } from '@/client/diagnose-dialog'
 import { ProbeDialog } from '@/client/probe-dialog'
 import type { RpcCarrier } from '@/client/rpc-carrier'
 import { errorText } from '@/shared/errors'
@@ -471,9 +472,21 @@ export function Card(props: CardProps) {
                 danger
                 confirmDisabled={busy !== null}
             />
-            {/* 「验证模型」弹层见 verify-dialog.tsx：候选列表 + 记录区 + 底部动作行，本文件只递状态与回调 */}
-            <VerifyDialog
+            {/* 两个诊断弹层共用 diagnose-dialog.tsx 的外壳（「验证模型」已迁入；探测仍走 probe-dialog.tsx），
+                本文件只递数据、文案键与回调 */}
+            <DiagnoseDialog
                 t={t}
+                titleKey="verifyTitle"
+                descriptionKey="verifyDesc"
+                quotaKey="verifyQuota"
+                modelsTabKey="verifyTabModels"
+                recordsTabKey="verifyTabRecords"
+                listEmptyKey="verifyEmpty"
+                recordsEmptyKey="verifyRecordEmpty"
+                terminalCwdKey="verify"
+                terminalCommandKey="verifyCommand"
+                runKey="verifyGo"
+                stopKey="verifyStop"
                 open={verify.open}
                 onClose={verify.close}
                 running={verify.running}
@@ -482,7 +495,10 @@ export function Card(props: CardProps) {
                 picked={verify.picked}
                 onTogglePick={verify.togglePick}
                 onToggleGroup={verify.toggleGroup}
-                onToggleAll={verify.toggleAll}
+                tools={verifyCandidates.length === 0 ? [] : [{
+                    label: groupAllPicked(verify.picked, verifyCandidates) ? t('verifyDeselectAll') : t('verifySelectAll'),
+                    onClick: verify.toggleAll,
+                }]}
                 total={verify.total}
                 done={verify.done}
                 lines={verify.lines}
