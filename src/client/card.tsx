@@ -482,6 +482,7 @@ export function Card(props: CardProps) {
                 picked={verify.picked}
                 onTogglePick={verify.togglePick}
                 onToggleGroup={verify.toggleGroup}
+                onToggleAll={verify.toggleAll}
                 total={verify.total}
                 done={verify.done}
                 lines={verify.lines}

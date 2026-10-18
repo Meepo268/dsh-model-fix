@@ -1,5 +1,5 @@
 /**
- * 「验证模型」弹层（浏览器半）：两个选项卡（模型列表 / 验证记录）+ 底部动作行。
+ * 「验证模型」弹层（浏览器半）：两个选项卡（模型列表 / 验证记录，选项卡行右上给全列表「全选 / 取消全选」）+ 底部动作行。
  *
  * 结构逐条照官方 models 页「获取可用模型」的候选框，去掉其「搜索 — 全选」工具条一行，改为列表下方
  * 一条 warn 额度提示；选项卡条复刻官方「设置 → 内置插件」的插件视图
@@ -50,6 +50,8 @@ interface VerifyDialogProps {
     picked: ReadonlySet<string>
     onTogglePick: (key: string) => void
     onToggleGroup: (models: readonly VerifyCandidate[]) => void
+    /** 全列表「全选 / 取消全选」 */
+    onToggleAll: () => void
     /** 记录区抬头：总项数取自 opened 帧；0 意味还没发起过，故记录面板给一行空态而非记录区 */
     total: number
     /** 记录区抬头进度段：已完成条数，逐条 probed 帧更新 */
@@ -131,30 +133,44 @@ export function VerifyDialog(props: VerifyDialogProps) {
             <div className="dsh-mf-verifyBody">
                 {/* 额度提示对两页都成立，故留在选项卡条之上、不进任何一个面板 */}
                 <p className="dsh-mf-verifyQuota">{t('verifyQuota')}</p>
-                {/* 选项卡条逐条复刻官方 PluginsSettingsSection：role/aria 串、选中态走 data-active、
-                    未选中的页签 tabIndex:-1（只靠方向键进出） */}
-                <div className="dsh-mf-verifyTabs" role="tablist" aria-label={t('verifyTitle')}>
-                    {TABS.map((row, index) => {
-                        const selected = row.id === tab
-                        return (
-                            <button
-                                key={row.id}
-                                ref={(element) => { tabRefs.current[index] = element }}
-                                id={`${tabsId}-tab-${row.id}`}
-                                type="button"
-                                role="tab"
-                                className="dsh-mf-verifyTab"
-                                aria-selected={selected}
-                                aria-controls={`${tabsId}-panel-${row.id}`}
-                                data-active={selected ? 'true' : undefined}
-                                tabIndex={selected ? 0 : -1}
-                                onClick={() => { setTab(row.id) }}
-                                onKeyDown={(event) => { onTabKeyDown(index, event) }}
-                            >
-                                {t(row.label)}
-                            </button>
-                        )
-                    })}
+                {/* 选项卡行：选项卡条居左（逐条复刻官方 PluginsSettingsSection：role/aria 串、选中态走 data-active、
+                    未选中的页签 tabIndex:-1 只靠方向键进出），右端是全列表「全选 / 取消全选」键 */}
+                <div className="dsh-mf-verifyTabsRow">
+                    <div className="dsh-mf-verifyTabs" role="tablist" aria-label={t('verifyTitle')}>
+                        {TABS.map((row, index) => {
+                            const selected = row.id === tab
+                            return (
+                                <button
+                                    key={row.id}
+                                    ref={(element) => { tabRefs.current[index] = element }}
+                                    id={`${tabsId}-tab-${row.id}`}
+                                    type="button"
+                                    role="tab"
+                                    className="dsh-mf-verifyTab"
+                                    aria-selected={selected}
+                                    aria-controls={`${tabsId}-panel-${row.id}`}
+                                    data-active={selected ? 'true' : undefined}
+                                    tabIndex={selected ? 0 : -1}
+                                    onClick={() => { setTab(row.id) }}
+                                    onKeyDown={(event) => { onTabKeyDown(index, event) }}
+                                >
+                                    {t(row.label)}
+                                </button>
+                            )
+                        })}
+                    </div>
+                    {/* 候选为空不显：空表判据恒真，会显示「取消全选」 */}
+                    {props.candidates.length > 0 ? (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="dsh-mf-verifyListAll"
+                            disabled={props.running}
+                            onClick={props.onToggleAll}
+                        >
+                            {groupAllPicked(props.picked, props.candidates) ? t('verifyDeselectAll') : t('verifySelectAll')}
+                        </Button>
+                    ) : null}
                 </div>
                 {/* 两个面板都常驻挂载、切页只改 hidden（官方那份 visitedIds 的同一用意）：记录区的 TerminalBlock
                     输出区带滚动位置，卸载即丢；hidden 即 display:none、不是 flex 项，换页不留空段 */}

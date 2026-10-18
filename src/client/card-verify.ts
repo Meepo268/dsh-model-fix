@@ -118,8 +118,12 @@ export function useVerifyRun(options: VerifyRunOptions) {
     const toggleGroup = (models: readonly VerifyCandidate[]) => {
         setPicked((current) => toggleGroupPicks(current, models))
     }
+    // 全列表「全选 / 取消全选」
+    const toggleAll = () => {
+        setPicked((current) => toggleGroupPicks(current, candidates))
+    }
     return {
         open, picked, lines, total, done, running: options.busy === 'verify',
-        terminalLabels, onOpen, run, stop, close, togglePick, toggleGroup,
+        terminalLabels, onOpen, run, stop, close, togglePick, toggleGroup, toggleAll,
     }
 }

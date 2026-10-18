@@ -146,6 +146,10 @@ const STYLE_TEXT = [
     // 不取：本项目的正文一律 12px 更优先，选项卡条与面板是相邻两段，那 12px 由 .dsh-mf-verifyBody 的 gap 给
     // （未选中的面板带 hidden 即 display:none、不是 flex 项，换页后不留空段），面板自身不再补 padding
     '.dsh-mf-verifyTabs{border-bottom:.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));align-items:flex-end;gap:22px;margin-top:2px;display:flex}',
+    // 选项卡行：选项卡条居左、全列表「全选 / 取消全选」键居右（margin-left:auto，同分组全选键）
+    // 行取 center 而非 flex-end：页签内底部有 9px 内边距，flex-end 会把键压到细线处、文本偏下（实测）
+    '.dsh-mf-verifyTabsRow{display:flex;align-items:center}',
+    '.dsh-mf-verifyListAll{margin-left:auto}',
     '.dsh-mf-verifyTab{color:var(--dsw-alias-label-tertiary,#81858c);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}',
     '.dsh-mf-verifyTab:hover,.dsh-mf-verifyTab[data-active="true"]{color:var(--dsw-alias-label-primary,#0f1115)}',
     '.dsh-mf-verifyTab[data-active="true"]:after,.dsh-mf-verifyTab:focus-visible:after{background:var(--dsw-alias-label-primary,#0f1115);content:"";border-radius:2px 2px 0 0;height:2px;position:absolute;bottom:-1px;left:0;right:0}',
