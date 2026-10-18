@@ -2,6 +2,7 @@ import type { TSESLint } from 'typescript-eslint'
 import js from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
+import reactHooks from 'eslint-plugin-react-hooks'
 import { CLIENT_EXTERNALS, NODE_EXTERNALS } from './scripts/build-externals.mjs'
 
 /** 构建产物目录：非本仓源码，一律不检查 */
@@ -106,6 +107,15 @@ export default tseslint.config(
         languageOptions: { globals: { ...globals.browser } },
     },
     {
+        // 浏览器半的 hooks 纪律：调用位置合法 + 依赖数组完整（exhaustive-deps 给 warn，与刻意省略冲突）
+        files: ['src/client/**/*.{ts,tsx}'],
+        plugins: { 'react-hooks': reactHooks },
+        rules: {
+            'react-hooks/rules-of-hooks': 'error',
+            'react-hooks/exhaustive-deps': 'warn',
+        },
+    },
+    {
         files: ['src/**/*.{ts,tsx}', 'test/**/*.ts'],
         rules: {
             // 硬约束：src / test 的一切源码导入走 @/ 与 @test/ 别名（tsconfig paths + tsdown alias 双声明）
@@ -117,6 +127,20 @@ export default tseslint.config(
             }],
             // tsconfig 开 verbatimModuleSyntax：纯类型的导入必须用 import type
             '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
+            // 裸表达式无意义且常掩盖漏 await；放行 `void promise` 语句形式（显式放弃 await 的既有约定）
+            '@typescript-eslint/no-unused-expressions': 'error',
+            'no-void': ['error', { allowAsStatement: true }],
+            // smart 豁免 == null 与字面量比较
+            'eqeqeq': ['error', 'smart'],
+            // 未使用的导入/变量/参数/捕获一律报错（含类型）；导出 symbol 不受影响
+            '@typescript-eslint/no-unused-vars': ['error', {
+                args: 'all',
+                argsIgnorePattern: '^_',
+                varsIgnorePattern: '^_',
+                caughtErrors: 'all',
+                caughtErrorsIgnorePattern: '^_',
+                ignoreRestSiblings: true,
+            }],
         },
     },
     {
