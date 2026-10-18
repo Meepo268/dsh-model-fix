@@ -61,6 +61,16 @@ export function run(): void {
         lookup(catalog({ openai: ['gpt-5-mini'], 'custom-ai': ['gpt-5-turbo'] }), 'custom-ai', 'gpt-5-mini')?.id === 'gpt-5-mini',
         lookup(catalog({ openai: ['gpt-5-mini'], 'custom-ai': ['gpt-5-turbo'] }), 'custom-ai', 'gpt-5-mini'),
     )
+    check('o 系列前缀提示 openai', lookup(catalog({ openai: ['o3'] }), 'custom-ai', 'o3')?.id === 'o3')
+    check('裸 o 前缀不命中（候选表逐项列 o1/o3/o4 而非裸 o）', lookup(catalog({ openai: ['o3'] }), 'custom-ai', 'ollama-3') === undefined)
+    check('多候选提供方依序尝试（moonshotai 无条目回落 moonshotai-cn）', lookup(catalog({ 'moonshotai-cn': ['kimi-k3'] }), 'custom-ai', 'kimi-k3')?.id === 'kimi-k3')
+    check('多候选提供方第一候选优先', lookup(catalog({ moonshotai: ['kimi-k3'], 'moonshotai-cn': ['kimi-k3'] }), 'custom-ai', 'kimi-k3')?.id === 'kimi-k3')
+    check('qwen 前缀提示 alibaba 依序回落 alibaba-cn', lookup(catalog({ 'alibaba-cn': ['qwen3-max'] }), 'custom-ai', 'qwen3-max')?.id === 'qwen3-max')
+    check('glm 前缀提示 zai 依序回落 zhipuai', lookup(catalog({ zhipuai: ['glm-5'] }), 'custom-ai', 'glm-5')?.id === 'glm-5')
+    check('minimax 大写裸名小写后命中候选表', lookup(catalog({ minimax: ['MiniMax-M3'] }), 'custom-ai', 'MiniMax-M3')?.id === 'MiniMax-M3')
+    check('gemini 前缀提示 google', lookup(catalog({ google: ['gemini-3-flash'] }), 'custom-ai', 'gemini-3-flash')?.id === 'gemini-3-flash')
+    check('chatgpt 前缀提示 openai', lookup(catalog({ openai: ['chatgpt-4o-latest'] }), 'custom-ai', 'chatgpt-4o-latest')?.id === 'chatgpt-4o-latest')
+    check('mistral 系衍生前缀提示 mistral（codestral）', lookup(catalog({ mistral: ['codestral-latest'] }), 'custom-ai', 'codestral')?.id === 'codestral-latest')
 
     // ---------- 词干匹配：去版本日期/长数字段后唯一命中 ----------
     check('词干剥离日期后缀', lookup(catalog({ deepseek: ['deepseek-chat-20250901'] }), 'deepseek', 'deepseek-chat')?.id === 'deepseek-chat-20250901')

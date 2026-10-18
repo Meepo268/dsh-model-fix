@@ -51,10 +51,10 @@ function matchId(localId: string, ids: readonly string[]): string | undefined {
     if (prefix.length === 1) return prefix[0]
 }
 
-/** 按模型名前缀提示官方提供方 */
-function hintedProvider(id: string): string | undefined {
+/** 按模型名前缀提示官方提供方候选（同一模型常挂在多个官方名下，返回全部候选由调用方依序尝试） */
+function hintedProviders(id: string): readonly string[] {
     const bare = id.slice(id.lastIndexOf('/') + 1).toLowerCase()
-    return HINTS.find(([prefix]) => bare === prefix || bare.startsWith(`${prefix}-`) || bare.startsWith(`${prefix}.`))?.[1]
+    return HINTS.find(([prefix]) => bare === prefix || bare.startsWith(`${prefix}-`) || bare.startsWith(`${prefix}.`))?.[1] ?? []
 }
 
 /**
@@ -63,7 +63,7 @@ function hintedProvider(id: string): string | undefined {
  * - **组内**（provider 精确命中目录时）：依次试**完整 id** → **裸名** → **末段唯一匹配**。前两级是
  *   `matchId` 的三级匹配（完整 id 优先是因为目录 id 常自带命名空间前缀，如 `tencent/Hy3`），
  *   key 相同时只查一次；末段匹配见 `matchIn` 的 `tailMatch`。
- * - **全局**：官方提供方提示命中即认（模型名前缀自带定位依据）；其余走兜底，只在跨提供方唯一命中时才认。
+ * - **全局**：官方提供方提示依序试到命中即认（模型名前缀自带定位依据）；其余走兜底，只在跨提供方唯一命中时才认。
  *
  * 宁可漏也不错配：多命中一律判歧义放弃，不猜。
  */
@@ -103,16 +103,16 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
         const same = matchIn(providerId, true)
         if (same) return same
     }
-    // 模型名前缀提示的官方提供方：提示本身即定位依据，命中即认
-    const hinted = hintedProvider(bare)
-    if (hinted) {
-        const official = matchIn(hinted, false)
+    // 模型名前缀提示的官方提供方：提示本身即定位依据，依序试到命中即认
+    const hinted = hintedProviders(bare)
+    for (const provider of hinted) {
+        const official = matchIn(provider, false)
         if (official) return official
     }
     // 其余提供方：唯一命中才认，第二个命中即判歧义放弃（见函数头「宁可漏也不错配」）
     let found: IndexEntry | undefined
     for (const provider of groups.keys()) {
-        if (provider === providerId || provider === hinted) continue
+        if (provider === providerId || hinted.includes(provider)) continue
         const hit = matchIn(provider, false)
         if (!hit) continue
         if (found) return

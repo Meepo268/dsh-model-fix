@@ -32,11 +32,28 @@ export const DEVELOPER_COMPAT_FIELD = 'supportsDeveloperRole'
 /** disableStore 对应的 provider 路由 compat 字段名（开启写 false，关闭删键） */
 export const STORE_COMPAT_FIELD = 'supportsStore'
 
-/** 模型名前缀 -> 官方提供方，用于跨提供方匹配同源模型 */
-export const HINTS: ReadonlyArray<readonly [string, string]> = [
-    ['deepseek', 'deepseek'],
-    ['claude', 'anthropic'],
-    ['kimi', 'moonshotai'],
-    ['grok', 'xai'],
-    ['gpt', 'openai'],
+/** 模型名前缀 -> 官方提供方候选（依序尝试），用于跨提供方匹配同源模型；前缀须全小写（匹配前已对裸名 lowercase），取舍依据见 docs/decisions.md「参数来源」 */
+export const HINTS: ReadonlyArray<readonly [string, readonly string[]]> = [
+    ['deepseek', ['deepseek']],
+    ['claude', ['anthropic']],
+    ['kimi', ['moonshotai', 'moonshotai-cn']],
+    ['grok', ['xai']],
+    ['gpt', ['openai']],
+    ['chatgpt', ['openai']],
+    ['o1', ['openai']],
+    ['o3', ['openai']],
+    ['o4', ['openai']],
+    ['gemini', ['google']],
+    ['gemma', ['google']],
+    ['qwen', ['alibaba', 'alibaba-cn']],
+    ['glm', ['zai', 'zhipuai']],
+    ['mistral', ['mistral']],
+    ['magistral', ['mistral']],
+    ['codestral', ['mistral']],
+    ['ministral', ['mistral']],
+    ['pixtral', ['mistral']],
+    ['mixtral', ['mistral']],
+    ['voxtral', ['mistral']],
+    ['devstral', ['mistral']],
+    ['minimax', ['minimax', 'minimax-cn']],
 ]
