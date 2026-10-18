@@ -1,6 +1,6 @@
 /**
  * `llm-pi-ai` 段写回的统一外壳：四个写回端点（重置 / 恢复备份 / 剔除不支持档位 /
- * 探测式填充的两次写回）的骨架完全同形——读最新段 → 纯函数出计划 → 经 `queueTask` 写回 →
+ * 探测档位的两次写回）的骨架完全同形——读最新段 → 纯函数出计划 → 经 `queueTask` 写回 →
  * `SETTINGS_CONFLICT` 时重读重算、限次重试。这里只放这段骨架，各端点只给三件事：
  * 段不可读时怎么办、计划怎么算、日志报什么。
  *
@@ -47,7 +47,7 @@ interface ApiWritebackSpec<R extends ApiWritebackPlan> {
 /**
  * 读最新段 → 出计划 → 经 `queueTask` 写回 `llm-pi-ai` 段；`SETTINGS_CONFLICT` 时重读重算（限次）。
  *
- * **调用方须已置位事件流守卫**（探测式填充那种守卫持有整轮的）或改用 {@link guardedWritebackApi}。
+ * **调用方须已置位事件流守卫**（探测档位那种守卫持有整轮的）或改用 {@link guardedWritebackApi}。
  * 重试之所以安全：各端点的计划函数都是纯函数且幂等，重读后重算出的 op 与统计只覆盖增量。
  */export async function writebackApi<R extends ApiWritebackPlan>(ctx: Context, spec: ApiWritebackSpec<R>): Promise<R> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

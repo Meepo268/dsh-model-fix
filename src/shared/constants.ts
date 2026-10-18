@@ -23,7 +23,7 @@ export const VERIFY_STREAM_ROUTE = `/api/${PLUGIN_NS}/verify`
 export const VERIFY_STREAM_URL = VERIFY_STREAM_ROUTE.slice(1)
 
 /**
- * 「探测式填充」进度流的路由：与验证流同型（同一 exact 注册面、同样的 `buffered` 请求体、同样的 SSE 回包），
+ * 「探测档位」进度流的路由：与验证流同型（同一 exact 注册面、同样的 `buffered` 请求体、同样的 SSE 回包），
  * 只是执行器与用途不同——逐档试出哪些推理级别真能用，随后写回补全。
  */
 export const PROBE_STREAM_ROUTE = `/api/${PLUGIN_NS}/probe`

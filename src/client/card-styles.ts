@@ -100,7 +100,7 @@ const STYLE_TEXT = [
     '.dsh-mf-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
     '@media (max-width:680px){.dsh-mf-items{grid-template-columns:minmax(0,1fr)}}',
     '@media (prefers-reduced-motion:reduce){.dsh-mf-itemChevron{transition:none}}',
-    // 动作键行（强制更新 / 重置推理级别 / 恢复备份 / 验证模型 / 探测式填充）：独占一行、靠左起排，不设分割线——它承接上方瓦片，
+    // 动作键行（强制更新 / 重置推理级别 / 恢复备份 / 验证模型 / 探测档位）：独占一行、靠左起排，不设分割线——它承接上方瓦片，
     // 分隔线留给其下的取消/保存行；键渐多后在本行内换行落位，不相互挤压。
     // 本行不带自己的上间距：与瓦片的距离已由 .dsh-mf-body 的 gap:12px 给出，再叠一层会算成 24px
     '.dsh-mf-bar{display:flex;align-items:center;justify-content:flex-start;gap:8px}',

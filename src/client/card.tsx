@@ -127,7 +127,7 @@ export function Card(props: CardProps) {
         if (!dirty && autoCollapse) setOpen(false)
     }, [busy, dirty, autoCollapse])
 
-    // 「验证模型」「探测式填充」的整轮编排内聚在 card-verify.ts / card-probe.ts；
+    // 「验证模型」「探测档位」的整轮编排内聚在 card-verify.ts / card-probe.ts；
     // hooks 必须在早退 return 之前调用
     const verify = useVerifyRun({
         t,
@@ -527,7 +527,7 @@ export function Card(props: CardProps) {
                 onRun={verify.run}
                 onStop={verify.stop}
             />
-            {/* 「探测式填充」弹层见 probe-dialog.tsx：两个范围键 + 记录区 + 三个开关，本文件只递状态与回调 */}
+            {/* 「探测档位」弹层见 probe-dialog.tsx：两个范围键 + 记录区 + 三个开关，本文件只递状态与回调 */}
             <ProbeDialog
                 t={t}
                 open={probe.open}

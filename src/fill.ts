@@ -1,7 +1,7 @@
 /**
- * 探测式填充的两步写回：把候选档位**临时预声明**进模型配置，探测跑完后再按结论**收敛**成最终形态。
+ * 探测档位的两步写回：把候选档位**临时预声明**进模型配置，探测跑完后再按结论**收敛**成最终形态。
  *
- * 设计裁决（预声明必要性、写回壳理由、基线比对口径）见 docs/decisions.md「探测式填充」。
+ * 设计裁决（预声明必要性、写回壳理由、基线比对口径）见 docs/decisions.md「探测档位」。
  * 本文件独有的口径：`targetKey` 用 JSON.stringify([provider, model]) 序列化，因模型 id 可含 '/'，字符串拼接会歧义。
  */
 import type { Context } from '@deepseek-ai/cordis'
@@ -92,7 +92,7 @@ function effortsValueOf(levels: readonly string[], existing?: Record<string, unk
  *
  * **两套口径各按各的基线**，别混：
  * - `modelOps` 按**当前值**与目标表比对——只有真要改才产出 op，故收敛阶段算出的表与预声明一致时零写入。
- * - `models` / `added` / `removed` 按 `baseline`（缺省即当前值）比对——探测式填充传的是**预声明之前**的档位表，
+ * - `models` / `added` / `removed` 按 `baseline`（缺省即当前值）比对——探测档位传的是**预声明之前**的档位表，
  *   统计口径要对齐用户视角的那份配置：临时预声明的档位被收回时既不算新增也不算删除，它本不属于用户配置。
  *   正因如此「七档全可用」时收敛是零写入，而统计仍如实报出「补了 7 个档位」。
  */
@@ -146,7 +146,7 @@ function sameLevels(left: readonly string[], right: readonly string[]): boolean 
 /**
  * 读最新配置 → 出计划 → 写回 `llm-pi-ai` 段（骨架见 `src/writeback.ts`，`SETTINGS_CONFLICT` 时重读重算、限次）。
  *
- * **本函数不碰事件流守卫**：探测式填充的守卫持有整轮（预声明 → 探测 → 收敛），故走不带守卫的 `writebackApi`。
+ * **本函数不碰事件流守卫**：探测档位的守卫持有整轮（预声明 → 探测 → 收敛），故走不带守卫的 `writebackApi`。
  * `compute` 在每次重试里重算，故它必须是纯函数、可对任意一次快照求值。
  */
 async function applyEfforts(

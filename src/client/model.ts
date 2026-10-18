@@ -164,7 +164,7 @@ export function verifyKey(provider: string, model: string): string {
 }
 
 /**
- * 候选遍历的唯一实现：验证与探测式填充共用同一份事实源与同一套形状规则，
+ * 候选遍历的唯一实现：验证与探测档位共用同一份事实源与同一套形状规则，
  * 两者只在「收哪些」上分岔（前者全收，后者按两个开关过滤）。
  * 保持录入顺序；提供方非对象、无 models 数组、模型无 id 的行一律跳过。
  */
@@ -191,7 +191,7 @@ function candidatesOf(user: unknown, keep: (provider: string, candidate: VerifyC
     return candidatesOf(user, () => true)
 }
 
-/** 探测式填充的两个开关：只影响「收哪些模型」，不影响请求本身 */
+/** 探测档位的两个开关：只影响「收哪些模型」，不影响请求本身 */
 interface ProbeCandidateOptions {
     /** 排除提供方 id（取卡片上的当前值，与「命中」判定同源，故所见即所得） */
     excludes: readonly string[]
@@ -207,9 +207,9 @@ function isUnfilled(efforts: readonly string[]): boolean {
 }
 
 /**
- * 探测式填充的候选：与验证候选同源同形，只按两个开关收窄。
+ * 探测档位的候选：与验证候选同源同形，只按两个开关收窄。
  *
- * 「忽略排除」必须同时传给 Node 半的两次写回——两边共用同一个开关值（理由见 docs/decisions.md「探测式填充」）。
+ * 「忽略排除」必须同时传给 Node 半的两次写回——两边共用同一个开关值（理由见 docs/decisions.md「探测档位」）。
  */
 export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions): VerifyCandidate[] {
     const excluded = new Set(options.excludes)
@@ -218,7 +218,7 @@ export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions)
 }
 
 /**
- * 探测式填充的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**
+ * 探测档位的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**
  * （未声明 off 的模型不补 off——"能通"不等于"能关"）。
  *
  * `needTest` 恒假：本功能没有「不带档位的基线对照」——Node 半会先把候选档位临时预声明进配置（见 `src/probe.ts`），

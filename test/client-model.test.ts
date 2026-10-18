@@ -1,4 +1,4 @@
-/** src/client/model.ts 纯映射层用例：解码（只读 version-8，非法/缺失回默认）、组总控/单格语义、排除列表增删与命中判定、脏检测、快照规范化、验证候选拍取、目标收敛与分组全选、探测式填充候选（未填充判据 / 忽略排除）与七档展开 */
+/** src/client/model.ts 纯映射层用例：解码（只读 version-8，非法/缺失回默认）、组总控/单格语义、排除列表增删与命中判定、脏检测、快照规范化、验证候选拍取、目标收敛与分组全选、探测档位候选（未填充判据 / 忽略排除）与七档展开 */
 
 import { check, stable } from '@test/helper'
 import { DEFAULT_CONFIG as DEFAULT_FLAGS, toStored } from '@/shared/config-schema'
@@ -372,7 +372,7 @@ export function run(): void {
         [...completed],
     )
     check('toggleGroupPicks 不改入参', partial.size === 2 && !partial.has(acmeKeyB))
-    // ---------- 探测式填充候选：与验证候选同源同形，只按两个开关收窄 ----------
+    // ---------- 探测档位候选：与验证候选同源同形，只按两个开关收窄 ----------
     const probeUser = {
         providers: {
             // 三种档位形态：无声明（未填充）、只有 off（同样算未填充）、有其它档位（已填充）

@@ -133,8 +133,8 @@ export const zh: Record<CardKey, string> = {
     pruneGo: '剔除',
     pruneDone: '已剔除 {count} 个不被支持的推理级别。',
     pruneFailed: '剔除失败：{message}。',
-    // 探测式填充：跑完按「自动写入」开关决定要不要把档位按结论补进模型配置（默认写、不询问）
-    probe: '探测式填充',
+    // 探测档位：跑完按「自动写入」开关决定要不要把档位按结论补进模型配置（默认写、不询问）
+    probe: '探测档位',
     probeTitle: '探测推理级别并补全',
     probeDesc: '用真实请求来确定推理级别是否可用，最真实可靠；所耗时间随模型数量增加。',
     probeEmpty: '没有可探测的模型：请先在「模型」设置中添加模型，或关闭「忽略排除」后重试。',
@@ -157,7 +157,7 @@ export const zh: Record<CardKey, string> = {
     probeFilled: '已为 {models} 个模型补全推理级别：新增 {added} 个、剔除 {removed} 个。',
     // 与 probeFilled 的分工：措辞必须让人一眼看出「没有写入」，不能与已补全混淆
     probeFillSkipped: '可为 {models} 个模型补全推理级别：新增 {added} 个、剔除 {removed} 个；未执行写入。',
-    probeFillFailed: '探测式填充失败：{message}。',
+    probeFillFailed: '探测档位失败：{message}。',
     probeStoppedLine: '已停止，本轮不再继续探测。',
     terminalCommandLine: '命令第 {n} 行',
     terminalSignal: '信号 {signal}',

@@ -33,7 +33,7 @@ interface ProbeLimits {
 
 /** 验证的配额：勾选展开，请求数封顶 200（超出即拒绝，用户可减少勾选重来） */
 export const VERIFY_LIMITS: ProbeLimits = { maxProbes: 200, maxModels: Number.POSITIVE_INFINITY }
-/** 探测式填充的配额：全量展开为「模型数 × 至多 7 档」（off 仅当模型已声明时才探测），故模型数封顶 200（至多 1400 次最小请求） */
+/** 探测档位的配额：全量展开为「模型数 × 至多 7 档」（off 仅当模型已声明时才探测），故模型数封顶 200（至多 1400 次最小请求） */
 export const PROBE_LIMITS: ProbeLimits = { maxProbes: 1400, maxModels: 200 }
 
 /**
@@ -96,11 +96,11 @@ export function groupProbesByProvider(probes: readonly VerifyProbe[]): ProviderP
 /**
  * 校验并展开未信任载荷，按提供方分组返回待跑清单；入参非法即抛出。
  *
- * 与执行拆成两步：`done` 帧必须等**整轮**结束才发，而探测式填充的「整轮」含收敛写回，
+ * 与执行拆成两步：`done` 帧必须等**整轮**结束才发，而探测档位的「整轮」含收敛写回，
  * 故计划得先交到调用方手里（它还要拿模型清单去写配置）。
  *
  * @param payload 未信任的请求载荷（浏览器半发的模型清单）
- * @param limits 本轮的两条硬闸（请求数 / 模型数），验证与探测式填充各用一份
+ * @param limits 本轮的两条硬闸（请求数 / 模型数），验证与探测档位各用一份
  * @param rejectMessage 入参非法时的报错文案：两个功能说法不同，由调用方给出
  */
 export function planProbeGroups(payload: unknown, limits: ProbeLimits, rejectMessage: string): ProviderProbeGroup[] {

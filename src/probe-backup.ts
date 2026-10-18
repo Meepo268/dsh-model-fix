@@ -1,9 +1,9 @@
 /**
- * 「探测式填充」的崩溃兜底备份：探测开始前把**探测目标的档位表原值**存进自有段，
+ * 「探测档位」的崩溃兜底备份：探测开始前把**探测目标的档位表原值**存进自有段，
  * 启动末尾若还留着它，说明上一轮探测没能收尾，按这份备份把那些档位表撤回去。
  *
  * 备份只覆盖预声明动过的那一个字段：既不碰其他模型、也不碰同一模型的其他字段，更不会复活
- * 用户在探测期间删掉的模型。设计裁决见 docs/decisions.md「探测式填充」。
+ * 用户在探测期间删掉的模型。设计裁决见 docs/decisions.md「探测档位」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
@@ -53,7 +53,7 @@ export function captureProbeBackup(
     return backup
 }
 
-/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩，理由见 docs/decisions.md「探测式填充」 */
+/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩，理由见 docs/decisions.md「探测档位」 */
 export function encodeProbeBackup(backup: ProbeBackup): string {
     return Buffer.from(JSON.stringify(backup), 'utf8').toString('base64')
 }
@@ -176,7 +176,7 @@ async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<numb
 /**
  * 启动末尾的崩溃回退：段里没有备份即无事可做；有则按备份撤掉预声明并清掉备份，返回被撤的模型数。
  * 回退全程持事件流守卫（撤预声明那次若被放过去，`fix` 会把预声明又填回来）。
- * 理由见 docs/decisions.md「探测式填充」。
+ * 理由见 docs/decisions.md「探测档位」。
  */
 export async function restoreProbeBackup(ctx: Context): Promise<number> {
     const section = ownSection(ctx)
@@ -192,7 +192,7 @@ export async function restoreProbeBackup(ctx: Context): Promise<number> {
         }
         const changed = await restoreProviders(ctx, backup)
         await clearProbeBackup(ctx)
-        if (changed > 0) ctx.logger.warn(`${PLUGIN_NAME}: 检测到上次探测式填充未收尾，已撤掉 ${changed} 个模型的预声明档位`)
+        if (changed > 0) ctx.logger.warn(`${PLUGIN_NAME}: 检测到上次探测档位未收尾，已撤掉 ${changed} 个模型的预声明档位`)
         return changed
     } finally {
         endIgnoreAll()

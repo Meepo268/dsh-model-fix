@@ -1,8 +1,8 @@
 /**
- * 「探测式填充」的 Node 半执行器：把候选档位**临时预声明**进模型配置 → 逐档各发一次最小请求 →
+ * 「探测档位」的 Node 半执行器：把候选档位**临时预声明**进模型配置 → 逐档各发一次最小请求 →
  * 按结论**收敛**成最终档位表并写回。全过程只由用户主动发起，且在途全程持有事件流守卫。
  *
- * 设计裁决（预声明必要性、收敛口径、两级短路判据、中止整轮还原、配额、兜底备份）见 docs/decisions.md「探测式填充」。
+ * 设计裁决（预声明必要性、收敛口径、两级短路判据、中止整轮还原、配额、兜底备份）见 docs/decisions.md「探测档位」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -51,7 +51,7 @@ const runProbeGroup: GroupRunner = async (
         if (verdict.outcome === 'aborted') continue
         if (verdict.outcome === 'usable') usable.add(probe.model)
         // 判「这一档不被支持」要两个条件：宿主判为「参数不正确」，且该模型已有更低档跑通
-        // （本功能没有基线对照，故拿已跑通的更低档顶替，见 docs/decisions.md「探测式填充」）
+        // （本功能没有基线对照，故拿已跑通的更低档顶替，见 docs/decisions.md「探测档位」）
         const outcome = probe.effort !== undefined && usable.has(probe.model) && isEffortRejection(verdict.failure)
             ? 'unsupported-effort'
             : verdict.outcome
@@ -70,7 +70,7 @@ const runProbeGroup: GroupRunner = async (
             blockedBy = blockReason
             skipped = group.probes.length - index - 1
         } else if (shouldSkipModelTail(outcome, verdict.failure) || outcome === 'rate-limit') {
-            // 额度耗尽共用判据；限流是本功能自有的追加判据（超时不算，见 docs/decisions.md「探测式填充」）
+            // 额度耗尽共用判据；限流是本功能自有的追加判据（超时不算，见 docs/decisions.md「探测档位」）
             skipped = sameModelTail(group.probes, index)
         }
         if (skipped > 0) index += skipped
@@ -200,13 +200,13 @@ function count(target: Map<string, number>, key: string): void {
 }
 
 /**
- * 跑一轮探测式填充：预声明 → 逐档探测 → 收敛写回 → 发终帧。
+ * 跑一轮探测档位：预声明 → 逐档探测 → 收敛写回 → 发终帧。
  *
  * 三个开关（`ignoreExcludes` / `dropUnsupported` / `autoWrite`）随载荷走而不走参数：它们与模型清单同为
  * 浏览器半的声明，走载荷才与「入参按不可信输入校验」同一处收口。
  *
  * 事件流守卫**全程持有**（预声明到收敛之间不放开）：放开的话，中途改一次配置就会触发 `fix` 把预声明
- * 改回去，探测剩余的请求会被宿主本地拒绝、结论全错。理由与代价见 docs/decisions.md「探测式填充」。
+ * 改回去，探测剩余的请求会被宿主本地拒绝、结论全错。理由与代价见 docs/decisions.md「探测档位」。
  */
 export async function probeAndFill(
     ctx: Context,
@@ -248,7 +248,7 @@ export async function probeAndFill(
             }
             await convergeProbeEfforts(ctx, restore, preexisting)
         }
-        // 收敛已落盘即可撤掉兜底备份；撤不掉只告警，不把已成功的补全报成失败（见 docs/decisions.md「探测式填充」）
+        // 收敛已落盘即可撤掉兜底备份；撤不掉只告警，不把已成功的补全报成失败（见 docs/decisions.md「探测档位」）
         await clearProbeBackup(ctx).catch((error: unknown) => {
             ctx.logger.warn(`${PLUGIN_NAME}: 探测兜底备份清理失败（下次启动会回退本轮补全）：${errorText(error)}`)
         })

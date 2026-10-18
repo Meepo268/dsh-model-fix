@@ -135,9 +135,9 @@ export const en: Record<CardKey, string> = {
     pruneGo: 'Remove',
     pruneDone: 'Removed {count} unsupported reasoning effort(s).',
     pruneFailed: 'Failed to remove: {message}.',
-    // Probe & fill: whether the usable levels go back into the model config follows the auto-write
+    // Probe efforts: whether the usable levels go back into the model config follows the auto-write
     // switch (on by default, no asking)
-    probe: 'Probe & fill',
+    probe: 'Probe efforts',
     probeTitle: 'Probe reasoning levels and fill',
     probeDesc: 'Checks which reasoning levels are usable with real requests — the most reliable way; takes longer with more models.',
     probeEmpty: 'No models to probe. Add models on the Models settings page, or turn off "Ignore exclusions" and retry.',
@@ -161,7 +161,7 @@ export const en: Record<CardKey, string> = {
     probeFilled: 'Filled reasoning levels for {models} model(s): {added} added, {removed} removed.',
     // Pairs with probeFilled: the wording must make "nothing was written" unmistakable
     probeFillSkipped: 'Could fill reasoning levels for {models} model(s): {added} added, {removed} removed; nothing was written.',
-    probeFillFailed: 'Probe & fill failed: {message}.',
+    probeFillFailed: 'Probe efforts failed: {message}.',
     probeStoppedLine: 'Stopped; this run does not continue.',
     terminalCommandLine: 'Command line {n}',
     terminalSignal: 'signal {signal}',

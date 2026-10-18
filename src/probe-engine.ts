@@ -1,7 +1,7 @@
 /**
- * 「模型 × 推理级别」最小请求的执行引擎：验证与探测式填充共用。
+ * 「模型 × 推理级别」最小请求的执行引擎：验证与探测档位共用。
  *
- * 设计裁决（四级分层、受理判据、失败分类、短路判据、并发与中止语义）见 docs/decisions.md「验证」与「探测式填充」。
+ * 设计裁决（四级分层、受理判据、失败分类、短路判据、并发与中止语义）见 docs/decisions.md「验证」与「探测档位」。
  */
 
 import type { LlmRuntime, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -133,7 +133,7 @@ export type ProbeEmitter = (
     progress: ProbeFrameProgress,
 ) => void
 
-/** 一组怎么逐条跑：两个功能的全部差异都在这个回调里（验证带基线探测，探测式填充逐档平推） */
+/** 一组怎么逐条跑：两个功能的全部差异都在这个回调里（验证带基线探测，探测档位逐档平推） */
 export type GroupRunner = (
     llm: Pick<LlmRuntime, 'stream'>,
     group: ProviderProbeGroup,
@@ -204,7 +204,7 @@ export async function runProbeGroups(
 
 /**
  * 收尾发终帧：**中止不发 `done`**——消费方见「流自然结束却没等到 done」即知这轮没跑完，
- * 据此保留进度而不是报成功。由调用方在全部收尾动作（探测式填充的收敛写回）之后调用，
+ * 据此保留进度而不是报成功。由调用方在全部收尾动作（探测档位的收敛写回）之后调用，
  * 故终帧里的汇总已是最终形态。
  */
 export function finishRun(summary: VerifySummary, options: ProbeRunOptions = {}): void {
