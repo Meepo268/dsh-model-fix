@@ -51,6 +51,7 @@ export function useProbeRun(options: ProbeRunOptions) {
     const [scope, setScope] = useState<ProbeScope | null>(null)
     const [lines, setLines] = useState<readonly string[]>([])
     const [total, setTotal] = useState(0)
+    const [done, setDone] = useState(0)
     const [stopped, setStopped] = useState(false)
     const abort = useRef<AbortController | null>(null)
     useEffect(() => () => { abort.current?.abort() }, [])
@@ -94,6 +95,7 @@ export function useProbeRun(options: ProbeRunOptions) {
         if (models.length === 0) return
         setLines([])
         setTotal(0)
+        setDone(0)
         setStopped(false)
         options.setBusy('probe')
         const controller = new AbortController()
@@ -108,6 +110,7 @@ export function useProbeRun(options: ProbeRunOptions) {
                 setTotal(frame.total)
                 return
             }
+            setDone(frame.done)
             setLines((current) => [...current, verifyLineOf(frame, t)])
         }, controller.signal)
             .then((summary) => {
@@ -167,12 +170,13 @@ export function useProbeRun(options: ProbeRunOptions) {
         setScope(null)
         setLines([])
         setTotal(0)
+        setDone(0)
         setStopped(false)
         setIgnoreExcludes(false)
         setDropUnsupported(false)
     }
     return {
-        open, ignoreExcludes, dropUnsupported, setDropUnsupported, autoWrite, setAutoWrite, scope, lines, total,
+        open, ignoreExcludes, dropUnsupported, setDropUnsupported, autoWrite, setAutoWrite, scope, lines, total, done,
         running: options.busy === 'probe', terminalLabels,
         unfilledCount: plan?.unfilled.length ?? 0,
         allCount: plan?.all.length ?? 0,

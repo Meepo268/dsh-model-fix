@@ -522,6 +522,7 @@ export function Card(props: CardProps) {
                 efforts={verify.efforts}
                 onEffortsChange={verify.setEfforts}
                 total={verify.total}
+                done={verify.done}
                 lines={verify.lines}
                 terminalLabels={verify.terminalLabels}
                 onRun={verify.run}
@@ -546,6 +547,7 @@ export function Card(props: CardProps) {
                 dropUnsupported={probe.dropUnsupported}
                 onDropUnsupportedChange={probe.setDropUnsupported}
                 total={probe.total}
+                done={probe.done}
                 lines={probe.lines}
                 terminalLabels={probe.terminalLabels}
             />

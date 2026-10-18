@@ -100,7 +100,7 @@ export const zh: Record<CardKey, string> = {
     verifyDeselectAll: '取消全选',
     // 记录区逐行文案：provider 级失败不带模型与档位（那不是某个模型的问题），只交代整组结论。
     // 层级一律用冒号而非斜杠分隔——模型 id 本身就含斜杠（如 z-ai/glm-5），拿它当分隔符读不出层级
-    verifyCommand: '验证 {total} 项',
+    verifyCommand: '[{done} / {total}]',
     verifyLine: '{provider}: {model} [{effort}]：{result}',
     verifyLinePlain: '{provider}: {model}：{result}',
     verifyLineProvider: '{provider}：{result}',
@@ -152,7 +152,7 @@ export const zh: Record<CardKey, string> = {
     probeUnfilled: '探测未填充',
     probeAll: '探测所有',
     probeStop: '停止',
-    probeCommand: '探测 {total} 项',
+    probeCommand: '[{done} / {total}]',
     probeDone: '共探测 {models} 个模型、{levels} 个推理级别：可用 {usable} 个、不支持 {unsupported} 个。',
     probeFilled: '已为 {models} 个模型补全推理级别：新增 {added} 个、剔除 {removed} 个。',
     // 与 probeFilled 的分工：措辞必须让人一眼看出「没有写入」，不能与已补全混淆

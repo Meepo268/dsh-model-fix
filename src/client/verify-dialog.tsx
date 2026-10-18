@@ -55,6 +55,8 @@ interface VerifyDialogProps {
     onEffortsChange: (efforts: boolean) => void
     /** 记录区抬头：总项数取自 opened 帧；0 意味还没发起过，故记录面板给一行空态而非记录区 */
     total: number
+    /** 记录区抬头进度段：已完成条数，逐条 probed 帧更新 */
+    done: number
     lines: readonly string[]
     terminalLabels: TerminalBlockLabels
     onRun: () => void
@@ -233,7 +235,8 @@ export function VerifyDialog(props: VerifyDialogProps) {
                     {/* 记录区就在本页：opened 帧一到即有总项数，先于此则没有进度可展示，故空态占位 */}
                     {props.total > 0 ? (
                         <TerminalBlock
-                            command={t('verifyCommand', { total: String(props.total) })}
+                            cwd={t('verify')}
+                            command={t('verifyCommand', { done: String(props.done), total: String(props.total) })}
                             output={output}
                             running={props.running}
                             maxLines={Infinity}

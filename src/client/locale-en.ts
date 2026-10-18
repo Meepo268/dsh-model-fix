@@ -100,7 +100,7 @@ export const en: Record<CardKey, string> = {
     verifyRecordEmpty: 'No verification has been run yet. After you click "Verify", each result appears here.',
     // Per-line log copy: provider-level failures carry no model/effort (not a per-model issue).
     // Levels are colon-separated rather than slash-separated — model ids themselves contain slashes (e.g. z-ai/glm-5)
-    verifyCommand: 'Verify {total} item(s)',
+    verifyCommand: '[{done} / {total}]',
     verifyLine: '{provider}: {model} [{effort}]: {result}',
     verifyLinePlain: '{provider}: {model}: {result}',
     verifyLineProvider: '{provider}: {result}',
@@ -156,7 +156,7 @@ export const en: Record<CardKey, string> = {
     probeUnfilled: 'Probe unfilled',
     probeAll: 'Probe all',
     probeStop: 'Stop',
-    probeCommand: 'Probe {total} item(s)',
+    probeCommand: '[{done} / {total}]',
     probeDone: 'Probed {models} model(s), {levels} reasoning effort(s): {usable} usable, {unsupported} unsupported.',
     probeFilled: 'Filled reasoning levels for {models} model(s): {added} added, {removed} removed.',
     // Pairs with probeFilled: the wording must make "nothing was written" unmistakable

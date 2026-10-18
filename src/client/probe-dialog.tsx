@@ -46,6 +46,8 @@ interface ProbeDialogProps {
     onDropUnsupportedChange: (drop: boolean) => void
     /** 记录区抬头：总项数取自 opened 帧；0 意味还没发起过，故记录区整块不渲染 */
     total: number
+    /** 记录区抬头进度段：已完成条数，逐条 probed 帧更新 */
+    done: number
     lines: readonly string[]
     terminalLabels: TerminalBlockLabels
 }
@@ -108,7 +110,8 @@ export function ProbeDialog(props: ProbeDialogProps) {
                     首次发起才出现——opened 帧一到即有总项数 */}
                 {props.total > 0 ? (
                     <TerminalBlock
-                        command={t('probeCommand', { total: String(props.total) })}
+                        cwd={t('probe')}
+                        command={t('probeCommand', { done: String(props.done), total: String(props.total) })}
                         output={output}
                         running={props.running}
                         maxLines={Infinity}
