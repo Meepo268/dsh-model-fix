@@ -16,7 +16,7 @@ import type { KeyboardEvent } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { TIP_MAX_WIDTH, VERIFY_TERMINAL_LINES } from '@/client/card-styles'
+import { TIP_MAX_WIDTH } from '@/client/card-styles'
 import type { CardKey } from '@/client/locale-keys'
 import { groupAllPicked, verifyKey } from '@/client/model'
 import type { VerifyCandidate } from '@/client/model'
@@ -176,7 +176,7 @@ export function VerifyDialog(props: VerifyDialogProps) {
                     })}
                 </div>
                 {/* 两个面板都常驻挂载、切页只改 hidden（官方那份 visitedIds 的同一用意）：记录区的 TerminalBlock
-                    自带展开/收起状态，卸载即丢；hidden 即 display:none、不是 flex 项，换页不留空段 */}
+                    输出区带滚动位置，卸载即丢；hidden 即 display:none、不是 flex 项，换页不留空段 */}
                 <div
                     id={`${tabsId}-panel-models`}
                     className="dsh-mf-verifyPanel"
@@ -236,7 +236,7 @@ export function VerifyDialog(props: VerifyDialogProps) {
                             command={t('verifyCommand', { total: String(props.total) })}
                             output={output}
                             running={props.running}
-                            maxLines={VERIFY_TERMINAL_LINES}
+                            maxLines={Infinity}
                             labels={props.terminalLabels}
                             className="dsh-mf-verifyLog"
                         />

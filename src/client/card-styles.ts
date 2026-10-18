@@ -10,9 +10,6 @@ import { PLUGIN_NAME } from '@/shared/constants'
 /** 说明气泡宽度上限（px）：宿主 Tooltip 默认半视口，气泡会盖满整行开关区，故按瓦片列宽收窄 */
 export const TIP_MAX_WIDTH = 300
 
-/** 验证与探测两个弹层共用的记录区行数上限：跑满即滚动，够读完一轮的结论又不至于把弹层撑得过长 */
-export const VERIFY_TERMINAL_LINES = 10
-
 const STYLE_ID = 'dsh-model-fix-card-css'
 
 /**
@@ -188,7 +185,7 @@ const STYLE_TEXT = [
     '.dsh-mf-verifyButtons{display:flex;align-items:center;gap:8px}',
     // 记录区上下边距：宿主 TerminalBlock 的 .block 自带 margin:16px 0，在探测弹层里与正文容器的 12px 间距相加会算成
     // 28px；整条归零。验证弹层的记录区自成一个面板（面板内只此一段，16px 留白无处可抵），同样归零
-    '.dsh-mf-verifyLog{margin:0}',
+    '.dsh-mf-verifyLog{margin:0;--dsl-terminal-output-max-height:360px}',
     // 注意语义键：卡片 footer 的「验证模型」触发键与弹层内的验证确认键共用，仅把描边/字色换成 warn 令牌；
     // hover 用其 10% 稀释（宿主无 warn 悬停底令牌，与 .dsh-mf-chipVersion 同一 color-mix 手法，不自造色值）。
     // 叠加在 .dsh-mf-discard 之上时靠 :not(:disabled) 的高特异性压过其默认描边/字色

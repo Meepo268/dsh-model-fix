@@ -13,7 +13,7 @@ import { useMemo } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { TIP_MAX_WIDTH, VERIFY_TERMINAL_LINES } from '@/client/card-styles'
+import { TIP_MAX_WIDTH } from '@/client/card-styles'
 
 const { Button, Modal, StateDot, Switch, TerminalBlock, Tooltip, IconInfoOutlineRegular } = primitives
 
@@ -111,7 +111,7 @@ export function ProbeDialog(props: ProbeDialogProps) {
                         command={t('probeCommand', { total: String(props.total) })}
                         output={output}
                         running={props.running}
-                        maxLines={VERIFY_TERMINAL_LINES}
+                        maxLines={Infinity}
                         labels={props.terminalLabels}
                         className="dsh-mf-verifyLog"
                     />
