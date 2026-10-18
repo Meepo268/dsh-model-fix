@@ -6,7 +6,7 @@ import { isProviderBlocking } from '@/shared/verify-progress'
  * 探测的判定层：把宿主给出的失败事实翻译成本插件的结论，并给出两级短路的唯一判据。
  *
  * 全部是零 ctx、不触网的纯函数（tests 依赖此形态）。
- * 设计裁决（失败分类、两级短路判据）见 docs/decisions.md「验证」与「探测式填充」。
+ * 设计裁决（失败分类、两级短路判据）见 docs/decisions.md「验证」与「探测档位」。
  */
 
 /** 宿主规范码：额度 / 余额耗尽（`ACCOUNT_QUOTA` 是宿主给「账户余额不足」定的字面量，不是 `ACCOUNT_QUOTA_EXCEEDED`） */
@@ -58,7 +58,7 @@ export function classifyFailure(failure: LlmFailure): Exclude<ProbeOutcome, 'usa
  * 侧恒缺，故只能取宿主已归一好的结论，**不再自己比对文案**。
  *
  * 第二个条件是「除档位外别无变量」，两个功能各用自己的对照（验证用不带档位的基线探测，
- * 探测式填充用同模型已跑通的更低档位），由 `runGroup` 保证后才落「档位不支持」这个结论。
+ * 探测档位用同模型已跑通的更低档位），由 `runGroup` 保证后才落「档位不支持」这个结论。
  * 判据与理由见 docs/decisions.md「验证」。
  */
 export function isEffortRejection(failure: VerifyFailureFacts | undefined): boolean {
@@ -75,7 +75,7 @@ export function sameModelTail(probes: readonly VerifyProbe[], from: number): num
 }
 
 /**
- * 该失败是否足以否定**整个提供方**（provider 级短路的唯一判据，验证与探测式填充共用）。
+ * 该失败是否足以否定**整个提供方**（provider 级短路的唯一判据，验证与探测档位共用）。
  *
  * 判据只有一条：**能断定后续请求必然失败**才短。返回短路原因，不短路即 `undefined`：
  * - **端点不通 / 凭据无效**（`isProviderBlocking`）：与请求内容无关，同一提供方又共用同一 url 与同一把 key。
@@ -91,12 +91,12 @@ export function providerBlockReason(outcome: ProbeOutcome, firstRequest: boolean
 }
 
 /**
- * 该失败是否足以否定**该模型的其余档位**（模型级短路的唯一判据，验证与探测式填充共用）。
+ * 该失败是否足以否定**该模型的其余档位**（模型级短路的唯一判据，验证与探测档位共用）。
  *
  * 判据同 provider 级：**能断定后续请求必然失败**才短。档位请求上只有**额度耗尽**够格
- * （额度按提供方与模型计）。其余一律不短，宁可多烧几次额度也不误杀可用档位；探测式填充另把
+ * （额度按提供方与模型计）。其余一律不短，宁可多烧几次额度也不误杀可用档位；探测档位另把
  * **限流**追加为自己的模型级短路（被短模型整轮还原、无误杀，只省请求）。
- * 理由展开见 docs/decisions.md「验证」与「探测式填充」。
+ * 理由展开见 docs/decisions.md「验证」与「探测档位」。
  */
 export function shouldSkipModelTail(outcome: ProbeOutcome, failure: VerifyFailureFacts | undefined): boolean {
     return failure !== undefined && outcome === 'quota'

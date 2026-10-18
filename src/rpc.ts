@@ -1,6 +1,6 @@
 /**
  * Connection RPC 端点：forceUpdate / resetModels / restoreModels / pruneEfforts 四个写回端点
- * 与 reportLocale 语言上报端点，写回共用同一守卫做互斥；验证与探测式填充的进度各开一条 `connection.fetch` 的 exact 路由。
+ * 与 reportLocale 语言上报端点，写回共用同一守卫做互斥；验证与探测档位的进度各开一条 `connection.fetch` 的 exact 路由。
  *
  * 路由由本插件自注册而不走宿主 `connection.rpc.handle`（后者在服务自己的 ctx 上求值 `owner.webServer`，
  * 而 connection 插件不再注入 webServer，必然抛错，详见 rpc-route.ts）。设计裁决见 docs/decisions.md「写回端点」。
@@ -31,7 +31,7 @@ import { verifyModels } from '@/verify'
 import { createChannelRoute } from '@/rpc-route'
 import type { EndpointHandler } from '@/rpc-route'
 
-/** 一轮执行的入口：载荷 → 进度帧 → 终帧。验证与探测式填充同型，只有执行器不同 */
+/** 一轮执行的入口：载荷 → 进度帧 → 终帧。验证与探测档位同型，只有执行器不同 */
 type ProgressRunner = (payload: unknown, options: ProbeRunOptions) => Promise<VerifySummary>
 
 /** 守卫已开（另一写回在途）时的统一拒绝结果 */
@@ -123,7 +123,7 @@ export function installRpc(ctx: Context): void {
                 requestBody: 'buffered',
                 fetch: progressStreamFetch((payload, options) => verifyModels(ctx.llm, payload, options)),
             })
-            // 探测式填充的流多带一个 ctx：它一轮之内要写两次配置（预声明 + 收敛），都在守卫内完成
+            // 探测档位的流多带一个 ctx：它一轮之内要写两次配置（预声明 + 收敛），都在守卫内完成
             const disposeProbe = connection.fetch.register({
                 path: PROBE_STREAM_ROUTE,
                 methods: ['POST'],
@@ -146,7 +146,7 @@ export function installRpc(ctx: Context): void {
  * 走 `connection.fetch.register` 而非 `webServer.register` 是刻意的：前者由 Connection 代管信任围栏、
  * 浏览器认证与**客户端断开 → `request.signal`**，后者这些都得自己再搭一遍。
  *
- * 验证与探测式填充共用这一份实现：两者的线上形状逐字段同形，差别的只有执行器本身。
+ * 验证与探测档位共用这一份实现：两者的线上形状逐字段同形，差别的只有执行器本身。
  *
  * `needsIdleGuard` 只给会写配置的那条流用：它与写回端点共用事件流守卫做互斥，已开即拒（409）。
  *
@@ -164,7 +164,7 @@ export function progressStreamFetch(
         } catch {
             return new Response('invalid json body', { status: 400 })
         }
-        // 写配置的流（探测式填充）在此查守卫：载荷先解析，故判定与执行器的守卫置位之间无 await，
+        // 写配置的流（探测档位）在此查守卫：载荷先解析，故判定与执行器的守卫置位之间无 await，
         // 并发请求不可能双双通过检查
         if (needsIdleGuard && isIgnoreAll()) return new Response('另一操作进行中，请稍后重试', { status: 409 })
         const stream = new ReadableStream<Uint8Array>({

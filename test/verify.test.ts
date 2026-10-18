@@ -333,7 +333,7 @@ export async function run(): Promise<void> {
         === stable([{ provider: 'a', model: 'm1', effort: 'high' }]),
         summarizeProviders([], unsupportedDetail).unsupportedEfforts,
     )
-    // 可用档位明细与不支持明细同源同构：探测式填充据此写回补全，两处各筛一遍必然分叉
+    // 可用档位明细与不支持明细同源同构：探测档位据此写回补全，两处各筛一遍必然分叉
     const usableDetail = [
         { provider: 'a', model: 'm1', effort: 'high', outcome: 'usable', failure: undefined },
         // 不带档位的请求验的是模型本身，没有「哪一档可用」可言，不进这两只明细

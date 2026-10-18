@@ -68,7 +68,7 @@ function refillAfterApiChange(ctx: Context): void {
         .catch(swallowFixError)
 }
 
-/** 探测式填充的崩溃兜底：上一轮若崩在「预声明」与「收敛」之间，自有段会留下兜底备份，
+/** 探测档位的崩溃兜底：上一轮若崩在「预声明」与「收敛」之间，自有段会留下兜底备份，
  * 启动链末尾据此回退，回退后再补一轮 fill——否则被撤掉预声明的模型会停在未填充态。
  * 无备份时 restoreProbeBackup 直接返回 0。 */
 async function recoverProbeBackup(ctx: Context): Promise<void> {
@@ -76,7 +76,7 @@ async function recoverProbeBackup(ctx: Context): Promise<void> {
         const changed = await restoreProbeBackup(ctx)
         if (changed > 0 && ctx.fiber.store) await fix(ctx)
     } catch (error) {
-        ctx.logger.warn(`${PLUGIN_NAME}: 探测式填充的兜底回退失败（配置可能停在半截形态）：${errorText(error)}`)
+        ctx.logger.warn(`${PLUGIN_NAME}: 探测档位的兜底回退失败（配置可能停在半截形态）：${errorText(error)}`)
     }
 }
 

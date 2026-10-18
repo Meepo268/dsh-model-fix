@@ -1,11 +1,11 @@
 /**
- * 「探测式填充」弹层（浏览器半）：两个发起键 + 记录区 + 三个开关。
+ * 「探测档位」弹层（浏览器半）：两个发起键 + 记录区 + 三个开关。
  *
  * 没有候选列表——范围由 footer 那两个键与「忽略排除」开关决定，故正文依次是范围提示 → 额度提示 →
  * off 说明 → 记录区 → 三个开关（自动写入 / 忽略排除 / 剔除不支持）；footer 只留取消与两个范围键。
  *
  * 状态与动作全由卡片经 props 递进来，自己不碰 Connection 也不发起探测；「关窗即中止在途探测」记在 `onClose` 上。
- * 理由与样式数值见 docs/decisions.md「探测式填充」与 `card-styles.ts`。
+ * 理由与样式数值见 docs/decisions.md「探测档位」与 `card-styles.ts`。
  */
 
 import { useMemo } from 'react'
@@ -13,7 +13,7 @@ import { useMemo } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { TIP_MAX_WIDTH, VERIFY_TERMINAL_LINES } from '@/client/card-styles'
+import { TIP_MAX_WIDTH } from '@/client/card-styles'
 
 const { Button, Modal, StateDot, Switch, TerminalBlock, Tooltip, IconInfoOutlineRegular } = primitives
 
@@ -46,6 +46,8 @@ interface ProbeDialogProps {
     onDropUnsupportedChange: (drop: boolean) => void
     /** 记录区抬头：总项数取自 opened 帧；0 意味还没发起过，故记录区整块不渲染 */
     total: number
+    /** 记录区抬头进度段：已完成条数，逐条 probed 帧更新 */
+    done: number
     lines: readonly string[]
     terminalLabels: TerminalBlockLabels
 }
@@ -108,10 +110,11 @@ export function ProbeDialog(props: ProbeDialogProps) {
                     首次发起才出现——opened 帧一到即有总项数 */}
                 {props.total > 0 ? (
                     <TerminalBlock
-                        command={t('probeCommand', { total: String(props.total) })}
+                        cwd={t('probe')}
+                        command={t('probeCommand', { done: String(props.done), total: String(props.total) })}
                         output={output}
                         running={props.running}
-                        maxLines={VERIFY_TERMINAL_LINES}
+                        maxLines={Infinity}
                         labels={props.terminalLabels}
                         className="dsh-mf-verifyLog"
                     />

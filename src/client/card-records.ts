@@ -1,5 +1,5 @@
 /**
- * 验证与探测式填充两条记录区的纯文案层（浏览器半）：TerminalBlock 展示文案、探测结论→文案键
+ * 验证与探测档位两条记录区的纯文案层（浏览器半）：TerminalBlock 展示文案、探测结论→文案键
  * 对照表、单条结论记录行合成。零状态、零 React，只吃翻译函数与进度帧。
  */
 
@@ -9,7 +9,7 @@ import type { CardKey } from '@/client/locale-keys'
 import { isProviderBlocking } from '@/shared/verify-progress'
 import type { ProbeOutcome, VerifyProbedFrame } from '@/shared/verify-progress'
 
-/** 宿主 TerminalBlock 的展示文案（该包无语言回退，整份照官方 terminalLabels(t) 提供）。
+/** 宿主 TerminalBlock 的展示文案（该包无语言回退，文案经 t() 提供）。
  *  0.2.1-alpha.2 起新增必填字段 `commandLine`，而 devDep 停在 0.1.7-rc.2、编译面看不到它，
  *  故并入期望类型以避开 excess-property 检查。详见 docs/host-api.md */
 export type TerminalLabels = TerminalBlockLabels & { commandLine: (line: number) => string }
@@ -26,10 +26,11 @@ export function terminalLabelsOf(t: TranslateNS<'settings.modelFix'>): TerminalL
         copy: t('terminalCopy'),
         copied: t('terminalCopied'),
         noOutput: t('terminalNoOutput'),
-        collapseAria: t('terminalCollapseAria'),
-        collapse: t('terminalCollapse'),
-        expandAria: (n) => t('terminalExpandAria', { n: String(n) }),
-        expand: (n) => t('terminalExpand', { n: String(n) }),
+        // 宿主类型必填的 4 个字段：空值
+        collapseAria: '',
+        collapse: '',
+        expandAria: () => '',
+        expand: () => '',
     }
 }
 

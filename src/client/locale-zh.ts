@@ -100,7 +100,7 @@ export const zh: Record<CardKey, string> = {
     verifyDeselectAll: '取消全选',
     // 记录区逐行文案：provider 级失败不带模型与档位（那不是某个模型的问题），只交代整组结论。
     // 层级一律用冒号而非斜杠分隔——模型 id 本身就含斜杠（如 z-ai/glm-5），拿它当分隔符读不出层级
-    verifyCommand: '验证 {total} 项',
+    verifyCommand: '[{done} / {total}]',
     verifyLine: '{provider}: {model} [{effort}]：{result}',
     verifyLinePlain: '{provider}: {model}：{result}',
     verifyLineProvider: '{provider}：{result}',
@@ -133,8 +133,8 @@ export const zh: Record<CardKey, string> = {
     pruneGo: '剔除',
     pruneDone: '已剔除 {count} 个不被支持的推理级别。',
     pruneFailed: '剔除失败：{message}。',
-    // 探测式填充：跑完按「自动写入」开关决定要不要把档位按结论补进模型配置（默认写、不询问）
-    probe: '探测式填充',
+    // 探测档位：跑完按「自动写入」开关决定要不要把档位按结论补进模型配置（默认写、不询问）
+    probe: '探测档位',
     probeTitle: '探测推理级别并补全',
     probeDesc: '用真实请求来确定推理级别是否可用，最真实可靠；所耗时间随模型数量增加。',
     probeEmpty: '没有可探测的模型：请先在「模型」设置中添加模型，或关闭「忽略排除」后重试。',
@@ -152,12 +152,12 @@ export const zh: Record<CardKey, string> = {
     probeUnfilled: '探测未填充',
     probeAll: '探测所有',
     probeStop: '停止',
-    probeCommand: '探测 {total} 项',
+    probeCommand: '[{done} / {total}]',
     probeDone: '共探测 {models} 个模型、{levels} 个推理级别：可用 {usable} 个、不支持 {unsupported} 个。',
     probeFilled: '已为 {models} 个模型补全推理级别：新增 {added} 个、剔除 {removed} 个。',
     // 与 probeFilled 的分工：措辞必须让人一眼看出「没有写入」，不能与已补全混淆
     probeFillSkipped: '可为 {models} 个模型补全推理级别：新增 {added} 个、剔除 {removed} 个；未执行写入。',
-    probeFillFailed: '探测式填充失败：{message}。',
+    probeFillFailed: '探测档位失败：{message}。',
     probeStoppedLine: '已停止，本轮不再继续探测。',
     terminalCommandLine: '命令第 {n} 行',
     terminalSignal: '信号 {signal}',
@@ -169,10 +169,6 @@ export const zh: Record<CardKey, string> = {
     terminalCopy: '复制',
     terminalCopied: '复制成功',
     terminalNoOutput: '无输出',
-    terminalCollapseAria: '收起输出',
-    terminalCollapse: '收起',
-    terminalExpandAria: '展开其余 {n} 行输出',
-    terminalExpand: '… 其余 {n} 行',
     verifyEmpty: '暂无模型，请先在「模型」设置中添加模型。',
     verifyRecordEmpty: '尚未发起验证，点「验证」后结果会逐条显示在这里。',
     clearEffortsTitle: '清空推理级别记忆',

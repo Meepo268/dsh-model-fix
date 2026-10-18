@@ -129,7 +129,7 @@ export type CardKey =
     | 'pruneGo'
     | 'pruneDone'
     | 'pruneFailed'
-    // 探测式填充：两个发起键共用一套行模板与结论词（复用 verifyOut* / verifySkipped / verifyStopped），
+    // 探测档位：两个发起键共用一套行模板与结论词（复用 verifyOut* / verifySkipped / verifyStopped），
     // 只有开关、范围键与收尾几行是它自己的说法
     | 'probe'
     | 'probeTitle'
@@ -153,7 +153,7 @@ export type CardKey =
     | 'probeFillSkipped'
     | 'probeFillFailed'
     | 'probeStoppedLine'
-    // 宿主 TerminalBlock 的展示文案：键名与 terminalLabels(t) 逐条对齐官方安装页的映射（`DSH/packages/client/ui-plugin-manager/…/locales.ts`）
+    // 宿主 TerminalBlock 的展示文案：键名与官方安装页 terminalLabels(t) 的映射对齐（`DSH/packages/client/ui-plugin-manager/…/locales.ts`）
     | 'terminalCommandLine'
     | 'terminalSignal'
     | 'terminalExitCode'
@@ -164,10 +164,6 @@ export type CardKey =
     | 'terminalCopy'
     | 'terminalCopied'
     | 'terminalNoOutput'
-    | 'terminalCollapseAria'
-    | 'terminalCollapse'
-    | 'terminalExpandAria'
-    | 'terminalExpand'
     | 'clearEffortsTitle'
     | 'clearEffortsConfirm'
     | 'clearEffortsKeep'

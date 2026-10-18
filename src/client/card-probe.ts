@@ -1,5 +1,5 @@
 /**
- * 「探测式填充」的整轮编排 hook（浏览器半）：三个开关、点开弹层时冻结的候选计划、
+ * 「探测档位」的整轮编排 hook（浏览器半）：三个开关、点开弹层时冻结的候选计划、
  * 记录区、发跑（两个范围）/ 停止 / 关窗。只编排，不渲染——弹层本体见 `probe-dialog.tsx`；
  * busy 由卡片传入并与其余写操作共用同一互斥，补全结果与失败提示经 `onNotice` 落卡片状态行。
  */
@@ -40,7 +40,7 @@ export interface ProbeRunOptions {
 
 export function useProbeRun(options: ProbeRunOptions) {
     const { t } = options
-    // 「探测式填充」弹层：三个开关 + 点开弹层那一刻冻结的候选清单（两个键各一份）+ 记录区。
+    // 「探测档位」弹层：三个开关 + 点开弹层那一刻冻结的候选清单（两个键各一份）+ 记录区。
     // 候选清单冻结在点开时而非渲染时：弹层开着期间用户改了配置也不影响本轮
     const [open, setOpen] = useState(false)
     const [ignoreExcludes, setIgnoreExcludes] = useState(false)
@@ -51,6 +51,7 @@ export function useProbeRun(options: ProbeRunOptions) {
     const [scope, setScope] = useState<ProbeScope | null>(null)
     const [lines, setLines] = useState<readonly string[]>([])
     const [total, setTotal] = useState(0)
+    const [done, setDone] = useState(0)
     const [stopped, setStopped] = useState(false)
     const abort = useRef<AbortController | null>(null)
     useEffect(() => () => { abort.current?.abort() }, [])
@@ -71,7 +72,7 @@ export function useProbeRun(options: ProbeRunOptions) {
         }))
         return { unfilled: pick(true), all: pick(false) }
     }
-    /** 探测式填充：点开弹层并当场冻结计划。弹层开着期间配置再变也不改本轮（记录区的总项数照这份计划走） */
+    /** 探测档位：点开弹层并当场冻结计划。弹层开着期间配置再变也不改本轮（记录区的总项数照这份计划走） */
     const onOpen = () => {
         if (options.busy !== null) return
         setPlan(planOf(ignoreExcludes))
@@ -85,7 +86,7 @@ export function useProbeRun(options: ProbeRunOptions) {
         setPlan(planOf(value))
     }
     /**
-     * 跑一轮探测式填充。跑完不关窗：结论追加进记录区后留在窗内由用户自行关窗；
+     * 跑一轮探测档位。跑完不关窗：结论追加进记录区后留在窗内由用户自行关窗；
      * 「自动写入」开启时补全结果另落卡片状态行，关闭时换措辞报「可补全多少、未执行写入」。
      */
     const run = (unfilledOnly: boolean) => {
@@ -94,6 +95,7 @@ export function useProbeRun(options: ProbeRunOptions) {
         if (models.length === 0) return
         setLines([])
         setTotal(0)
+        setDone(0)
         setStopped(false)
         options.setBusy('probe')
         const controller = new AbortController()
@@ -108,6 +110,7 @@ export function useProbeRun(options: ProbeRunOptions) {
                 setTotal(frame.total)
                 return
             }
+            setDone(frame.done)
             setLines((current) => [...current, verifyLineOf(frame, t)])
         }, controller.signal)
             .then((summary) => {
@@ -167,12 +170,13 @@ export function useProbeRun(options: ProbeRunOptions) {
         setScope(null)
         setLines([])
         setTotal(0)
+        setDone(0)
         setStopped(false)
         setIgnoreExcludes(false)
         setDropUnsupported(false)
     }
     return {
-        open, ignoreExcludes, dropUnsupported, setDropUnsupported, autoWrite, setAutoWrite, scope, lines, total,
+        open, ignoreExcludes, dropUnsupported, setDropUnsupported, autoWrite, setAutoWrite, scope, lines, total, done,
         running: options.busy === 'probe', terminalLabels,
         unfilledCount: plan?.unfilled.length ?? 0,
         allCount: plan?.all.length ?? 0,

@@ -35,9 +35,10 @@ export function useVerifyRun(options: VerifyRunOptions) {
     const [open, setOpen] = useState(false)
     const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set())
     const [efforts, setEfforts] = useState(false)
-    // 验证记录区：逐行追加探测结论，发起时清空；总项数取自 opened 帧
+    // 验证记录区：逐行追加探测结论，发起时清空；总项数取自 opened 帧、已完成条数逐条 probed 帧更新
     const [lines, setLines] = useState<readonly string[]>([])
     const [total, setTotal] = useState(0)
+    const [done, setDone] = useState(0)
     // 本轮是否以中止收场：记录区的 settle 措辞按它分「完成 / 已停止」
     const [stopped, setStopped] = useState(false)
     // 在途的 AbortController：点停止、关窗与组件卸载都靠它中止——中止经 signal 传导到 Node 半的执行循环
@@ -61,6 +62,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
         // 每次发起都清空记录，免得上一轮的残留行混进这一轮
         setLines([])
         setTotal(0)
+        setDone(0)
         setStopped(false)
         options.setBusy('verify')
         const controller = new AbortController()
@@ -70,6 +72,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
                 setTotal(frame.total)
                 return
             }
+            setDone(frame.done)
             setLines((current) => [...current, verifyLineOf(frame, t)])
         }, controller.signal)
             .then((summary) => {
@@ -112,6 +115,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
         setPicked(new Set())
         setLines([])
         setTotal(0)
+        setDone(0)
         setEfforts(false)
     }
     const togglePick = (key: string) => {
@@ -126,7 +130,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
         setPicked((current) => toggleGroupPicks(current, models))
     }
     return {
-        open, picked, efforts, setEfforts, lines, total, running: options.busy === 'verify',
+        open, picked, efforts, setEfforts, lines, total, done, running: options.busy === 'verify',
         terminalLabels, onOpen, run, stop, close, togglePick, toggleGroup,
     }
 }
