@@ -1,5 +1,5 @@
 /**
- * 「模型 × 推理级别」最小请求的执行引擎：验证与探测档位共用。
+ * 最小请求的执行引擎：验证（每模型一次不带档位的请求）与探测档位（逐档请求）共用。
  *
  * 设计裁决（四级分层、受理判据、失败分类、短路判据、并发与中止语义）见 docs/decisions.md「验证」与「探测档位」。
  */
@@ -120,7 +120,7 @@ const NEVER_ABORTED = new AbortController().signal
  * 恒有 `settled === skipped + (当前条目确已发出 ? 1 : 0)`（口径见共享层 `VerifyProgressFrame`）。
  */
 interface ProbeFrameProgress {
-    /** 本帧了结的计划条目数；0 即附注帧，不推进 `done` */
+    /** 本帧了结的计划条目数（含因短路而未发出的），`done` 只数计划条目 */
     settled: number
     /** 因短路而未发出的条数；无则缺省 */
     skipped?: number
@@ -133,7 +133,7 @@ export type ProbeEmitter = (
     progress: ProbeFrameProgress,
 ) => void
 
-/** 一组怎么逐条跑：两个功能的全部差异都在这个回调里（验证带基线探测，探测档位逐档平推） */
+/** 一组怎么逐条跑：两个功能的全部差异都在这个回调里（验证每模型一条请求，探测档位逐档平推） */
 export type GroupRunner = (
     llm: Pick<LlmRuntime, 'stream'>,
     group: ProviderProbeGroup,
@@ -162,7 +162,7 @@ export async function runProbeGroups(
     options: ProbeRunOptions = {},
 ): Promise<VerifySummary> {
     const signal = options.signal ?? NEVER_ABORTED
-    // 分母只数计划条目：基线探测不是被验对象（口径同 `planned` / `probed`），故 `done ≤ total` 恒成立
+    // 分母只数计划条目（一条即一次请求，口径同 `planned` / `probed`），故 `done ≤ total` 恒成立
     const total = groups.reduce((sum, group) => sum + group.probes.length, 0)
     // 稀疏数组：中止时从未开跑的组保持 undefined，汇报时据实排除
     const outcomes = new Array<ProviderProbeOutcome>(groups.length)

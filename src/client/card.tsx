@@ -2,8 +2,8 @@
  * 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。五个挂载席位共用同一外壳，
  * 差异只有折叠态策略（`defaultOpen` 与保存后是否自动收起）与是否允许折叠（输入框弹层禁用）。
  *
- * 本文件只做**卡片外壳的编排**：草稿与保存、四个写回动作（强制更新 / 重置 / 恢复 / 剔除）、
- * 五层二次确认、瓦片与 footer 的渲染，以及验证 / 探测两个弹层的状态挂接——两条诊断链的整轮
+ * 本文件只做**卡片外壳的编排**：草稿与保存、三个写回动作（强制更新 / 重置 / 恢复）、
+ * 四层二次确认、瓦片与 footer 的渲染，以及验证 / 探测两个弹层的状态挂接——两条诊断链的整轮
  * 编排各自内聚在 `card-verify.ts` / `card-probe.ts`（弹层本体见 `verify-dialog.tsx` /
  * `probe-dialog.tsx`），记录区文案层在 `card-records.ts`，状态行助手在 `card-notice.ts`。
  *
@@ -44,7 +44,6 @@ import { VerifyDialog } from '@/client/verify-dialog'
 import { ProbeDialog } from '@/client/probe-dialog'
 import type { RpcCarrier } from '@/client/rpc-carrier'
 import { errorText } from '@/shared/errors'
-import type { UnsupportedEffort } from '@/shared/verify-progress'
 import { DEFAULT_CONFIG, toStored } from '@/shared/config-schema'
 import type { CardBusy, Notice } from '@/client/card-notice'
 import { isWritebackTimeout, truncateMessage } from '@/client/card-notice'
@@ -103,9 +102,6 @@ export function Card(props: CardProps) {
     const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
     const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
-    // 剔除确认的目标：验证明细里**明确**被判「档位不支持」的条目，由 Node 半直接给出，浏览器半不自己筛。
-    // 中止 / 出错 / 无此类结论时保持空数组，空数组即不弹窗
-    const [pruneTargets, setPruneTargets] = useState<readonly UnsupportedEffort[]>([])
     const saveStarted = useRef(false)
 
     const saved = snap.value
@@ -135,7 +131,6 @@ export function Card(props: CardProps) {
         setBusy,
         candidates: verifyCandidates,
         verifyModels: props.verifyModels,
-        onUnsupported: setPruneTargets,
     })
     const probe = useProbeRun({
         t,
@@ -164,7 +159,7 @@ export function Card(props: CardProps) {
     }
 
     /**
-     * 四个写回动作的结果汇报同形：成功按条数出一句、失败取原因出一句、传输层 reject 与 `ok:false`
+     * 三个写回动作的结果汇报同形：成功按条数出一句、失败取原因出一句、传输层 reject 与 `ok:false`
      * 走同一条展示路径、收尾一律清占用态，差异只有文案键，故收在一处。
      */
     const reportWriteback = (
@@ -175,8 +170,8 @@ export function Card(props: CardProps) {
     ): void => {
         call.then((result) => {
             if (result.ok) {
-                const value = result.value as { changed?: number; pruned?: number } | undefined
-                ok(value?.changed ?? value?.pruned ?? 0)
+                const value = result.value as { changed?: number } | undefined
+                ok(value?.changed ?? 0)
             } else {
                 failed(result.error.message)
             }
@@ -293,25 +288,6 @@ export function Card(props: CardProps) {
             props.restoreModels(),
             (count) => setNotice({ text: t('restoreDone', { count }), tone: 'success' }),
             (message) => setNotice({ text: t('restoreFailed', { message: truncateMessage(message) }), tone: 'error' }),
-        )
-    }
-    // 剔除确认的关闭即丢弃目标：不写任何配置，清空即不再弹出（不另设开关态避免两状态不同步）
-    const closePrune = () => { setPruneTargets([]) }
-    /**
-     * 剔除不被支持的推理级别：经 Node 半写回，读取最新配置、revision 围栏、`excludes` 跳过与守卫全在那边；
-     * 无论成败都关掉两层弹层（剔除确认 + 其下的验证弹层），否则结果写在状态行上用户看不到。
-     */
-    const pruneEfforts = () => {
-        if (busy) return
-        setBusy('prune')
-        reportWriteback(
-            props.pruneEfforts(pruneTargets),
-            (count) => setNotice({ text: t('pruneDone', { count: String(count) }), tone: 'success' }),
-            (message) => setNotice({ text: t('pruneFailed', { message: truncateMessage(message) }), tone: 'error' }),
-            () => {
-                closePrune()
-                verify.close()
-            },
         )
     }
     // 清空记忆：前端经自有 NS 的 settings scope 直写（与「保存」同一条写通道）；失败要显式提示。
@@ -446,7 +422,7 @@ export function Card(props: CardProps) {
             <CardMeta t={t} />
         </>
     )
-    // 五层二次确认同形，差异只有标题 / 说明 / 两键文案与红 tint 语义：都归 confirm.tsx 的 ConfirmModal
+    // 四层二次确认同形，差异只有标题 / 说明 / 两键文案与红 tint 语义：都归 confirm.tsx 的 ConfirmModal
     const confirms = (
         <>
             <ConfirmModal
@@ -495,19 +471,6 @@ export function Card(props: CardProps) {
                 danger
                 confirmDisabled={busy !== null}
             />
-            {/* 剔除确认：出现与否只看 pruneTargets 是否为空——中止、出错、无明确不支持结论时都不弹 */}
-            <ConfirmModal
-                open={pruneTargets.length > 0}
-                onClose={closePrune}
-                title={t('pruneTitle')}
-                closeLabel={t('close')}
-                description={t('pruneConfirm', { count: String(pruneTargets.length) })}
-                cancelLabel={t('cancel')}
-                confirmLabel={t('pruneGo')}
-                onConfirm={pruneEfforts}
-                danger
-                confirmDisabled={busy !== null}
-            />
             {/* 「验证模型」弹层见 verify-dialog.tsx：候选列表 + 记录区 + 底部动作行，本文件只递状态与回调 */}
             <VerifyDialog
                 t={t}
@@ -519,8 +482,6 @@ export function Card(props: CardProps) {
                 picked={verify.picked}
                 onTogglePick={verify.togglePick}
                 onToggleGroup={verify.toggleGroup}
-                efforts={verify.efforts}
-                onEffortsChange={verify.setEfforts}
                 total={verify.total}
                 done={verify.done}
                 lines={verify.lines}

@@ -82,17 +82,14 @@ export const zh: Record<CardKey, string> = {
     restoreGo: '确认恢复',
     restoreDone: '已恢复 {count} 个模型。',
     restoreFailed: '恢复失败：{message}。',
-    // 四个写回共用：超时只说明没等到结果，写回可能已生效
+    // 三个写回共用：超时只说明没等到结果，写回可能已生效
     writebackTimeout: '等待超时，未收到结果（写回可能已生效）',
     verify: '验证模型',
     verifyTitle: '选择要验证的模型',
-    verifyDesc: '对选中的模型发起请求，确认模型/推理级别是否可用；验证所耗时间随模型数量增加。',
+    verifyDesc: '对选中的模型发起请求，确认模型是否可用；验证所耗时间随模型数量增加。',
     verifyTabModels: '模型列表',
     verifyTabRecords: '验证记录',
     verifyQuota: '验证会发起真实请求，可能消耗少量额度。',
-    verifyEfforts: '验证推理级别',
-    // 关档位不等于端点不推理——它可能有自己的默认级别，故措辞要说清「不发参数」而非「不验证」
-    verifyEffortsTip: '开启后逐个验证模型声明的全部推理级别，请求数成倍增加；关闭时不携带推理级别，但这不代表端点不会推理。',
     verifyGo: '验证',
     verifyStop: '停止',
     // 分组全选文案照官方「获取可用模型」的 fetchSelectAll / fetchDeselectAll
@@ -116,23 +113,13 @@ export const zh: Record<CardKey, string> = {
     verifyOutOther: '不可用',
     verifyStopped: '已停止',
     verifyStoppedLine: '已停止，本轮不再继续验证。',
-    // 收尾统计统一为「共验证 n 个模型，可用 [x/y] 个模型/推理级别」，n 取 tested（勾选去重数），
-    // x 取实际可用数，y 取计划验证数。两档口径各取各的数：
-    // 关（verifyDoneModels）请求不带档位，x=可用模型数、y=勾选模型数；
-    // 开（verifyDoneLevels）x=可用档位数、y=计划档位数（plannedEfforts）——没声明档位的模型验的是
-    // 模型本身、不占级别，故 planned（含它那条）不能当分母。模型数一律取 tested
-    // （计划里的去重模型数，而非 report.models 的可用模型数——全档位失败的模型不计入那个数，会让总数小于用户勾选数）
-    verifyDoneLevels: '共验证 {tested} 个模型，可用 [{efforts}/{levels}] 个推理级别',
+    // 收尾统计统一为「共验证 n 个模型，可用 [x/y] 个模型」，n 取 tested（勾选去重数），
+    // x 取实际可用数，y 取勾选模型数。模型数一律取 tested
+    // （计划里的去重模型数，而非 report.models 的可用模型数——全失败的模型不计入那个数，会让总数小于用户勾选数）
     verifyDoneModels: '共验证 {tested} 个模型，可用 [{models}/{tested}] 个模型',
     verifyFailed: '验证失败：{message}',
     // 收尾末行：逐条记录只交代过程，不交代「总共怎么样」，否则用户只能自己数末行才知道结论
     verifyFinished: '验证结束：{result}',
-    // 剔除确认：只有明确判为「档位不支持」的才进这里；超时/限流/额度耗尽一概不算
-    pruneTitle: '剔除不被支持的推理级别',
-    pruneConfirm: '验证发现 {count} 个推理级别不被支持，是否从模型配置中剔除？',
-    pruneGo: '剔除',
-    pruneDone: '已剔除 {count} 个不被支持的推理级别。',
-    pruneFailed: '剔除失败：{message}。',
     // 探测档位：跑完按「自动写入」开关决定要不要把档位按结论补进模型配置（默认写、不询问）
     probe: '探测档位',
     probeTitle: '探测推理级别并补全',

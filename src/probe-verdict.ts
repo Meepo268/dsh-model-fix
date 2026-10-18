@@ -57,16 +57,17 @@ export function classifyFailure(failure: LlmFailure): Exclude<ProbeOutcome, 'usa
  * （`INVALID_REQUEST`）。该码是宿主 `classifyPiAiError` 从报错文案里认出来的，`status` 在 pi-ai
  * 侧恒缺，故只能取宿主已归一好的结论，**不再自己比对文案**。
  *
- * 第二个条件是「除档位外别无变量」，两个功能各用自己的对照（验证用不带档位的基线探测，
- * 探测档位用同模型已跑通的更低档位），由 `runGroup` 保证后才落「档位不支持」这个结论。
- * 判据与理由见 docs/decisions.md「验证」。
+ * 第二个条件是「除档位外别无变量」，只有探测档位用（它拿同模型已跑通的更低档位作对照），
+ * 由 `runGroup` 保证后才落「档位不支持」这个结论。验证不带档位，用不到这一判据。
+ * 判据与理由见 docs/decisions.md「验证」与「探测档位」。
  */
 export function isEffortRejection(failure: VerifyFailureFacts | undefined): boolean {
     return failure?.code === INVALID_REQUEST_CODE
 }
 
 /**
- * 从 `from` 之后起与它同模型的探测条数。请求按模型分组生成，故这些就是该模型剩下的档位。
+ * 从 `from` 之后起与它同模型的探测条数。请求按模型分组生成，故这些就是该模型剩下的档位
+ * （验证每模型只有一条请求，用不到；探测档位用它短到档位尾）。
  */
 export function sameModelTail(probes: readonly VerifyProbe[], from: number): number {
     let count = 0
@@ -82,7 +83,7 @@ export function sameModelTail(probes: readonly VerifyProbe[], from: number): num
  * - **该提供方的首个请求超时**：首条就等满单次探测的等待上限，成因在请求之外，故断整组；
  *   理由记 `timeout` 而**不是** `unreachable`——报告里的「可达 / 凭据」只按真实失败事实记，翻假会误导用户。
  *
- * `firstRequest` 由各功能按「本组已发出几条请求」给出，验证那边要把它额外的基线探测请求算进去。
+ * `firstRequest` 由调用方按「本组已发出几条请求」给出。
  * 理由展开见 docs/decisions.md「验证」。
  */
 export function providerBlockReason(outcome: ProbeOutcome, firstRequest: boolean): ProviderBlockReason | undefined {
@@ -91,23 +92,13 @@ export function providerBlockReason(outcome: ProbeOutcome, firstRequest: boolean
 }
 
 /**
- * 该失败是否足以否定**该模型的其余档位**（模型级短路的唯一判据，验证与探测档位共用）。
+ * 该失败是否足以否定**该模型的其余档位**（模型级短路的唯一判据，只有探测档位的逐档请求会用）。
  *
- * 判据同 provider 级：**能断定后续请求必然失败**才短。档位请求上只有**额度耗尽**够格
+ * 判据：**能断定后续请求必然失败**才短。档位请求上只有**额度耗尽**够格
  * （额度按提供方与模型计）。其余一律不短，宁可多烧几次额度也不误杀可用档位；探测档位另把
  * **限流**追加为自己的模型级短路（被短模型整轮还原、无误杀，只省请求）。
- * 理由展开见 docs/decisions.md「验证」与「探测档位」。
+ * 理由展开见 docs/decisions.md「探测档位」。
  */
 export function shouldSkipModelTail(outcome: ProbeOutcome, failure: VerifyFailureFacts | undefined): boolean {
     return failure !== undefined && outcome === 'quota'
-}
-
-/**
- * **基线**失败后是否短该模型的档位尾（验证独有，判据与上面的共用判据同处一地便于对照与单测）。
- *
- * 基线请求**不带推理级别**，故它的失败天生与档位无关：只剩「这个失败是不是确定性的」一问——
- * 限流与超时明确不是，额度耗尽与其它厂商侧拒绝则是，中止没有结论。理由见 docs/decisions.md「验证」。
- */
-export function shouldSkipModelTailAfterBaseline(outcome: ProbeOutcome): boolean {
-    return outcome === 'quota' || outcome === 'other'
 }

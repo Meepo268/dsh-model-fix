@@ -66,8 +66,6 @@ export const ENDPOINT_FORCE_UPDATE = 'forceUpdate'
 export const ENDPOINT_RESET_MODELS = 'resetModels'
 /** 卡片「恢复备份」按钮调用的 endpoint 名 */
 export const ENDPOINT_RESTORE_MODELS = 'restoreModels'
-/** 剔除不被支持的推理级别时调用的 endpoint 名（由验证结果确认框发起，携带档位明细） */
-export const ENDPOINT_PRUNE_EFFORTS = 'pruneEfforts'
 /** 浏览器半启动时上报探测语言的 endpoint 名（Node 侧没有 locale 服务，见 effort-name.ts 的语言解析） */
 export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
 
@@ -77,7 +75,7 @@ export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
 export const MAX_ATTEMPTS = 3
 
 /**
- * 四个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 除调用方给的 `signal` 外没有任何计时器，
+ * 三个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 除调用方给的 `signal` 外没有任何计时器，
  * 不给就有一条「等不到结果即永远占着卡片占用态」的挂死路径。超时只中止这次等待，Node 半的写回照跑完，
  * 故文案说「未收到结果」而不是「未写入」（取值与取舍见 docs/decisions.md「写回端点」）。
  */

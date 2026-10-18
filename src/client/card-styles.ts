@@ -173,15 +173,12 @@ const STYLE_TEXT = [
     // 验证弹层里它是正文首段，与下方选项卡组之间的 12px 由 .dsh-mf-verifyBody 的 gap 给；
     // 探测弹层里它与上一句提示紧挨，两段各自的 margin 在 flex 里会相加，同样只能靠容器定距
     '.dsh-mf-verifyQuota{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-state-warn-label,#dd8629)}',
-    // 开关行：探测弹层的两个开关在正文内（开关自身不带外边距，段间距只由 .dsh-mf-verifyBody 的 gap 给）；
-    // 验证弹层的「验证所有推理级别」在 footer 里，与那行 .dsh-mf-verifyActions 共用本类
+    // 开关行：探测弹层的三个开关在正文内（开关自身不带外边距，段间距只由 .dsh-mf-verifyBody 的 gap 给）
     '.dsh-mf-verifyOption{display:flex;align-items:center;gap:6px;min-width:0;font-size:13px;line-height:1.5;color:var(--dsw-alias-label-secondary,#61666b)}',
-    // 探测弹层的两个开关并排：同属一组操作参数，按「小节内相邻块」的 12px 档定距；
+    // 探测弹层的三个开关并排：同属一组操作参数，按「小节内相邻块」的 12px 档定距；
     // 上间距同样交给 .dsh-mf-verifyBody 的 gap:12px，margin 归零
     '.dsh-mf-verifyOptions{display:flex;align-items:center;gap:12px;min-width:0;margin:0}',
-    // 验证弹层 footer 只有一行（档位开关靠左、取消/验证两键靠右）：宿主 .footer 是单行 flex 且无 wrap，
-    // 故自绘一行容器覆盖它的三个数值（width:100% + space-between 覆盖 flex-end）
-    '.dsh-mf-verifyActions{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}',
+    // 弹层 footer 的键行（验证弹层只有 取消/验证 两键）：宿主 .footer 是单行 flex 且无 wrap，键间距 8px 与宿主 gap 同值
     '.dsh-mf-verifyButtons{display:flex;align-items:center;gap:8px}',
     // 记录区上下边距：宿主 TerminalBlock 的 .block 自带 margin:16px 0，在探测弹层里与正文容器的 12px 间距相加会算成
     // 28px；整条归零。验证弹层的记录区自成一个面板（面板内只此一段，16px 留白无处可抵），同样归零

@@ -145,7 +145,7 @@ export function planFill(
  * 由调用方决定后续处理（RPC 转失败结果，事件侧吞掉 rejection）。冲突重试时重读整段以取最新 revision。
  * 返回变更模型数（不含路由 compat 计数，保持 RPC 契约）。
  *
- * 本函数**不走** `src/writeback.ts` 的写回外壳：守卫不由它托管，骨架与四个写回端点不同形（理由见该文件头）。
+ * 本函数**不走** `src/writeback.ts` 的写回外壳：守卫不由它托管，骨架与三个写回端点不同形（理由见该文件头）。
  */
 export async function fix(ctx: Context, force = false): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

@@ -57,7 +57,7 @@ Node.js（ESM）+ `@deepseek-ai/cordis`；tsdown 双配置构建到 `lib/`（Nod
 | 推理级别记忆的存取与剪枝 | [推理级别记忆](docs/decisions.md#推理级别记忆) |
 | 子智能体推理级别 | [子智能体](docs/decisions.md#子智能体) |
 | 档位自调 | [档位自调](docs/decisions.md#档位自调) |
-| 重置 / 恢复 / 剔除的写回端点 | [写回端点](docs/decisions.md#写回端点) |
+| 重置 / 恢复的写回端点 | [写回端点](docs/decisions.md#写回端点) |
 | 验证模型 | [验证](docs/decisions.md#验证) |
 | 探测档位 | [探测档位](docs/decisions.md#探测档位) |
 | 宿主接线与卡片行为 | [宿主与卡片](docs/decisions.md#宿主与卡片) |

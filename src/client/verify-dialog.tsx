@@ -2,10 +2,10 @@
  * 「验证模型」弹层（浏览器半）：两个选项卡（模型列表 / 验证记录）+ 底部动作行。
  *
  * 结构逐条照官方 models 页「获取可用模型」的候选框，去掉其「搜索 — 全选」工具条一行，改为列表下方
- * 一条 warn 额度提示、底部左侧加「验证推理级别」开关；选项卡条复刻官方「设置 → 内置插件」的插件视图
+ * 一条 warn 额度提示；选项卡条复刻官方「设置 → 内置插件」的插件视图
  * 选项卡（记录区是「正在发生的事」，与「挑哪些模型去验」摆在一屏里只会互相挤，故单列一页）。
  *
- * 状态与动作全由卡片经 props 递进来（勾选集、档位开关、记录区内容、发跑与中止回调），自己不碰 Connection。
+ * 状态与动作全由卡片经 props 递进来（勾选集、记录区内容、发跑与中止回调），自己不碰 Connection。
  * 关窗即中止在途验证这条纪律记在 `onClose` 上：取消键、遮罩、Escape、× 四者走同一回调。
  * 理由与样式数值见 docs/decisions.md「验证」与 `card-styles.ts`。
  */
@@ -16,12 +16,11 @@ import type { KeyboardEvent } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { TIP_MAX_WIDTH } from '@/client/card-styles'
 import type { CardKey } from '@/client/locale-keys'
 import { groupAllPicked, verifyKey } from '@/client/model'
 import type { VerifyCandidate } from '@/client/model'
 
-const { Button, Modal, StateDot, Switch, TerminalBlock, Tooltip, IconInfoOutlineRegular } = primitives
+const { Button, Modal, StateDot, TerminalBlock } = primitives
 
 /** 选项卡 id：既作页签/面板的 DOM id 后缀（aria-controls 与之配对），也作当前页的状态值 */
 type VerifyTab = 'models' | 'records'
@@ -42,7 +41,7 @@ interface VerifyDialogProps {
     open: boolean
     /** 关窗即中止在途验证：连接一断，Node 半的执行循环随即早停。取消键 / 遮罩 / Escape / × 都落到这一个回调上 */
     onClose: () => void
-    /** 在途（卡片 busy 判为 verify）：键就地变「停止」，列表与开关全禁 */
+    /** 在途（卡片 busy 判为 verify）：键就地变「停止」，列表全禁 */
     running: boolean
     /** 无任何动作在途（卡片 busy 为空）：与「未勾选任何模型」一同决定发起键是否可点 */
     idle: boolean
@@ -51,8 +50,6 @@ interface VerifyDialogProps {
     picked: ReadonlySet<string>
     onTogglePick: (key: string) => void
     onToggleGroup: (models: readonly VerifyCandidate[]) => void
-    efforts: boolean
-    onEffortsChange: (efforts: boolean) => void
     /** 记录区抬头：总项数取自 opened 帧；0 意味还没发起过，故记录面板给一行空态而非记录区 */
     total: number
     /** 记录区抬头进度段：已完成条数，逐条 probed 帧更新 */
@@ -108,43 +105,25 @@ export function VerifyDialog(props: VerifyDialogProps) {
             description={t('verifyDesc')}
             className="dsh-mf-verifyDialog"
             footer={
-                /* 宿主 .footer 是单行 flex、无 wrap、justify-content 为 flex-end。弹层加宽后档位开关与两键
-                    并排同一行、开关靠左两键靠右，故在 footer 内自绘容器覆盖宿主那三个数值 */
-                <div className="dsh-mf-verifyActions">
-                    <span className="dsh-mf-verifyOption">
-                        <Switch
-                            checked={props.efforts}
-                            disabled={props.running}
-                            label={t('verifyEfforts')}
-                            onChange={props.onEffortsChange}
-                        />
-                        <span>{t('verifyEfforts')}</span>
-                        {/* 释义走宿主 Tooltip 原语，锚点复刻瓦片内的 .helpButton；portal 必需（模态层自建层叠上下文会裁掉气泡） */}
-                        <Tooltip label={t('verifyEffortsTip')} side="top" maxWidth={TIP_MAX_WIDTH} portal>
-                            <button type="button" className="dsh-mf-help" aria-label={t('verifyEffortsTip')}>
-                                <IconInfoOutlineRegular size={12} />
-                            </button>
-                        </Tooltip>
-                    </span>
-                    <div className="dsh-mf-verifyButtons">
-                        {/* 在途不禁用：遮罩 / Escape / × 本就任何时刻都能关窗并中止，键若在途禁用，它反成唯一关不掉的出口 */}
-                        <Button variant="outline" data-modal-autofocus onClick={props.onClose}>{t('cancel')}</Button>
-                        {/* 判据为三态：本键在途 → 放行（它已是「停止」），其余非空闲一律禁 */}
-                        <Button
-                            variant="outline"
-                            className="dsh-mf-warn"
-                            disabled={props.running ? false : !props.idle || props.picked.size === 0}
-                            onClick={() => {
-                                // 发跑由 useEffect 自动跳记录页（等首条记录数据到达再跳）
-                                if (props.running) props.onStop()
-                                else props.onRun()
-                            }}
-                        >
-                            {/* 在途指示：宿主 Button 自身即 inline-flex + gap，指示器直接作首个子节点 */}
-                            {props.running ? <StateDot state="ongoing" /> : null}
-                            {t(props.running ? 'verifyStop' : 'verifyGo')}
-                        </Button>
-                    </div>
+                /* 宿主 .footer 是单行 flex、无 wrap、justify-content 为 flex-end + gap 8px，两键靠右即得 */
+                <div className="dsh-mf-verifyButtons">
+                    {/* 在途不禁用：遮罩 / Escape / × 本就任何时刻都能关窗并中止，键若在途禁用，它反成唯一关不掉的出口 */}
+                    <Button variant="outline" data-modal-autofocus onClick={props.onClose}>{t('cancel')}</Button>
+                    {/* 判据为三态：本键在途 → 放行（它已是「停止」），其余非空闲一律禁 */}
+                    <Button
+                        variant="outline"
+                        className="dsh-mf-warn"
+                        disabled={props.running ? false : !props.idle || props.picked.size === 0}
+                        onClick={() => {
+                            // 发跑由 useEffect 自动跳记录页（等首条记录数据到达再跳）
+                            if (props.running) props.onStop()
+                            else props.onRun()
+                        }}
+                    >
+                        {/* 在途指示：宿主 Button 自身即 inline-flex + gap，指示器直接作首个子节点 */}
+                        {props.running ? <StateDot state="ongoing" /> : null}
+                        {t(props.running ? 'verifyStop' : 'verifyGo')}
+                    </Button>
                 </div>
             }
         >

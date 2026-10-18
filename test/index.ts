@@ -13,7 +13,6 @@ import { run as runMemory } from '@test/memory.test'
 import { run as runMigrate } from '@test/migrate.test'
 import { run as runOfficialFilter } from '@test/official-filter.test'
 import { run as runUpgrade } from '@test/upgrade.test'
-import { run as runPrune } from '@test/prune.test'
 import { run as runProbe } from '@test/probe.test'
 import { run as runProbeBackup } from '@test/probe-backup.test'
 import { run as runRefresh } from '@test/refresh.test'
@@ -53,8 +52,6 @@ section('upgrade.test.ts')
 runUpgrade()
 section('official-filter.test.ts')
 runOfficialFilter()
-section('prune.test.ts')
-runPrune()
 section('refresh.test.ts')
 await runRefresh()
 section('reset.test.ts')

@@ -325,27 +325,19 @@ export function run(): void {
     // ---------- 选择键：模型 id 含 '/' 也不能与拼接方案撞车 ----------
     check('verifyKey 二元组序列化', verifyKey('a', 'x/y') === '["a","x/y"]')
     check('verifyKey 不同提供方的同名模型互不相同', verifyKey('a', 'm') !== verifyKey('b', 'm'))
-    // ---------- 校验目标：只取勾选项；开档位逐个验全部声明档位，关档位一律不发档位参数；
-    // needTest 只在「确实有档位要验」时为真——那时那一次不带档位的请求才是探测对照，否则它自己就是被验对象 ----------
+    // ---------- 校验目标：只取勾选项；每模型一条不带档位参数的请求（不带档位而非挑最低档——
+    // 不带参数验的才是用户实际会走的那条路径，端点可能有自己的默认推理级别） ----------
     const candidates = verifyCandidatesOf(verifyUser)
     const keys = new Set([verifyKey('acme-gateway', 'z-ai/glm-5'), verifyKey('acme-gateway', 'no-efforts')])
     check(
-        'verifyTargets 关档位时一律不带档位（不是挑最低档），且无须探测',
-        stable(verifyTargets(candidates, keys, false)) === stable([
-            { provider: 'acme-gateway', model: 'z-ai/glm-5', efforts: [], needTest: false },
-            { provider: 'acme-gateway', model: 'no-efforts', efforts: [], needTest: false },
+        'verifyTargets 每模型一条不带档位的请求',
+        stable(verifyTargets(candidates, keys)) === stable([
+            { provider: 'acme-gateway', model: 'z-ai/glm-5' },
+            { provider: 'acme-gateway', model: 'no-efforts' },
         ]),
-        verifyTargets(candidates, keys, false),
+        verifyTargets(candidates, keys),
     )
-    check(
-        'verifyTargets 开档位时取全部声明档位；无档位模型与关档位同形（那一次请求即被验对象）',
-        stable(verifyTargets(candidates, keys, true)) === stable([
-            { provider: 'acme-gateway', model: 'z-ai/glm-5', efforts: ['off', 'low', 'high'], needTest: true },
-            { provider: 'acme-gateway', model: 'no-efforts', efforts: [], needTest: false },
-        ]),
-        verifyTargets(candidates, keys, true),
-    )
-    check('verifyTargets 未勾选得空', verifyTargets(candidates, new Set(), true).length === 0)
+    check('verifyTargets 未勾选得空', verifyTargets(candidates, new Set()).length === 0)
     check('verifyTargets 不改入参候选', stable(candidates[0].efforts) === stable(['off', 'low', 'high']))
     // ---------- 分组全选：文案判据与点击方向同走 groupAllPicked（every 而非 any） ----------
     const acmeGroup = candidates.slice(0, 2)
@@ -413,12 +405,12 @@ export function run(): void {
     )
     check('probeCandidatesOf 垃圾输入返回空', probeCandidatesOf(undefined, { excludes: [], ignoreExcludes: false, unfilledOnly: false }).length === 0)
     check(
-        'probeTargetsOf 已声明 off 的模型发满七档、未声明的不发 off，needTest 恒假',
+        'probeTargetsOf 已声明 off 的模型发满七档、未声明的不发 off',
         stable(probeTargetsOf(pick([], false, true)).map((t) => t.efforts)) === stable([
             [...EFFORT_LEVELS.filter((l) => l !== 'off')],
             [...EFFORT_LEVELS],
             [...EFFORT_LEVELS.filter((l) => l !== 'off')],
-        ]) && probeTargetsOf(pick([], false, true)).every((t) => t.needTest === false),
+        ]),
         probeTargetsOf(pick([], false, true)).map((t) => t.efforts),
     )
     check('probeTargetsOf 空候选得空', probeTargetsOf([]).length === 0)

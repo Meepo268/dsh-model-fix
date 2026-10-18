@@ -80,17 +80,14 @@ export const en: Record<CardKey, string> = {
     restoreGo: 'Restore',
     restoreDone: 'Restored {count} model(s).',
     restoreFailed: 'Restore failed: {message}.',
-    // Shared by all four writebacks: a timeout only means no result arrived; the write itself may have landed
+    // Shared by all three writebacks: a timeout only means no result arrived; the write itself may have landed
     writebackTimeout: 'timed out with no result (the write may still have taken effect)',
     verify: 'Verify models',
     verifyTitle: 'Choose models to verify',
-    verifyDesc: 'Each selected model gets a request to confirm the model / reasoning level is usable; verification takes longer with more models.',
+    verifyDesc: 'Each selected model gets a request to confirm the model is usable; verification takes longer with more models.',
     verifyTabModels: 'Model list',
     verifyTabRecords: 'Verification log',
     verifyQuota: 'Verification sends real requests and may use a small amount of your quota.',
-    verifyEfforts: 'Verify reasoning efforts',
-    // Turning the switch off means "send no parameter", not "the endpoint will not reason"
-    verifyEffortsTip: 'Verifies every reasoning effort the model declares, multiplying the request count; when off, no reasoning effort is sent — which does not mean the endpoint will not reason.',
     verifyGo: 'Verify',
     verifyStop: 'Stop',
     // Group select-all wording mirrors the official "Fetch available models" fetchSelectAll / fetchDeselectAll
@@ -116,25 +113,13 @@ export const en: Record<CardKey, string> = {
     verifyOutOther: 'unavailable',
     verifyStopped: 'Stopped',
     verifyStoppedLine: 'Stopped; this run does not continue.',
-    // Closing stats are unified as "Verified n model(s), [x/y] model(s)/reasoning effort(s) usable",
-    // where n = tested (checked distinct models), x = actually usable, y = planned to verify.
-    // Two flavours match the two states of the effort switch: with it off (verifyDoneModels) the requests
-    // carry no effort, so x = usable models and y = checked models; with it on (verifyDoneLevels) it reports
-    // usable / planned efforts, the denominator being plannedEfforts (models that declare no effort are
-    // verified as models, so they do not occupy an effort slot). The model count is always tested (distinct
-    // models in the plan), not report.models (usable models only, which drops models whose every effort failed)
-    verifyDoneLevels: 'Verified {tested} model(s), [{efforts}/{levels}] reasoning effort(s) usable',
+    // Closing stats are unified as "Verified n model(s), [x/y] model(s) usable", where n = tested
+    // (checked distinct models) and x = actually usable; the model count is always tested (distinct
+    // models in the plan), not report.models (usable models only, which drops failed models)
     verifyDoneModels: 'Verified {tested} model(s), [{models}/{tested}] model(s) usable',
     verifyFailed: 'Verification failed: {message}',
     // Closing line: the per-probe log only narrates the run, so it never states the overall result
     verifyFinished: 'Verification finished: {result}',
-    // Prune confirmation: only entries judged outright unsupported land here — timeouts, rate limits and
-    // exhausted quota never do
-    pruneTitle: 'Remove unsupported reasoning efforts',
-    pruneConfirm: 'Verification found {count} reasoning effort(s) that are not supported. Remove them from the model configuration?',
-    pruneGo: 'Remove',
-    pruneDone: 'Removed {count} unsupported reasoning effort(s).',
-    pruneFailed: 'Failed to remove: {message}.',
     // Probe efforts: whether the usable levels go back into the model config follows the auto-write
     // switch (on by default, no asking)
     probe: 'Probe efforts',

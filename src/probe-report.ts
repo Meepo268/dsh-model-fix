@@ -11,7 +11,7 @@ import type { ProviderProbeOutcome, UnsupportedEffort, UsableEffort, VerifyProbe
 
 /**
  * 单组结论 -> 汇报：可用模型按「提供方 / 模型」去重；档位不可用单独计数，不与其它失败混计。
- * 可达 / 凭据取自**全程**结果（被验请求与基线探测一并计入）而非首个。
+ * 可达 / 凭据取自**全程**结果（每一次发出的请求都计入）而非首个。
  *
  * **只认能否定整个提供方的失败**：端点不通翻 `reachable`，凭据无效翻 `keyValid`，额度耗尽两者都不翻
  * （它多半是按模型设的额度，属模型级事实）。理由见 docs/decisions.md「验证」。
@@ -24,7 +24,7 @@ export function reportProvider(result: ProviderProbeOutcome): VerifyProviderRepo
     let keyRejected = false
     for (const item of result.results) {
         if (item.outcome === 'usable') {
-            // 可用**档位**数只计带档位的请求；不带档位的那条要么是对照（基线探测），要么本身即被验对象（计模型数）
+            // 可用**档位**数只计带档位的请求；不带档位的那条验的是模型本身（计模型数）
             if (item.effort !== undefined) efforts++
             usable.add(JSON.stringify([item.provider, item.model]))
         } else if (item.outcome === 'unsupported-effort') {
@@ -34,10 +34,6 @@ export function reportProvider(result: ProviderProbeOutcome): VerifyProviderRepo
         } else if (item.outcome === 'credential') {
             keyRejected = true
         }
-    }
-    // 基线探测同样能证伪端点与凭据（它也是真发出去的一次请求），故一并纳入；只是它不产明细、不计任何计数
-    for (const item of result.tests) {        if (item.outcome === 'unreachable') unreachable = true
-        else if (item.outcome === 'credential') keyRejected = true
     }
     return {
         provider: result.provider,

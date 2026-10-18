@@ -14,7 +14,7 @@ import { writebackApi } from '@/writeback'
 /** 写回只动这一个模型字段：最大上下文 / 输出上限 / 图片模态与自定义字段一概保留 */
 const FILL_FIELD = 'reasoningEfforts'
 
-/** 「提供方 / 模型」二元组键：模型 id 可含 '/'，故用序列化而非字符串拼接（与 verifyKey、planPruneEfforts 同口径） */
+/** 「提供方 / 模型」二元组键：模型 id 可含 '/'，故用序列化而非字符串拼接（与 verifyKey 同口径） */
 function targetKey(provider: string, model: string): string {
     return JSON.stringify([provider, model])
 }

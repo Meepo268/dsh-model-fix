@@ -220,53 +220,40 @@ export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions)
 /**
  * 探测档位的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**
  * （未声明 off 的模型不补 off——"能通"不等于"能关"）。
- *
- * `needTest` 恒假：本功能没有「不带档位的基线对照」——Node 半会先把候选档位临时预声明进配置（见 `src/probe.ts`），
- * 预声明本身就是那次对照。
  */
 export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTarget[] {
     return candidates.map((candidate) => ({
-        ...candidate,
+        provider: candidate.provider,
+        model: candidate.model,
         efforts: EFFORT_LEVELS.filter((level) => level !== 'off' || candidate.efforts.includes('off')),
-        needTest: false,
     }))
 }
 
 /**
- * 一次验证的**请求计划**里的一条：一个待验的「提供方 / 模型」+ 它的档位 + 是否需要先探测一次。
- * `efforts` 为空数组的模型两者相同，但「空数组」在两种语境下含义不同（列表里是「该模型没声明档位」，
- * 计划里是「这次不带档位验」）。
+ * 一次诊断的**请求计划**里的一条：一个待跑的「提供方 / 模型」。
+ * 验证只验模型本身（一条不带 `reasoningEffort` 的请求，`efforts` 缺省）；
+ * 探测档位才带上「这轮要试的档位」逐档展开。
  */
-export interface VerifyTarget extends VerifyCandidate {
-    /**
-     * 是否需要先发一次不带 `reasoningEffort` 的**探测**作对照。
-     *
-     * 判「某档位不被支持」只能靠这个对照，故有档位可验时必为真；而两种情形为假——
-     * 关掉档位开关时全部请求本就不带参数，以及模型没有声明任何档位时——
-     * 此时那一次不带档位的请求**本身就是被验对象**，再补一条探测纯属白烧额度。
-     */
-    needTest: boolean
+export interface VerifyTarget {
+    provider: string
+    model: string
+    /** 本轮要逐档试的档位（仅探测档位携带）：缺省即一次不带档位参数的请求 */
+    efforts?: string[]
 }
 
 /**
- * 从勾选的候选算出请求计划：`allEfforts` 为真时逐个验该模型**声明的全部**推理级别，否则一律不带档位。
+ * 从勾选的候选算出验证的请求计划：每模型一条不带 `reasoningEffort` 的请求。
  *
- * 「不带档位」而不是挑一个最低档位：不带参数并不等于端点不会推理——端点可能有自己的默认推理级别，
- * 那种情况下发 `off` 验的不是用户实际会走的那条路径。两种模式下未声明档位的模型都产出空数组，
- * 即一次不带 `reasoningEffort` 的请求（开档位模式对它没有可验的档位，与关档位模式同形），
- * 并且 `needTest` 为假——那一请求就是被验对象，不是对照。
+ * 「不带档位」而不是挑一个最低档位：不带参数验的是用户实际会走的那条路径——
+ * 端点可能有自己的默认推理级别，发 `off` 验出来的结论与默认路径未必一致。
  */
 export function verifyTargets(
     candidates: readonly VerifyCandidate[],
     keys: ReadonlySet<string>,
-    allEfforts: boolean,
 ): VerifyTarget[] {
     return candidates
         .filter((candidate) => keys.has(verifyKey(candidate.provider, candidate.model)))
-        .map((candidate) => {
-            const efforts = allEfforts ? candidate.efforts : []
-            return { ...candidate, efforts: [...efforts], needTest: efforts.length > 0 }
-        })
+        .map((candidate) => ({ provider: candidate.provider, model: candidate.model }))
 }
 
 /**

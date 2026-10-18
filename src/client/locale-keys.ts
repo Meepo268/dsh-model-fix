@@ -96,8 +96,6 @@ export type CardKey =
     | 'verifyTabModels'
     | 'verifyTabRecords'
     | 'verifyQuota'
-    | 'verifyEfforts'
-    | 'verifyEffortsTip'
     | 'verifyGo'
     | 'verifyStop'
     | 'verifySelectAll'
@@ -121,14 +119,8 @@ export type CardKey =
     | 'verifyStopped'
     | 'verifyStoppedLine'
     | 'verifyDoneModels'
-    | 'verifyDoneLevels'
     | 'verifyFailed'
     | 'verifyFinished'
-    | 'pruneTitle'
-    | 'pruneConfirm'
-    | 'pruneGo'
-    | 'pruneDone'
-    | 'pruneFailed'
     // 探测档位：两个发起键共用一套行模板与结论词（复用 verifyOut* / verifySkipped / verifyStopped），
     // 只有开关、范围键与收尾几行是它自己的说法
     | 'probe'

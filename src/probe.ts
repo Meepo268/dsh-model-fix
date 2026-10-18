@@ -36,7 +36,7 @@ const runProbeGroup: GroupRunner = async (
     emitProbe: ProbeEmitter,
 ): Promise<ProviderProbeOutcome> => {
     const results: VerifyProbeResult[] = []
-    // 已跑通至少一档的模型：判「某档不被支持」的第二条件用它替代验证那边的基线对照
+    // 已跑通至少一档的模型：判「某档不被支持」的第二条件（除档位外别无变量）用它作对照
     const usable = new Set<string>()
     let blockedBy: ProviderBlockReason | undefined
     // 本组已发出的请求数：provider 级短路要区分「首个请求就超时」与「链路已跑通、只是这一次慢」
@@ -89,8 +89,6 @@ const runProbeGroup: GroupRunner = async (
     return {
         provider: group.provider,
         results,
-        // 本功能没有基线探测，故无「非被验对象的那一次请求」
-        tests: [],
         blockedBy,
         planned: group.probes.length,
         plannedEfforts,

@@ -4,7 +4,7 @@
  */
 
 /** 全部写操作共用的单一互斥标志：一者 in-flight 时其余入口与按钮全禁 */
-export type CardBusy = 'save' | 'force' | 'reset' | 'restore' | 'clear' | 'verify' | 'probe' | 'prune' | null
+export type CardBusy = 'save' | 'force' | 'reset' | 'restore' | 'clear' | 'verify' | 'probe' | null
 
 /** 内联状态行：文本 + 色调（成功＝官方 .savedNotice 绿，失败＝.error 红） */
 export interface Notice {

@@ -24,7 +24,6 @@ const finishAborted = (): readonly StreamChunk[] =>
 const target = (provider: unknown, model: unknown, hasOff = false) => ({
     provider, model,
     efforts: hasOff ? [...EFFORT_LEVELS] : [...EFFORT_LEVELS.filter((l) => l !== 'off')],
-    needTest: false,
 })
 
 /**
@@ -415,7 +414,7 @@ export async function run(): Promise<void> {
         const { llm } = stub({})
         let message = ''
         try {
-            await probeAndFill(ctx as unknown as Context, llm, { models: [{ provider: 'acme', model: 'm1', efforts: ['turbo'], needTest: false }] })
+            await probeAndFill(ctx as unknown as Context, llm, { models: [{ provider: 'acme', model: 'm1', efforts: ['turbo'] }] })
         } catch (error) {
             message = error instanceof Error ? error.message : String(error)
         }
@@ -462,7 +461,7 @@ export async function run(): Promise<void> {
         // 目标在当次配置里不存在（探测途中被删）即静默不命中，不产出 op
         const gone = apply([{ provider: 'acme', model: 'removed', levels: ['off'] }])
         check('entries 里的目标已不在配置中：零 op、零统计', gone.modelOps.length === 0 && gone.models === 0, gone)
-        // 模型 id 可含 '/'：键用二元组序列化，与 verifyKey / planPruneEfforts 同口径
+        // 模型 id 可含 '/'：键用二元组序列化，与 verifyKey 同口径
         const slashed = planEffortApply({ acme: { models: [{ id: 'z-ai/glm-5' }] } }, [{ provider: 'acme', model: 'z-ai/glm-5', levels: ['off'] }])
         check('模型 id 含斜杠仍按二元组键命中', slashed.models === 1, slashed)
         // 原有档位表读取：只认纯对象的键并按规范次序排序，未声明即空表

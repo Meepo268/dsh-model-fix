@@ -1,5 +1,5 @@
 /**
- * 浏览器半调 Node 半的唯一出口：四个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
+ * 浏览器半调 Node 半的唯一出口：三个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
  *
  * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与 Node 半一一对应。
  * 卡片只消费本文件产出的 `RpcCarrier`，自己不发起请求。
@@ -9,14 +9,14 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 // channel RPC 的结果信封
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import {
-    ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
+    ENDPOINT_FORCE_UPDATE, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
     ENDPOINT_RESTORE_MODELS, PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
 } from '@/shared/constants'
 import { decodeProgressFrame } from '@/shared/verify-progress'
-import type { UnsupportedEffort, VerifyProgressUpdate, VerifySummary } from '@/shared/verify-progress'
+import type { VerifyProgressUpdate, VerifySummary } from '@/shared/verify-progress'
 import type { VerifyTarget } from '@/client/model'
 
-/** 浏览器半经本文件调 Node 半的调用面：四个写回端点（各带 `WRITEBACK_MS` 等待上限）、语言上报与两条诊断链的读流 */
+/** 浏览器半经本文件调 Node 半的调用面：三个写回端点（各带 `WRITEBACK_MS` 等待上限）、语言上报与两条诊断链的读流 */
 export interface RpcCarrier {
     /** 强制更新 RPC：channel 与端点在入口拼好，卡片只消费结果 */
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
@@ -24,11 +24,9 @@ export interface RpcCarrier {
     resetModels: () => Promise<ConnectionRpcResult<unknown>>
     /** 恢复备份 RPC：回退启动时备份到当前配置（共有 provider 的共有 model 回退，其下被删的 model 复活）；返回被恢复与复活的模型数 */
     restoreModels: () => Promise<ConnectionRpcResult<unknown>>
-    /** 剔除不被支持的推理级别：入参是验证明细给出的「提供方 / 模型 / 档位」清单；返回实际剔掉的档位条数 */
-    pruneEfforts: (targets: readonly UnsupportedEffort[]) => Promise<ConnectionRpcResult<unknown>>
     /** 语言上报：把浏览器界面语言告知 Node 半（取值链见 `src/effort-name.ts`）；无等待上限——失败由调用方重报 */
     reportLocale: (locale: string) => Promise<ConnectionRpcResult<unknown>>
-    /** 验证模型：走进度流端点，对「模型 × 推理级别」各发一次最小请求（`needTest` 的模型另发一次不计数的探测作对照），逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined，没能开跑或中途异常则抛错 */
+    /** 验证模型：走进度流端点，对每个勾选模型发一次不带推理级别的最小请求，逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined，没能开跑或中途异常则抛错 */
     verifyModels: (
         models: readonly VerifyTarget[],
         onFrame: (frame: VerifyProgressUpdate) => void,
@@ -58,9 +56,6 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(WRITEBACK_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
-    /** 剔除不被支持的推理级别：走 Node 半而非浏览器半直写，因为这条写回必须经事件流守卫，而守卫是 Node 半的模块级标志 */
-    const pruneEfforts = (targets: readonly UnsupportedEffort[]) =>
-        rpc.call(channel, ENDPOINT_PRUNE_EFFORTS, { targets }, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
     /**
      * 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
@@ -117,7 +112,7 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
         }
     }
     /**
-     * 验证模型：载荷是卡片按勾选收敛好的「提供方 / 模型 / 各自档位列表 / 是否需要探测」计划；探测由 Node 半在执行阶段现发。
+     * 验证模型：载荷是卡片按勾选收敛好的「提供方 / 模型」清单（每模型一条不带档位参数的请求）。
      *
      * 走独立的进度流端点而非 channel RPC——一次调用要回持续多帧的响应。用文档相对路由（去掉前导斜杠）
      * 是宿主对浏览器侧的约定，两侧同取 `src/shared/constants.ts` 的同一常量。
@@ -135,5 +130,5 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => streamSummary(PROBE_STREAM_URL, { models, ...flags }, onFrame, signal)
-    return { forceUpdate, resetModels, restoreModels, pruneEfforts, reportLocale, verifyModels, probeEfforts }
+    return { forceUpdate, resetModels, restoreModels, reportLocale, verifyModels, probeEfforts }
 }

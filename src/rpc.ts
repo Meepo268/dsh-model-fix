@@ -1,5 +1,5 @@
 /**
- * Connection RPC 端点：forceUpdate / resetModels / restoreModels / pruneEfforts 四个写回端点
+ * Connection RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点
  * 与 reportLocale 语言上报端点，写回共用同一守卫做互斥；验证与探测档位的进度各开一条 `connection.fetch` 的 exact 路由。
  *
  * 路由由本插件自注册而不走宿主 `connection.rpc.handle`（后者在服务自己的 ctx 上求值 `owner.webServer`，
@@ -12,7 +12,7 @@ import type { ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/ds
 import type {} from '@deepseek-ai/dsh-llm'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import {
-    ENDPOINT_FORCE_UPDATE, ENDPOINT_PRUNE_EFFORTS, ENDPOINT_REPORT_LOCALE,
+    ENDPOINT_FORCE_UPDATE, ENDPOINT_REPORT_LOCALE,
     ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
     PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE,
 } from '@/shared/constants'
@@ -23,7 +23,6 @@ import type { ProbeRunOptions } from '@/probe-engine'
 import { fix } from '@/fix'
 import { reportLocale } from '@/effort-name'
 import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
-import { parsePruneTargets, pruneUnsupportedEfforts } from '@/prune'
 import { probeAndFill } from '@/probe'
 import { resetModels } from '@/reset'
 import { restoreModels } from '@/restore'
@@ -73,27 +72,13 @@ async function handleRestoreModels(ctx: Context): Promise<ConnectionRpcResult<un
     }
 }
 
-/** 剔除不被支持的推理级别：守卫已开即拒；载荷非法（targets 解析失败）返回 invalid 结果 */
-async function handlePruneEfforts(ctx: Context, payload: unknown): Promise<ConnectionRpcResult<unknown>> {
-    if (isIgnoreAll()) return writeInProgress()
-    const targets = parsePruneTargets(payload)
-    if (targets === undefined) {
-        return { ok: false, error: { code: 'model-fix/prune-efforts-invalid', message: '剔除请求不合法（提供方 / 模型 / 推理级别缺失或越界）', details: {} } }
-    }
-    try {
-        return { ok: true, value: { pruned: await pruneUnsupportedEfforts(ctx, targets) } }
-    } catch (error) {
-        return { ok: false, error: { code: 'model-fix/prune-efforts-failed', message: errorText(error), details: {} } }
-    }
-}
-
 /** 浏览器半启动时上报探测语言：Node 侧没有 locale 服务，见 effort-name.ts 的语言解析 */
 function handleReportLocale(payload: unknown): ConnectionRpcResult<unknown> {
     reportLocale(payload)
     return { ok: true, value: {} }
 }
 
-/** 注册一个 channel（五个端点）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
+/** 注册一个 channel（三个写回端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer：webServer 用于注册前缀路由，connection 用于信任围栏。
     // 无 webServer 的 profile（如 headless）下子 fiber 不启动，插件其余功能不受影响。
@@ -102,13 +87,12 @@ export function installRpc(ctx: Context): void {
         const webServer = rpcCtx.get('webServer') as WebServer
         rpcCtx.effect(() => {
             const channel = `/${PLUGIN_NS}`
-            // 强制更新与恢复备份各按整份配置重算、不读载荷；重置也不读，但剔除要按调用方给的档位明细动手
+            // 三个写回端点都不读载荷（各按整份配置重算、或剔除模型上的推理级别）；只有语言上报读
             const handler: EndpointHandler = async (endpoint, payload) => {
                 switch (endpoint) {
                     case ENDPOINT_FORCE_UPDATE: return handleForceUpdate(ctx)
                     case ENDPOINT_RESET_MODELS: return handleResetModels(ctx)
                     case ENDPOINT_RESTORE_MODELS: return handleRestoreModels(ctx)
-                    case ENDPOINT_PRUNE_EFFORTS: return handlePruneEfforts(ctx, payload)
                     case ENDPOINT_REPORT_LOCALE: return handleReportLocale(payload)
                     default:
                         return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }

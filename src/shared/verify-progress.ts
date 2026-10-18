@@ -5,28 +5,21 @@
  * （`eslint.config.ts` 的跨半纯度门禁），而复制一份类型必然随演进漂移。
  * 本文件只有类型与纯谓词：零 Node 依赖、零 schemastery、零宿主值导入。
  *
- * 两个功能共用同一份形状而不另立一套：探测的请求维度与验证完全一致（同样是「模型 × 推理级别」各一次最小请求，
- * 同样按 `block-start` 判受理、同样只按 `code` 分类、同样 provider 间并发 / provider 内串行），
- * 真正的分岔在「每组怎么跑」那一步（Node 半的执行器）。
+ * 两个功能共用同一份形状而不另立一套：验证是「每模型一次」不带 `reasoningEffort` 的最小请求，
+ * 探测档位是「模型 × 推理级别」各一次最小请求；两者同样按 `block-start` 判受理、只按 `code` 分类、
+ * provider 间并发 / provider 内串行，真正的分岔在「每组怎么跑」那一步（Node 半的执行器）。
  */
 
 import { isPlainObject } from '@/shared/types'
 
 /**
- * 计划里的一条**验证请求**：一次请求 = 一个「模型 × 推理级别」组合（`effort` 缺省即不带 `reasoningEffort`）。
- * 计划里只有被验对象——不带档位的**探测**请求不在其中，它由执行阶段按 `needTest` 现发。
+ * 计划里的一条**探测请求**：一次请求 = 一个「模型 × 推理级别」组合（`effort` 缺省即不带 `reasoningEffort`）。
+ * 验证的每个模型只占一条不带档位的请求；探测档位按模型展开至多七条。
  */
 export interface VerifyProbe {
     provider: string
     model: string
     effort?: string
-    /**
-     * 该模型是否需要一次不带 `reasoningEffort` 的**探测**请求作对照。判「某档位不被支持」只能靠它
-     * （上游对这类报错的格式千差万别）。两种情形不需要：关掉档位开关时全部请求本就不带参数，
-     * 以及模型没有声明任何档位时——那一次不带档位的请求**本身就是被验对象**，不是对照。
-     * 由浏览器半在规划时声明，Node 半不替它反推。
-     */
-    needTest: boolean
 }
 
 /**
@@ -114,17 +107,12 @@ export interface VerifyProbeResult {
 /** 一个提供方的验证结论：逐条明细 + 短路情况（由 Node 半执行器产出，供汇报函数消费） */
 export interface ProviderProbeOutcome {
     provider: string
-    /** 与该组验证请求清单前缀对齐：短路时长度小于 planned；探测不在其中 */
+    /** 与该组探测请求清单前缀对齐：短路时长度小于 planned */
     results: VerifyProbeResult[]
-    /**
-     * 探测结论（实际发出的那些）。它不是被验对象，故不进 `results`、不计任何计数，
-     * 但真发出去过就能证伪端点与凭据，故单列。
-     */
-    tests: VerifyProbeResult[]
     blockedBy: ProviderBlockReason | undefined
-    /** 计划验证请求数（**不含探测**，探测是判据不是被验对象） */
+    /** 计划请求数（验证每模型一条；探测档位逐档展开） */
     planned: number
-    /** 计划推理级别数（**不含探测**）：计划里带档位的条目数（模型没声明档位时验的是模型，不占级别） */
+    /** 计划里带档位的条目数（验证恒为 0——验的是模型本身，不占级别） */
     plannedEfforts: number
     /** 计划验过的模型数（按「提供方 / 模型」去重）：取自计划而非明细——模型若被短路到一条未发，明细里就没有它 */
     tested: number
@@ -149,13 +137,13 @@ export interface VerifyProviderReport {
     models: number
     /** 该组内可用档位数 */
     efforts: number
-    /** 判定为「档位不支持」的验证请求数：逐模型逐档位，故与其它失败分开计数 */
+    /** 判定为「档位不支持」的请求数：逐模型逐档位，故与其它失败分开计数 */
     unsupported: number
-    /** 计划验证请求数（不含探测） */
+    /** 计划请求数（验证每模型一条；探测档位逐档展开） */
     planned: number
-    /** 计划推理级别数：计划里带档位的条目数（模型没声明档位时验的是模型，不占级别） */
+    /** 计划里带档位的条目数（验证恒为 0） */
     plannedEfforts: number
-    /** 实际发出的验证请求数（短路时小于 planned；探测恒不计入） */
+    /** 实际发出的请求数（短路时小于 planned） */
     probed: number
 }
 
@@ -205,13 +193,13 @@ export interface VerifySummary {
     /** 逐条探测明细，顺序为「组序 → 组内探测序」，可重复消费 */
     results: readonly VerifyProbeResult[]
     /**
-     * 明确判为不被支持的档位明细：统计值前端直接用 `tested` / `models` / `efforts` / `plannedEfforts`，
-     * 但剔除要写配置就得逐条定位（理由见 `UnsupportedEffort`）。
+     * 明确判为不被支持的档位明细：写配置就得逐条定位（理由见 `UnsupportedEffort`）。
+     * 只有探测档位会产出它（收敛时按「剔除不支持」开关扣减）；验证只验模型本身、不带档位，恒为空。
      */
     unsupportedEfforts: readonly UnsupportedEffort[]
     /**
-     * 判为可用的档位明细（与 `unsupportedEfforts` 同源同构）。探测档位据此写回补全档位；
-     * 验证侧也能直接用它。
+     * 判为可用的档位明细（与 `unsupportedEfforts` 同源同构）：探测档位据此写回补全档位；
+     * 验证不带档位，恒为空。
      */
     usableEfforts: readonly UsableEffort[]
     /**
@@ -222,19 +210,17 @@ export interface VerifySummary {
     fill?: ProbeFillResult
     /** 本次验证的模型数（按「提供方 / 模型」去重），即用户勾了几个；取自计划而非明细，故被短路的模型也在内 */
     tested: number
-    /**
-     * 可用模型数：至少有一条**验证请求**（探测不算）通过的去重模型数，全档位失败的模型不计入。
-     * 关掉档位开关时它就是「勾选的模型里跑通几个」。
-     */
+    /** 可用模型数：至少有一条请求通过的去重模型数（验证即「勾选的模型里跑通几个」；探测档位全档位失败的模型不计入） */
     models: number
-    /** 判可用的带档位请求数（探测恒不计入） */
+    /** 判可用的带档位请求数（验证恒为 0） */
     efforts: number
+    /** 判「档位不支持」的请求数（验证恒为 0） */
     unsupported: number
-    /** 计划验证请求数（不含探测）：关档位时等于勾选模型数，开档位时含「没声明档位的模型」各一次请求 */
+    /** 计划请求数（验证每模型一条，即勾选模型数；探测档位逐档展开） */
     planned: number
-    /** 计划推理级别数：计划里带档位的条目数，故开档位时它才是「X / Y 个推理级别」的分母 */
+    /** 计划里带档位的条目数（验证恒为 0；探测档位收尾文案「X / Y 个推理级别」的分母） */
     plannedEfforts: number
-    /** 实际发出的验证请求数（探测恒不计入） */
+    /** 实际发出的请求数（短路时小于 planned） */
     probed: number
 }
 
@@ -250,10 +236,9 @@ export type VerifyProgressFrame =
     | { type: 'opened'; total: number }
     /**
      * 一条探测出结果。`done`/`total` 是跨提供方并行的进度位置，可直接显示为进度：
-     * `total` 是计划条目数（不含基线探测，与 `planned`/`probed` 同口径），
-     * `done` 是已了结的条目数（被短路而未发出的计入），故 `done ≤ total` 恒成立；
-     * 交代基线为什么没过的**附注帧不推进 `done`**。
-     * `skipped` 在该结论短路了后续请求时出现，值为未发出的条数。`effort` 缺省即模型级结论。
+     * `total` 是计划条目数（与 `planned`/`probed` 同口径），
+     * `done` 是已了结的条目数（被短路而未发出的计入），故 `done ≤ total` 恒成立。
+     * `skipped` 在该结论短路了后续请求时出现，值为未发出的条数。`effort` 缺省即不带档位的模型级结论。
      */
     | {
         type: 'probed'
@@ -313,7 +298,7 @@ function isProgressFrame(value: unknown): value is VerifyProgressFrame {
     if (value.type === 'probed') {
         return typeof value.provider === 'string' && typeof value.model === 'string'
             && typeof value.outcome === 'string' && typeof value.done === 'number' && typeof value.total === 'number'
-            // effort 缺省即「该模型未声明档位」，键缺省是合法形态
+            // effort 缺省即不带档位的模型级结论，键缺省是合法形态
             && (value.effort === undefined || typeof value.effort === 'string')
             // skipped 仅在该结论短路了后续请求时出现
             && (value.skipped === undefined || typeof value.skipped === 'number')
