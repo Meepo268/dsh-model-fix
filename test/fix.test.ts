@@ -449,4 +449,42 @@ export async function run(): Promise<void> {
         }))
         check('容量只缺一半：变更计数为 1', changes === 1)
     }
+
+    // ---------- 18. 尽量匹配：开关把 loose 传给 lookup（歧义时合成填充，开关关时维持放弃） ----------
+    // 模型 id 在另一提供方有两家镜像：精确匹配判歧义；开 loose 后合成条目按 60% 口径填充
+    const AMBIGUOUS_CAT: IndexedCatalog = {
+        catalog: {},
+        groups: new Map([
+            ['gw-one', { ids: ['model-x'], byId: new Map([['model-x', { id: 'model-x', efforts: ['low', 'high'], contextWindow: 100_000, maxTokens: 8_000 }]]) }],
+            ['gw-two', { ids: ['model-x'], byId: new Map([['model-x', { id: 'model-x', efforts: ['low', 'high'], contextWindow: 100_000, maxTokens: 8_000 }]]) }],
+        ]),
+    }
+    {
+        resetModules()
+        const ctx = makeStubCtx({
+            api: { providers: { testprovider: { models: [{ id: 'model-x' }] } } },
+        })
+        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true } }))
+        setCatalog(AMBIGUOUS_CAT)
+        const changes = await fix(ctx as unknown as Context)
+        const model = modelsOf(ctx, 'testprovider')[0]
+        check('尽量匹配关：歧义维持放弃、零填充', changes === 0 && model.reasoningEfforts === undefined, { changes, model })
+    }
+    {
+        resetModules()
+        const ctx = makeStubCtx({
+            api: { providers: { testprovider: { models: [{ id: 'model-x' }] } } },
+        })
+        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true } }))
+        setCatalog(AMBIGUOUS_CAT)
+        const changes = await fix(ctx as unknown as Context)
+        const model = modelsOf(ctx, 'testprovider')[0]
+        check('尽量匹配开：歧义合成填充（两候选全同值，60% 全过线）', stable(model) === stable({
+            id: 'model-x',
+            reasoningEfforts: { low: 'low', high: 'high' },
+            contextWindow: 100_000,
+            maxTokens: 8_000,
+        }), model)
+        check('尽量匹配开：变更计数为 1', changes === 1)
+    }
 }

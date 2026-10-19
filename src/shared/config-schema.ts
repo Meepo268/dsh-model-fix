@@ -36,6 +36,7 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
     hideOfficial: true,
     localizeEfforts: true,
     showOriginalEfforts: true,
+    looseMatch: false,
 }
 
 /**
@@ -76,6 +77,7 @@ export const USER_EXPERIENCE_KEYS = [
     'hideOfficial',
     'localizeEfforts',
     'showOriginalEfforts',
+    'looseMatch',
 ] as const
 
 /** UI 可见性组的行键；新增席位可见性开关在此追加 */

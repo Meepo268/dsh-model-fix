@@ -1,5 +1,6 @@
 import { HINTS, LEVELS } from '@/constants'
 import type { IndexedCatalog, IndexEntry } from '@/types'
+import { isCapacity } from '@/types'
 
 /** 归一化模型 id：小写并去 `-latest` / `-openai-compact` 后缀；归一规则仅此一处（目录匹配键建索引时取自这里） */
 export function normalizeId(id: string): string {
@@ -48,8 +49,9 @@ function hintedProviders(id: string): readonly string[] {
     return HINTS.find(([prefix]) => bare === prefix || bare.startsWith(`${prefix}-`) || bare.startsWith(`${prefix}.`))?.[1] ?? []
 }
 
-/** 在目录中查找模型条目：组内依次 完整 id → 裸名 → 末段唯一匹配；全局官方提示依序试、兜底仅跨提供方唯一命中才认。多命中判歧义放弃（宁可漏不错配，见 decisions.md「参数来源」） */
-export function lookup(indexed: IndexedCatalog, providerId: string, modelId: string): IndexEntry | undefined {
+/** 在目录中查找模型条目：组内依次 完整 id → 裸名 → 末段唯一匹配；全局官方提示依序试、兜底仅跨提供方唯一命中才认。多命中判歧义放弃（宁可漏不错配，见 decisions.md「参数来源」）。
+ * `loose`（尽量匹配）时歧义不再放弃：兜底命中 ≥2 进加权合成、=1 直接返回；仍无命中则用归一裸名全局 includes 扩展候选，同样单命中直接返回、多命中合成 */
+export function lookup(indexed: IndexedCatalog, providerId: string, modelId: string, loose = false): IndexEntry | undefined {
     const { groups } = indexed
     const bare = modelId.slice(modelId.lastIndexOf('/') + 1)
     /** 组内匹配；`tailMatch` 只在 provider 严格匹配（已定域）时开启，避免裸名撞别家末段造成跨提供方错配 */
@@ -59,8 +61,8 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
         const exact = matchId(modelId, group.ids)
         if (exact !== undefined) return group.byId.get(exact)
         if (bare !== modelId) {
-            const loose = matchId(bare, group.ids)
-            if (loose !== undefined) return group.byId.get(loose)
+            const looseHit = matchId(bare, group.ids)
+            if (looseHit !== undefined) return group.byId.get(looseHit)
         }
         if (!tailMatch) return
         // 裸名过不了三级匹配：它不以目录 id 开头，词干 base 也带着前缀，故改比末段；
@@ -87,16 +89,48 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
         const official = matchIn(provider, false)
         if (official) return official
     }
-    // 其余提供方：唯一命中才认，第二个命中即判歧义放弃（见函数头「宁可漏也不错配」）
-    let found: IndexEntry | undefined
+    // 其余提供方：`loose` 时收集全部命中（候选都过了组内三级匹配），否则第二命中即放弃
+    const collected: LooseCandidate[] = []
     for (const provider of groups.keys()) {
         if (provider === providerId || hinted.includes(provider)) continue
         const hit = matchIn(provider, false)
         if (!hit) continue
-        if (found) return
-        found = hit
+        if (!loose && collected.length) return
+        collected.push({ entry: hit, provider })
     }
-    return found
+
+    // ≥2 命中只有 loose 可达（非 loose 已在循环内返回）
+    if (collected.length === 1) return collected[0].entry
+    if (collected.length > 1) return synthesize(collected)
+
+    if (!loose) return
+    const wanted = normalizeId(bare)
+    const fuzzy: LooseCandidate[] = []
+    for (const [provider, group] of groups) {
+        for (const id of group.ids) {
+            if (!id.includes(wanted)) continue
+            const entry = group.byId.get(id)
+            if (entry) fuzzy.push({ entry, provider })
+        }
+    }
+    // 和collected同逻辑
+    if (fuzzy.length === 1) return fuzzy[0].entry
+    if (fuzzy.length > 1) return synthesize(fuzzy)
+}
+
+/** 尽量匹配的 60% 判据：efforts / image 支持门槛，容量分位位置 */
+const LOOSE_SHARE = 0.6
+
+/** 投票权重：官方 ×5，其余 ×1 */
+const LOOSE_OFFICIAL_WEIGHT = 5
+
+/** 官方 = HINTS 值集合（与 hintedProviders 同源） */
+const OFFICIAL_PROVIDERS: ReadonlySet<string> = new Set(HINTS.flatMap(([, providers]) => providers))
+
+/** 候选：条目 + 提供方（提供方定投票权重） */
+interface LooseCandidate {
+    entry: IndexEntry
+    provider: string
 }
 
 /** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效） */
@@ -112,4 +146,61 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
     // 空或只剩 off：无可选档位，等同无匹配，不填充（与 stripEmptyFields 的空壳判据同口径）
     if (keys.length === 0 || (keys.length === 1 && keys[0] === 'off')) return
     return mapped
+}
+
+// ---------- 尽量匹配：加权合成（纯函数，见 docs/decisions.md「参数来源」） ----------
+
+function weightOf(provider: string): number {
+    return OFFICIAL_PROVIDERS.has(provider) ? LOOSE_OFFICIAL_WEIGHT : 1
+}
+
+/** 容量「安全 N」：有值容量取 60 分位；官方 ×5 不展开进分位（否则单条官方值即可顶高 N） */
+function safeCapacity(candidates: readonly LooseCandidate[], field: 'contextWindow' | 'maxTokens'): number | undefined {
+    const values: number[] = []
+    for (const { entry } of candidates) {
+        const value = entry[field]
+        if (isCapacity(value)) values.push(value)
+    }
+    values.sort((a, b) => a - b)
+    return values[Math.ceil(values.length * LOOSE_SHARE) - 1]
+}
+
+function synthesize(candidates: readonly LooseCandidate[]): IndexEntry | undefined {
+    const total = candidates.reduce((sum, candidate) => sum + weightOf(candidate.provider), 0)
+    const effortVotes = new Map<string, number>() // 档位 -> 票数
+    const offSpellings = new Map<string, number>() // off 原拼写 -> 票数（含 none）
+    for (const { entry, provider } of candidates) {
+        const weight = weightOf(provider)
+        const seen = new Set<string>()
+        for (const effort of entry.efforts) {
+            const level = effort === 'none' || effort === 'off' ? 'off' : effort
+            if (seen.has(level)) continue
+            seen.add(level)
+            effortVotes.set(level, (effortVotes.get(level) ?? 0) + weight)
+            if (level === 'off') offSpellings.set(effort, (offSpellings.get(effort) ?? 0) + weight)
+        }
+    }
+    const efforts: string[] = []
+    for (const [level, votes] of effortVotes) {
+        if (votes < total * LOOSE_SHARE) continue
+        if (level === 'off') {
+            // off 拼写不一致取票数最高者（保留原值而非 null，见 decisions.md「参数来源」）
+            efforts.push([...offSpellings.entries()].sort((a, b) => b[1] - a[1])[0][0])
+        } else {
+            efforts.push(level)
+        }
+    }
+    const contextWindow = safeCapacity(candidates, 'contextWindow')
+    const maxTokens = safeCapacity(candidates, 'maxTokens')
+    // 图片：声明 true 的候选权重 ≥60% 总权重才写（目录只缓存正向信息，false 即无值）
+    const imageVotes = candidates.reduce((sum, { entry, provider }) => entry.image ? sum + weightOf(provider) : sum, 0)
+    const image = imageVotes >= total * LOOSE_SHARE || undefined
+    if (efforts.length === 0 && contextWindow === undefined && maxTokens === undefined && !image) return
+    return {
+        id: '', // 合成条目无对应目录 id
+        efforts,
+        contextWindow,
+        maxTokens,
+        ...(image ? { image: true } : {}),
+    }
 }

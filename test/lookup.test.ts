@@ -128,6 +128,77 @@ export function run(): void {
     check('前缀命中多个 -> 无匹配', lookup(catalog({ openai: ['gpt-5-mini', 'gpt-5-nano'] }), 'openai', 'gpt-5') === undefined)
     check('完全无命中 -> undefined', lookup(catalog({ openai: ['gpt-5'] }), 'openai', 'o3') === undefined)
 
+    // ---------- 尽量匹配（loose=true）：多命中加权合成，无命中则 includes 扩展 ----------
+    // 容量取「有值候选」的 60 分位（宁小勿大）；efforts / image 按权重计（官方 HINTS 值集合 ×5，其余 ×1）
+    check('loose 关闭时歧义仍放弃（守卫）', lookup(catalog({ a: ['Hy3'], b: ['Hy3'] }), 'custom-router', 'Hy3', false) === undefined)
+    {
+        // 容量安全 N：5 家候选 ctx 分别 10/10/10/9/8（万），升序累计票数首次 ≥60% 的值即 10（60% 以上候选 ≤ 10）
+        const ctx = indexed({
+            gw1: [entry('m', [], { contextWindow: 100_000 })],
+            gw2: [entry('m', [], { contextWindow: 100_000 })],
+            gw3: [entry('m', [], { contextWindow: 100_000 })],
+            gw4: [entry('m', [], { contextWindow: 90_000 })],
+            gw5: [entry('m', [], { contextWindow: 80_000 })],
+        })
+        const looseCtx = lookup(ctx, 'relay', 'm', true)
+        check('loose 容量取 60 分位安全 N', looseCtx?.contextWindow === 100_000, looseCtx)
+        // 容量分位数基于有值候选（无值候选不占位）：仅 2/5 家有值时仍取分位，不再判「支持率不足」
+        const maxT = indexed({
+            gw1: [entry('m', [], { maxTokens: 8_000 })],
+            gw2: [entry('m', [], { maxTokens: 8_000 })],
+            gw3: [entry('m')],
+            gw4: [entry('m')],
+            gw5: [entry('m')],
+        })
+        check('loose 容量分位只算有值候选', lookup(maxT, 'relay', 'm', true)?.maxTokens === 8_000, lookup(maxT, 'relay', 'm', true))
+        // 官方权重不展开进容量分位（分位只在候选粒度上算）：官方 + 2 网关有值 = 3/5 有值，N 取多数侧
+        const withOfficial = indexed({
+            deepseek: [entry('m', [], { maxTokens: 8_000 })],
+            gw1: [entry('m', [], { maxTokens: 8_000 })],
+            gw2: [entry('m', [], { maxTokens: 8_000 })],
+            gw3: [entry('m')],
+            gw4: [entry('m')],
+        })
+        check('loose 容量分位不受官方权重展开影响', lookup(withOfficial, 'relay', 'm', true)?.maxTokens === 8_000, lookup(withOfficial, 'relay', 'm', true))
+        // 安全 N 宁小勿大：官方值最大但非官方候选占多数时，N 取多数侧的小值
+        const officialLarger = indexed({
+            deepseek: [entry('m', [], { contextWindow: 1_000_000 })],
+            gw1: [entry('m', [], { contextWindow: 100_000 })],
+            gw2: [entry('m', [], { contextWindow: 100_000 })],
+            gw3: [entry('m', [], { contextWindow: 100_000 })],
+        })
+        check('loose 安全 N 宁小勿大（官方大值不主导）', lookup(officialLarger, 'relay', 'm', true)?.contextWindow === 100_000, lookup(officialLarger, 'relay', 'm', true))
+        // efforts 逐档 60%：low 4/5 √、high 3/5=60% √、medium 2/5 ×
+        const efforts = indexed({
+            gw1: [entry('m', ['low', 'high'])],
+            gw2: [entry('m', ['low', 'high', 'medium'])],
+            gw3: [entry('m', ['low', 'high'])],
+            gw4: [entry('m', ['low', 'medium'])],
+            gw5: [entry('m', ['low'])],
+        })
+        const looseEfforts = lookup(efforts, 'relay', 'm', true)
+        check('loose efforts 逐档 60% 取值', stable(looseEfforts?.efforts) === stable(['low', 'high']), looseEfforts)
+        // image：≥60% 为 true 才写
+        const images = indexed({
+            gw1: [entry('m', [], { image: true })],
+            gw2: [entry('m', [], { image: true })],
+            gw3: [entry('m', [], { image: true })],
+            gw4: [entry('m')],
+            gw5: [entry('m')],
+        })
+        check('loose image 60% 为 true 才写', lookup(images, 'relay', 'm', true)?.image === true, lookup(images, 'relay', 'm', true))
+        // 全字段不达标 -> undefined（合成返回空，特征形同虚设时不硬填）
+        const none = indexed({ gw1: [entry('m')], gw2: [entry('m', ['xhigh'])], gw3: [entry('m')] })
+        check('loose 全字段不达标 -> undefined', lookup(none, 'relay', 'm', true) === undefined, lookup(none, 'relay', 'm', true))
+        // 彻底无命中：includes 扩展兜底——裸名不吃精确匹配时按子串捞候选；扩展候选同样过合成
+        const fuzzy = indexed({ deepseek: [entry('deepseek-v4-flash', ['high'], { contextWindow: 100_000 })], gw1: [entry('deepseek-v4-flash-0731', [], { contextWindow: 80_000 })], gw2: [entry('deepseek-v4-flash-0423')] })
+        const fuzzyHit = lookup(fuzzy, 'relay', 'deepseek-v4-f', true)
+        // 分位数 [80000,100000] 取 60% 位（累计 ≥60% 的位置）为 100000
+        check('loose 无命中时 includes 扩展候选', fuzzyHit?.contextWindow === 100_000, fuzzyHit)
+        // loose 关闭时同样的模糊查询仍无命中（扩展只在 loose 开启时发生）
+        check('loose 关闭时无命中仍无扩展', lookup(fuzzy, 'relay', 'deepseek-v4-f', false) === undefined)
+    }
+
     // ---------- toReasoningEfforts：none/off 映射到 off 键，保留目录原值而非 null ----------
     check('efforts 映射与 none 转 off（保留原值 none）', stable(toReasoningEfforts(entry('m', ['none', 'low', 'high']))) === stable({ off: 'none', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['none', 'low', 'high'])))
     check('efforts 映射与 off 保留原值', stable(toReasoningEfforts(entry('m', ['off', 'low', 'high']))) === stable({ off: 'off', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['off', 'low', 'high'])))

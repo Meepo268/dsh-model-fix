@@ -11,7 +11,7 @@ const base: PluginConfig = {
     excludes: ['acme-gateway'],
     efforts: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
-    userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true },
+    userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
 }
 
 /** 取 modelOps 中 path 匹配的第一条 set op 的 value（provider 级 models 数组） */

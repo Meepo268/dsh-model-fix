@@ -36,6 +36,7 @@ export type CardKey =
     | 'rowHideOfficial'
     | 'rowLocalizeEfforts'
     | 'rowShowOriginalEfforts'
+    | 'rowLooseMatch'
     | 'tipReasoning'
     | 'tipContext'
     | 'tipImage'
@@ -49,6 +50,7 @@ export type CardKey =
     | 'tipHideOfficial'
     | 'tipLocalizeEfforts'
     | 'tipShowOriginalEfforts'
+    | 'tipLooseMatch'
     | 'excludePlaceholder'
     | 'excludeAdd'
     | 'excludeInvalid'
@@ -206,6 +208,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     hideOfficial: 'rowHideOfficial',
     localizeEfforts: 'rowLocalizeEfforts',
     showOriginalEfforts: 'rowShowOriginalEfforts',
+    looseMatch: 'rowLooseMatch',
 }
 
 /** 配置组（瓦片）标题键映射 */
@@ -245,4 +248,5 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     hideOfficial: 'tipHideOfficial',
     localizeEfforts: 'tipLocalizeEfforts',
     showOriginalEfforts: 'tipShowOriginalEfforts',
+    looseMatch: 'tipLooseMatch',
 }

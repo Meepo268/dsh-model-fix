@@ -27,7 +27,8 @@ interface FillPlan {
     readonly excluded: number
 }
 
-/** 纯计划函数（零 ctx、可单测）：遍历提供方算出模型参数 op 与路由 compat op；`excludes` 命中者在入口整条跳过；`efforts` 记忆不在本文件处理 */
+/** 纯计划函数（零 ctx、可单测）：遍历提供方算出模型参数 op 与路由 compat op；`excludes` 命中者在入口整条跳过；`efforts` 记忆不在本文件处理。
+ * `looseMatch` 开启时把尽量匹配开关传给 lookup（歧义/无命中的兜底合成，见 lookup.ts） */
 export function planFill(
     cfg: PluginConfig,
     providers: Record<string, unknown>,
@@ -37,6 +38,7 @@ export function planFill(
     const allowRules = cfg.allowUpdate
     const autoRules = cfg.autoFill
     const compatRules = cfg.compat
+    const looseMatch = cfg.userExperience.looseMatch
     // 提供方级排除：命中的 id 整条跳过（模型写回与路由 compat 都不作用其上）
     const excludes = new Set(cfg.excludes)
     const ops: SettingsPathOp[] = []
@@ -63,7 +65,7 @@ export function planFill(
                     contextWindow?: unknown
                     maxTokens?: unknown
                 }
-                const entry = lookup(indexed, providerId, modelId)
+                const entry = lookup(indexed, providerId, modelId, looseMatch)
                 const efforts = toReasoningEfforts(entry)
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input
