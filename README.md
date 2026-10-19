@@ -77,13 +77,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.31.50/dsh-model-fix.tgz
+https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.31.58/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.31.50/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.31.58/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
