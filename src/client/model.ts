@@ -164,8 +164,7 @@ export function verifyKey(provider: string, model: string): string {
 }
 
 /**
- * 候选遍历的唯一实现：验证与探测档位共用同一份事实源与同一套形状规则，
- * 两者只在「收哪些」上分岔（前者全收，后者按两个开关过滤）。
+ * 候选遍历的唯一实现：验证与探测共用。
  * 保持录入顺序；提供方非对象、无 models 数组、模型无 id 的行一律跳过。
  */
 function candidatesOf(user: unknown, keep: (provider: string, candidate: VerifyCandidate) => boolean): VerifyCandidate[] {
@@ -184,42 +183,18 @@ function candidatesOf(user: unknown, keep: (provider: string, candidate: VerifyC
     return candidates
 }
 
-/**
- * 从 `llm-pi-ai` 的 user 层拍出验证候选（与 Node 半 fix 遍历同一事实源，故列表与实际会填充的模型零漂移）。
- * 不套用 `excludes`：验证是只读诊断，排除语义只约束插件对配置的写入。
- */export function verifyCandidatesOf(user: unknown): VerifyCandidate[] {
+/** 从 `llm-pi-ai` 的 user 层拍全量候选清单，验证与探测共用 */
+export function verifyCandidatesOf(user: unknown): VerifyCandidate[] {
     return candidatesOf(user, () => true)
 }
 
-/** 探测档位的两个开关：只影响「收哪些模型」，不影响请求本身 */
-interface ProbeCandidateOptions {
-    /** 排除提供方 id（取卡片上的当前值，与「命中」判定同源，故所见即所得） */
-    excludes: readonly string[]
-    /** 忽略排除：开则连被排除的提供方也一起探测（Node 半的两次写回同时放行，两处必须同一个开关） */
-    ignoreExcludes: boolean
-    /** 只收未填充的：该模型没有声明 `reasoningEfforts`，或该字段只有 `off` 一个档位 */
-    unfilledOnly: boolean
-}
-
-/** 「未填充」判据：无档位声明，或只声明了 `off`（等同于「这个模型不推理」） */
-function isUnfilled(efforts: readonly string[]): boolean {
+/** 「未填充」判据：无档位声明，或只声明了 `off` */
+export function isUnfilled(efforts: readonly string[]): boolean {
     return efforts.length === 0 || efforts.every((effort) => effort === 'off')
 }
 
 /**
- * 探测档位的候选：与验证候选同源同形，只按两个开关收窄。
- *
- * 「忽略排除」必须同时传给 Node 半的两次写回——两边共用同一个开关值（理由见 docs/decisions.md「探测档位」）。
- */
-export function probeCandidatesOf(user: unknown, options: ProbeCandidateOptions): VerifyCandidate[] {
-    const excluded = new Set(options.excludes)
-    return candidatesOf(user, (provider, candidate) => (options.ignoreExcludes || !excluded.has(provider))
-        && (!options.unfilledOnly || isUnfilled(candidate.efforts)))
-}
-
-/**
- * 探测档位的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**
- * （未声明 off 的模型不补 off——"能通"不等于"能关"）。
+ * 探测档位的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**。
  */
 export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTarget[] {
     return candidates.map((candidate) => ({

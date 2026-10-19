@@ -35,12 +35,12 @@ export interface RpcCarrier {
     /**
      * 探测档位：走进度流端点，Node 半先把候选档位临时预声明进配置、再对每个模型逐档各发一次最小请求，
      * 跑完按「自动写入」开关收敛写回或整轮还原；终帧的 `summary.fill` 一律带收敛结论的增删统计
-     * （关闭时是「可补全」的假设统计）。三个开关须与 Node 半的两次写回同值。被中止（停止 / 关窗 / 断连）
+     * （关闭时是「可补全」的假设统计）。开关须与 Node 半同值。被中止（停止 / 关窗 / 断连）
      * 回 undefined——中止不发终帧，且未跑完的模型一律还原成预声明之前的形态；没能开跑或中途异常则抛错。
      */
     probeEfforts: (
         models: readonly VerifyTarget[],
-        flags: { ignoreExcludes: boolean; dropUnsupported: boolean; autoWrite: boolean },
+        flags: { dropUnsupported: boolean; autoWrite: boolean },
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => Promise<VerifySummary | undefined>
@@ -120,13 +120,12 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const verifyModels = (models: readonly VerifyTarget[], onFrame: (frame: VerifyProgressUpdate) => void, signal: AbortSignal) =>
         streamSummary(VERIFY_STREAM_URL, { models }, onFrame, signal)
     /**
-     * 探测档位：载荷与验证同形，另带三个开关。三个开关必须与 Node 半共用同一个值——
-     * 「忽略排除」若只在这边放开而那边仍跳过，等于白探测一轮；「剔除不支持」决定收敛口径；
-     * 「自动写入」关闭时 Node 半在探测结束后只把预声明原样收回。
+     * 探测档位：载荷与验证同形，另带两个开关，须与 Node 半共用同一个值——
+     * 「剔除不支持」决定收敛口径；「自动写入」关闭时 Node 半在探测结束后只把预声明原样收回。
      */
     const probeEfforts = (
         models: readonly VerifyTarget[],
-        flags: { ignoreExcludes: boolean; dropUnsupported: boolean; autoWrite: boolean },
+        flags: { dropUnsupported: boolean; autoWrite: boolean },
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => streamSummary(PROBE_STREAM_URL, { models, ...flags }, onFrame, signal)

@@ -146,11 +146,9 @@ const STYLE_TEXT = [
     // 不取：本项目的正文一律 12px 更优先，选项卡条与面板是相邻两段，那 12px 由 .dsh-mf-verifyBody 的 gap 给
     // （未选中的面板带 hidden 即 display:none、不是 flex 项，换页后不留空段），面板自身不再补 padding
     '.dsh-mf-verifyTabs{border-bottom:.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));align-items:flex-end;gap:22px;margin-top:2px;display:flex}',
-    // 选项卡行：选项卡条居左、全列表「全选 / 取消全选」键居右（margin-left:auto，同分组全选键）
-    // 行取 center 而非 flex-end：页签内底部有 9px 内边距，flex-end 会把键压到细线处、文本偏下（实测）
     '.dsh-mf-verifyTabsRow{display:flex;align-items:center}',
-    // 选项卡行右端小键（全列表「全选 / 取消全选」等）：margin-left:auto 顶到行尾（同分组全选键）
-    '.dsh-mf-verifyListAll{margin-left:auto}',
+    // margin-left:auto 在组上（单个键上会把行间空白均分到键间）
+    '.dsh-mf-verifyTools{display:flex;gap:8px;margin-left:auto}',
     '.dsh-mf-verifyTab{color:var(--dsw-alias-label-tertiary,#81858c);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}',
     '.dsh-mf-verifyTab:hover,.dsh-mf-verifyTab[data-active="true"]{color:var(--dsw-alias-label-primary,#0f1115)}',
     '.dsh-mf-verifyTab[data-active="true"]:after,.dsh-mf-verifyTab:focus-visible:after{background:var(--dsw-alias-label-primary,#0f1115);content:"";border-radius:2px 2px 0 0;height:2px;position:absolute;bottom:-1px;left:0;right:0}',
@@ -171,22 +169,17 @@ const STYLE_TEXT = [
     '.dsh-mf-verifyRow{border-radius:var(--dsw-radius-md,12px)}',
     '.dsh-mf-verifyLabel{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer}',
     '.dsh-mf-verifyId{flex:auto;min-width:0;overflow:hidden;font-family:var(--ds-font-family-code);font-size:13px;text-overflow:ellipsis;white-space:nowrap}',
-    // 空态：margin 归零（上下气口交给容器的 12px 与宿主 .body 的外边距），其余逐条照官方 candidateEmpty。
-    // 验证弹层两个面板的空态共用本类——「还没勾到模型」与「还没发起过」是同一件事的两面，读法也一致
+    // 空态：margin 归零（气口由容器给）
     '.dsh-mf-verifyEmpty{margin:0;color:var(--dsw-alias-label-secondary,#61666b);text-align:center;font-size:13px;line-height:20px}',
-    // 额度提示：逐条同官方插件卡的 .notice——warn 语义、12px/18px，margin 归零。
-    // 验证弹层里它是正文首段，与下方选项卡组之间的 12px 由 .dsh-mf-verifyBody 的 gap 给；
-    // 探测弹层里它与上一句提示紧挨，两段各自的 margin 在 flex 里会相加，同样只能靠容器定距
+    // 额度提示：两个诊断弹层里都是正文首段，段距由 .dsh-mf-verifyBody 的 gap 给
     '.dsh-mf-verifyQuota{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-state-warn-label,#dd8629)}',
-    // 开关行：探测弹层的三个开关在正文内（开关自身不带外边距，段间距只由 .dsh-mf-verifyBody 的 gap 给）
+    // 开关行：探测弹层的两个开关经外壳插槽放正文内
     '.dsh-mf-verifyOption{display:flex;align-items:center;gap:6px;min-width:0;font-size:13px;line-height:1.5;color:var(--dsw-alias-label-secondary,#61666b)}',
-    // 探测弹层的三个开关并排：同属一组操作参数，按「小节内相邻块」的 12px 档定距；
-    // 上间距同样交给 .dsh-mf-verifyBody 的 gap:12px，margin 归零
+    // 两个开关并排（上间距交给 .dsh-mf-verifyBody 的 gap）
     '.dsh-mf-verifyOptions{display:flex;align-items:center;gap:12px;min-width:0;margin:0}',
-    // 弹层 footer 的键行（验证弹层只有 取消/验证 两键）：宿主 .footer 是单行 flex 且无 wrap，键间距 8px 与宿主 gap 同值
+    // 弹层 footer 的键行（取消 / 主动作）
     '.dsh-mf-verifyButtons{display:flex;align-items:center;gap:8px}',
-    // 记录区上下边距：宿主 TerminalBlock 的 .block 自带 margin:16px 0，在探测弹层里与正文容器的 12px 间距相加会算成
-    // 28px；整条归零。验证弹层的记录区自成一个面板（面板内只此一段，16px 留白无处可抵），同样归零
+    // 记录区上下边距归零（宿主 TerminalBlock 的 .block 自带 margin:16px 0，会与容器 gap 相加成 28px）
     '.dsh-mf-verifyLog{margin:0;--dsl-terminal-output-max-height:360px}',
     // 注意语义键：卡片 footer 的「验证模型」触发键与弹层内的验证确认键共用，仅把描边/字色换成 warn 令牌；
     // hover 用其 10% 稀释（宿主无 warn 悬停底令牌，与 .dsh-mf-chipVersion 同一 color-mix 手法，不自造色值）。

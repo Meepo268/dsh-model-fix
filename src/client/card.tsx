@@ -3,9 +3,8 @@
  * 差异只有折叠态策略（`defaultOpen` 与保存后是否自动收起）与是否允许折叠（输入框弹层禁用）。
  *
  * 本文件只做**卡片外壳的编排**：草稿与保存、三个写回动作（强制更新 / 重置 / 恢复）、
- * 四层二次确认、瓦片与 footer 的渲染，以及验证 / 探测两个弹层的状态挂接——两条诊断链的整轮
- * 编排各自内聚在 `card-verify.ts` / `card-probe.ts`（弹层外壳见 `diagnose-dialog.tsx`，
- * 探测仍走旧形态的 `probe-dialog.tsx`），记录区文案层在 `card-records.ts`，状态行助手在 `card-notice.ts`。
+ * 四层二次确认、瓦片与 footer 渲染；诊断两条链在 `card-verify.ts` / `card-probe.ts`，
+ * 弹层外壳在 `diagnose-dialog.tsx`（探测的组装层在 `probe-dialog.tsx`），记录区文案层在 `card-records.ts`，状态行助手在 `card-notice.ts`。
  *
  * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发），瓦片手风琴：默认收起、同时只开一个。
  * 编辑只改本地草稿，「保存」才经 settings scope 原子写当前版本快照键（efforts 取写入当刻实时值，
@@ -137,7 +136,6 @@ export function Card(props: CardProps) {
         t,
         busy,
         setBusy,
-        excludes: shown.excludes,
         user: providersSnap.status === 'ready' ? providersSnap.user : undefined,
         probeEfforts: props.probeEfforts,
         onNotice: setNotice,
@@ -472,8 +470,6 @@ export function Card(props: CardProps) {
                 danger
                 confirmDisabled={busy !== null}
             />
-            {/* 两个诊断弹层共用 diagnose-dialog.tsx 的外壳（「验证模型」已迁入；探测仍走 probe-dialog.tsx），
-                本文件只递数据、文案键与回调 */}
             <DiagnoseDialog
                 t={t}
                 titleKey="verifyTitle"
@@ -482,7 +478,6 @@ export function Card(props: CardProps) {
                 modelsTabKey="verifyTabModels"
                 recordsTabKey="verifyTabRecords"
                 listEmptyKey="verifyEmpty"
-                recordsEmptyKey="verifyRecordEmpty"
                 terminalCwdKey="verify"
                 terminalCommandKey="verifyCommand"
                 runKey="verifyGo"
@@ -506,28 +501,36 @@ export function Card(props: CardProps) {
                 onRun={verify.run}
                 onStop={verify.stop}
             />
-            {/* 「探测档位」弹层见 probe-dialog.tsx：两个范围键 + 记录区 + 三个开关，本文件只递状态与回调 */}
             <ProbeDialog
                 t={t}
                 open={probe.open}
                 onClose={probe.close}
                 running={probe.running}
                 idle={busy === null}
-                scope={probe.scope}
-                unfilledCount={probe.unfilledCount}
-                allCount={probe.allCount}
-                onProbe={probe.run}
-                onStop={probe.stop}
+                candidates={probe.candidates}
+                picked={probe.picked}
+                onTogglePick={probe.togglePick}
+                onToggleGroup={probe.toggleGroup}
+                tools={[
+                    ...(probe.unfilledCount > 0 ? [{
+                        label: probe.allUnfilledPicked ? t('probeDeselectUnfilled') : t('probeSelectUnfilled'),
+                        onClick: probe.toggleUnfilled,
+                    }] : []),
+                    ...(probe.candidates.length > 0 ? [{
+                        label: groupAllPicked(probe.picked, probe.candidates) ? t('verifyDeselectAll') : t('verifySelectAll'),
+                        onClick: probe.toggleAll,
+                    }] : []),
+                ]}
                 autoWrite={probe.autoWrite}
                 onAutoWriteChange={probe.setAutoWrite}
-                ignoreExcludes={probe.ignoreExcludes}
-                onIgnoreExcludesChange={probe.toggleIgnoreExcludes}
                 dropUnsupported={probe.dropUnsupported}
                 onDropUnsupportedChange={probe.setDropUnsupported}
                 total={probe.total}
                 done={probe.done}
                 lines={probe.lines}
                 terminalLabels={probe.terminalLabels}
+                onRun={probe.run}
+                onStop={probe.stop}
             />
         </>
     )

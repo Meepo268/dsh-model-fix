@@ -96,8 +96,7 @@ const runProbeGroup: GroupRunner = async (
     }
 }
 
-/** 两个开关的取值：「自动写入」缺省为开（不带该键的旧前端行为不变），「剔除不支持」缺省为关；显式给了却不是布尔值按非法入参拒绝（Node 半不替浏览器半反推语义）。
- * 「忽略排除」照此校验却不取用：它只决定浏览器半点开弹层时冻结的候选清单含不含被排除的提供方，两次写回一律按那份清单走，不再读 excludes */
+/** 两个开关的取值：「自动写入」缺省为开（不带该键的旧前端行为不变），「剔除不支持」缺省为关；显式给了却不是布尔值按非法入参拒绝（Node 半不替浏览器半反推语义） */
 function flagsOf(payload: unknown): { dropUnsupported: boolean; autoWrite: boolean } {
     if (!isPlainObject(payload)) throw new Error(PROBE_REJECT_MESSAGE)
     const read = (key: string, absent: boolean): boolean => {
@@ -106,7 +105,6 @@ function flagsOf(payload: unknown): { dropUnsupported: boolean; autoWrite: boole
         if (typeof value !== 'boolean') throw new Error(PROBE_REJECT_MESSAGE)
         return value
     }
-    read('ignoreExcludes', false)
     return { dropUnsupported: read('dropUnsupported', false), autoWrite: read('autoWrite', true) }
 }
 
@@ -200,7 +198,7 @@ function count(target: Map<string, number>, key: string): void {
 /**
  * 跑一轮探测档位：预声明 → 逐档探测 → 收敛写回 → 发终帧。
  *
- * 三个开关（`ignoreExcludes` / `dropUnsupported` / `autoWrite`）随载荷走而不走参数：它们与模型清单同为
+ * 两个开关（`dropUnsupported` / `autoWrite`）随载荷走而不走参数：它们与模型清单同为
  * 浏览器半的声明，走载荷才与「入参按不可信输入校验」同一处收口。
  *
  * 事件流守卫**全程持有**（预声明到收敛之间不放开）：放开的话，中途改一次配置就会触发 `fix` 把预声明

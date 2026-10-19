@@ -125,8 +125,8 @@ export async function run(): Promise<void> {
             stable(summary.fill) === stable({ models: 1, added: 6, removed: 0 }),
             summary.fill,
         )
-        // 排除里的提供方：探测范围由浏览器半给，写回仍照旧尊重 excludes，故它一点没被动过
-        check('被排除的提供方不预声明不写回（键整个不出现）', modelsOf(ctx, 'lab')[0].reasoningEfforts === undefined, modelsOf(ctx, 'lab'))
+        // 清单外的提供方整条不动：预声明与收敛都只按清单覆盖，lab 不在清单里
+        check('清单外的提供方不预声明不写回（键整个不出现）', modelsOf(ctx, 'lab')[0].reasoningEfforts === undefined, modelsOf(ctx, 'lab'))
     }
     {
         // 剔除不支持：off 已跑通、low 被判参数不正确 ⇒ low 判「不支持」并**从原有档位里剔掉**。
@@ -367,12 +367,12 @@ export async function run(): Promise<void> {
         )
     }
     {
-        // 写回范围只认冻结的候选清单：lab 在 excludes 里也照写
+        // 写回范围只认冻结的候选清单：进了清单即照写
         const ctx = ctxOf()
         const { llm, calls } = stub({})
         await probeAndFill(ctx as unknown as Context, llm, { models: [target('lab', 'n1')] })
         check(
-            'excludes 里的提供方只要在候选清单中就照常预声明与写入',
+            '进了候选清单即照常预声明与写入',
             calls.length === 6 && stable(Object.keys(effortsOf(ctx, 'lab', 'n1') as Record<string, unknown>)) === stable(EFFORT_LEVELS.filter((l) => l !== 'off')),
             { calls, efforts: effortsOf(ctx, 'lab', 'n1') },
         )
@@ -383,7 +383,7 @@ export async function run(): Promise<void> {
         const { llm } = stub({})
         let message = ''
         try {
-            await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')], ignoreExcludes: 'yes' })
+            await probeAndFill(ctx as unknown as Context, llm, { models: [target('acme', 'm1')], dropUnsupported: 'yes' })
         } catch (error) {
             message = error instanceof Error ? error.message : String(error)
         }
@@ -455,9 +455,9 @@ export async function run(): Promise<void> {
         )
         // 空表即删键：不写空对象（空壳等同未声明，且会反复触发写入判定）
         check('空表删键时按原有档位表计删除条数（m2 原有两档）', two.models === 2 && two.added === 1 && two.removed === 2, two)
-        // 范围只由 entries 决定：excludes 里的提供方进了清单也照写
+        // 范围只由 entries 决定
         const listed = apply([{ provider: 'lab', model: 'n1', levels: ['off'] }])
-        check('excludes 里的提供方进了 entries 就照写，不按 excludes 跳过', listed.modelOps.length === 1 && listed.models === 1, listed)
+        check('进了 entries 即照写', listed.modelOps.length === 1 && listed.models === 1, listed)
         // 目标在当次配置里不存在（探测途中被删）即静默不命中，不产出 op
         const gone = apply([{ provider: 'acme', model: 'removed', levels: ['off'] }])
         check('entries 里的目标已不在配置中：零 op、零统计', gone.modelOps.length === 0 && gone.models === 0, gone)
@@ -494,7 +494,6 @@ export async function run(): Promise<void> {
     }
     {
         // 自有段缺失 ⇒ 兜底备份无处可放，整轮中止（预声明一旦写下就可能来不及收回，没有退路就不动用户配置）。
-        // 与 excludes 无关：写回已不读它，但备份始终要存进自有段
         const ctx = makeStubCtx({ api: { providers: { acme: { models: [{ id: 'm1' }] } } }, noPlugin: true })
         const { llm } = stub({})
         let message = ''

@@ -94,7 +94,7 @@ export const en: Record<CardKey, string> = {
     verifySelectAll: 'Select all',
     verifyDeselectAll: 'Deselect all',
     verifyEmpty: 'No models yet. Add models on the Models settings page first.',
-    verifyRecordEmpty: 'No verification has been run yet. After you click "Verify", each result appears here.',
+    recordsEmpty: 'No records',
     // Per-line log copy: provider-level failures carry no model/effort (not a per-model issue).
     // Levels are colon-separated rather than slash-separated — model ids themselves contain slashes (e.g. z-ai/glm-5)
     verifyCommand: '[{done} / {total}]',
@@ -123,23 +123,19 @@ export const en: Record<CardKey, string> = {
     // Probe efforts: whether the usable levels go back into the model config follows the auto-write
     // switch (on by default, no asking)
     probe: 'Probe efforts',
-    probeTitle: 'Probe reasoning levels and fill',
-    probeDesc: 'Checks which reasoning levels are usable with real requests — the most reliable way; takes longer with more models.',
-    probeEmpty: 'No models to probe. Add models on the Models settings page, or turn off "Ignore exclusions" and retry.',
+    probeTitle: 'Choose models to probe',
+    probeTabRecords: 'Probing log',
+    probeDesc: 'Tries every reasoning level with real requests to find out which ones the model supports; takes longer with more models.',
     probeQuota: 'Probing sends real requests and may use a small amount of your quota; the result is written back to the model config.',
-    // "Usable" only means accepted: an endpoint taking the off value does not mean reasoning is really disabled
-    probeOffNote: 'A usable "off" only means the request connects — not that reasoning is actually turned off (some endpoints have a default reasoning level).',
-    // The two counts map onto the two keys below: {models} is the "Probe all" scope,
-    // {unfilled} is the "Probe unfilled" scope
-    probePlan: '{models} model(s) in total, {unfilled} of them with no reasoning level filled in yet.',
     probeAutoWrite: 'Auto-write',
     probeAutoWriteTip: 'When on, the result is written back to the model config after probing; when off, nothing is written.',
-    probeIgnoreExcludes: 'Ignore exclusions',
-    probeIgnoreExcludesTip: 'When on, providers listed under "Excluded providers" are probed and written to as well.',
     probeDropUnsupported: 'Drop unsupported',
-    probeDropUnsupportedTip: 'When on, levels judged unsupported are removed from the model config; when off, nothing is removed. Only applies to "Probe all".',
-    probeUnfilled: 'Probe unfilled',
-    probeAll: 'Probe all',
+    // Only meaningful for probed models that already declare levels: unfilled models have nothing to drop
+    probeDropUnsupportedTip: 'When on, levels judged unsupported are removed from the model config; when off, nothing is removed.',
+    // Quick-pick keys, same shape as "Select all / Deselect all": wording and direction share one pair of functions
+    probeSelectUnfilled: 'Select unfilled',
+    probeDeselectUnfilled: 'Deselect unfilled',
+    probeGo: 'Probe',
     probeStop: 'Stop',
     probeCommand: '[{done} / {total}]',
     probeDone: 'Probed {models} model(s), {levels} reasoning effort(s): {usable} usable, {unsupported} unsupported.',

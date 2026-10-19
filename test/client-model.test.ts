@@ -1,4 +1,4 @@
-/** src/client/model.ts 纯映射层用例：解码（只读 version-8，非法/缺失回默认）、组总控/单格语义、排除列表增删与命中判定、脏检测、快照规范化、验证候选拍取、目标收敛与分组全选、探测档位候选（未填充判据 / 忽略排除）与七档展开 */
+/** src/client/model.ts 纯映射层用例：解码（只读 version-8，非法/缺失回默认）、组总控/单格语义、排除列表增删与命中判定、脏检测、快照规范化、验证候选拍取、目标收敛与分组全选、探测档位「未填充」判据与七档展开 */
 
 import { check, stable } from '@test/helper'
 import { DEFAULT_CONFIG as DEFAULT_FLAGS, toStored } from '@/shared/config-schema'
@@ -12,9 +12,9 @@ import {
     followingActive,
     groupAllPicked,
     groupValue,
+    isUnfilled,
     isDirty,
     masterValue,
-    probeCandidatesOf,
     probeTargetsOf,
     providerIdsOf,
     removeExclude,
@@ -364,7 +364,7 @@ export function run(): void {
         [...completed],
     )
     check('toggleGroupPicks 不改入参', partial.size === 2 && !partial.has(acmeKeyB))
-    // ---------- 探测档位候选：与验证候选同源同形，只按两个开关收窄 ----------
+    // ---------- 探测候选：与验证同源（全量清单）；「未填充」只是快捷勾选的筛子 ----------
     const probeUser = {
         providers: {
             // 三种档位形态：无声明（未填充）、只有 off（同样算未填充）、有其它档位（已填充）
@@ -372,46 +372,28 @@ export function run(): void {
             lab: { models: [{ id: 'lab-none' }] },
         },
     }
-    const pick = (excludes: readonly string[], ignoreExcludes: boolean, unfilledOnly: boolean) =>
-        probeCandidatesOf(probeUser, { excludes, ignoreExcludes, unfilledOnly })
+    const unfilledOf = (user: unknown) => verifyCandidatesOf(user).filter((candidate) => isUnfilled(candidate.efforts))
     check(
-        'probeCandidatesOf 探测所有：收全部模型（两个开关关）',
-        stable(pick([], false, false)) === stable([
-            { provider: 'acme', model: 'none', efforts: [] },
-            { provider: 'acme', model: 'off-only', efforts: ['off'] },
-            { provider: 'acme', model: 'full', efforts: ['low'] },
-            { provider: 'lab', model: 'lab-none', efforts: [] },
-        ]),
-        pick([], false, false),
-    )
-    check(
-        'probeCandidatesOf 探测未填充：无档位声明与只有 off 都算未填充，有其它档位的不算',
-        stable(pick([], false, true)) === stable([
+        '未填充子集：无档位声明与只有 off 都算未填充，有其它档位的不算',
+        stable(unfilledOf(probeUser)) === stable([
             { provider: 'acme', model: 'none', efforts: [] },
             { provider: 'acme', model: 'off-only', efforts: ['off'] },
             { provider: 'lab', model: 'lab-none', efforts: [] },
         ]),
-        pick([], false, true),
+        unfilledOf(probeUser),
     )
-    check(
-        'probeCandidatesOf 默认跳过排除命中的提供方',
-        stable(pick(['lab'], false, false).map((c) => `${c.provider}/${c.model}`)) === stable(['acme/none', 'acme/off-only', 'acme/full']),
-        pick(['lab'], false, false),
-    )
-    check(
-        'probeCandidatesOf 忽略排除：被排除的提供方也收进来（同一开关同时管 Node 半的两次写回）',
-        stable(pick(['lab'], true, true).map((c) => `${c.provider}/${c.model}`)) === stable(['acme/none', 'acme/off-only', 'lab/lab-none']),
-        pick(['lab'], true, true),
-    )
-    check('probeCandidatesOf 垃圾输入返回空', probeCandidatesOf(undefined, { excludes: [], ignoreExcludes: false, unfilledOnly: false }).length === 0)
+    // ---------- isUnfilled：「选择未填充」快捷键的筛子 ----------
+    check('isUnfilled 无档位声明为真', isUnfilled([]) === true)
+    check('isUnfilled 只有 off 也算未填充（等同「这个模型不推理」）', isUnfilled(['off']) === true)
+    check('isUnfilled 有其它档位即已填充', isUnfilled(['off', 'low']) === false && isUnfilled(['low']) === false)
     check(
         'probeTargetsOf 已声明 off 的模型发满七档、未声明的不发 off',
-        stable(probeTargetsOf(pick([], false, true)).map((t) => t.efforts)) === stable([
+        stable(probeTargetsOf(unfilledOf(probeUser)).map((t) => t.efforts)) === stable([
             [...EFFORT_LEVELS.filter((l) => l !== 'off')],
             [...EFFORT_LEVELS],
             [...EFFORT_LEVELS.filter((l) => l !== 'off')],
         ]),
-        probeTargetsOf(pick([], false, true)).map((t) => t.efforts),
+        probeTargetsOf(unfilledOf(probeUser)).map((t) => t.efforts),
     )
     check('probeTargetsOf 空候选得空', probeTargetsOf([]).length === 0)
     // followingActive：跟随实际生效的判据（插件开关 && 宿主设置未显式开启）
