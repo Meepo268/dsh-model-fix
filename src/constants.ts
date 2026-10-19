@@ -43,6 +43,7 @@ export const HINTS: ReadonlyArray<readonly [string, readonly string[]]> = [
     ['gemini', ['google']],
     ['gemma', ['google']],
     ['qwen', ['alibaba', 'alibaba-cn']],
+    ['qwen3', ['alibaba', 'alibaba-cn']],
     ['glm', ['zai', 'zhipuai']],
     ['mistral', ['mistral']],
     ['magistral', ['mistral']],
@@ -53,4 +54,10 @@ export const HINTS: ReadonlyArray<readonly [string, readonly string[]]> = [
     ['voxtral', ['mistral']],
     ['devstral', ['mistral']],
     ['minimax', ['minimax', 'minimax-cn']],
+    ['mimo', ['xiaomi']],
+    ['llama', ['llama']],
+    ['sonar', ['perplexity']],
+    ['longcat', ['longcat']],
+    ['doubao', ['volcengine', 'volcengine-coding-plan']],
+    ['step', ['stepfun', 'stepfun-ai', 'stepfun-step-plan']],
 ]

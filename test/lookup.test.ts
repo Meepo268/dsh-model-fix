@@ -66,9 +66,37 @@ export function run(): void {
     check('多候选提供方依序尝试（moonshotai 无条目回落 moonshotai-cn）', lookup(catalog({ 'moonshotai-cn': ['kimi-k3'] }), 'custom-ai', 'kimi-k3')?.id === 'kimi-k3')
     check('多候选提供方第一候选优先', lookup(catalog({ moonshotai: ['kimi-k3'], 'moonshotai-cn': ['kimi-k3'] }), 'custom-ai', 'kimi-k3')?.id === 'kimi-k3')
     check('qwen 前缀提示 alibaba 依序回落 alibaba-cn', lookup(catalog({ 'alibaba-cn': ['qwen3-max'] }), 'custom-ai', 'qwen3-max')?.id === 'qwen3-max')
+    // qwen3 代版本号粘在 qwen 后（qwen3.x / qwen3-x），`qwen` 行的分隔符判据罩不住，须单列；
+    // 无提示时同名常落多网关 -> 兜底判歧义放弃，有提示则官方组依序优先
+    check('qwen3 点形前缀提示 alibaba（消多网关镜像歧义）', lookup(
+        catalog({ alibaba: ['qwen3.8-max'], aihubmix: ['qwen3.8-max'] }), 'custom-ai', 'qwen3.8-max',
+    )?.id === 'qwen3.8-max')
+    check('qwen3 连字符形（qwen3-coder）同走提示', lookup(
+        catalog({ alibaba: ['qwen3-coder-flash'], aihubmix: ['qwen3-coder-flash'] }), 'custom-ai', 'qwen3-coder-flash',
+    )?.id === 'qwen3-coder-flash')
     check('glm 前缀提示 zai 依序回落 zhipuai', lookup(catalog({ zhipuai: ['glm-5'] }), 'custom-ai', 'glm-5')?.id === 'glm-5')
     check('minimax 大写裸名小写后命中候选表', lookup(catalog({ minimax: ['MiniMax-M3'] }), 'custom-ai', 'MiniMax-M3')?.id === 'MiniMax-M3')
     check('gemini 前缀提示 google', lookup(catalog({ google: ['gemini-3-flash'] }), 'custom-ai', 'gemini-3-flash')?.id === 'gemini-3-flash')
+    check('mimo 前缀提示 xiaomi（官方组优先于网关镜像，消跨提供方歧义）', lookup(
+        indexed({ xiaomi: [entry('mimo-v2.6-flash')], aihubmix: [entry('mimo-v2.6-flash')] }),
+        'custom-ai', 'mimo-v2.6-flash',
+    )?.id === 'mimo-v2.6-flash')
+    // 头部厂商镜像常多家重复：无提示行时同名落多网关 -> 兜底判歧义放弃；有提示则官方组依序优先
+    check('llama 前缀提示 llama（Meta 官方组消网关镜像歧义）', lookup(
+        catalog({ llama: ['llama-3.3-70b-instruct'], aihubmix: ['llama-3.3-70b-instruct'] }), 'custom-ai', 'llama-3.3-70b-instruct',
+    )?.id === 'llama-3.3-70b-instruct')
+    check('sonar 前缀提示 perplexity', lookup(
+        catalog({ perplexity: ['sonar-pro'], aihubmix: ['sonar-pro'] }), 'custom-ai', 'sonar-pro',
+    )?.id === 'sonar-pro')
+    check('longcat 前缀提示 longcat（大写裸名归一小写后命中）', lookup(
+        catalog({ longcat: ['LongCat-2.0'], aihubmix: ['LongCat-2.0'] }), 'custom-ai', 'LongCat-2.0',
+    )?.id === 'LongCat-2.0')
+    check('doubao 前缀提示 volcengine（前缀与提供方名不搭，指向火山引擎官方组）', lookup(
+        catalog({ volcengine: ['doubao-seed-1-8'], aihubmix: ['doubao-seed-1-8'] }), 'custom-ai', 'doubao-seed-1-8',
+    )?.id === 'doubao-seed-1-8')
+    check('step 前缀提示 stepfun 系（首候选缺席时依序回落 stepfun-ai）', lookup(
+        catalog({ 'stepfun-ai': ['step-5-preview'], aihubmix: ['step-5-preview'] }), 'custom-ai', 'step-5-preview',
+    )?.id === 'step-5-preview')
     check('chatgpt 前缀提示 openai', lookup(catalog({ openai: ['chatgpt-4o-latest'] }), 'custom-ai', 'chatgpt-4o-latest')?.id === 'chatgpt-4o-latest')
     check('mistral 系衍生前缀提示 mistral（codestral）', lookup(catalog({ mistral: ['codestral-latest'] }), 'custom-ai', 'codestral')?.id === 'codestral-latest')
 
