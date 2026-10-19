@@ -193,18 +193,16 @@ const STYLE_TEXT = [
     //   （当前推理级别）的色调——它同样表达「有个值摆在那里、此刻却不参与决策」，与模型名同权就误读成正常状态
     // · 生效态（跟随中）：success 绿底 + 字；补 6px 状态点（::before），与非生效态在形状上即可区分（非生效态不画点）
     // · 失败态（写入被拒）：warn 琥珀色，原生 title 提示原因
-    // 弹层面板：宽度与 flex 参与方式复刻宿主设置面板 SettingsRoot.module.css 的 `.panel`（左下角齿轮点开的那一个），
-    // 高度改按内容收敛：设置面板是 800×800 的固定大框，本卡片内容远不足 800px，固定高度会让面板上下留出
-    // 一大片容器自身区域（无内容即无滚动提示、点击落在容器上），故取 640px——够放下多数瓦片的常用视域，
-    // 超出即在包裹层内滚动。min() 保留窄视口下的收敛，calc 分支给顶栏留出与 .root padding 相同的上下空气。
+    // 弹层面板：宽度与 flex 参与方式复刻宿主设置面板 SettingsRoot.module.css 的 `.panel`（左下角齿轮点开的那一个）；
+    // 高度由内容撑开，640px 封顶（min() 保留窄视口下的收敛，calc 分支给顶栏留出与 .root padding 相同的上下空气），
+    // 卡片超出封顶时在包裹层内滚动
     // flex:none：Modal 的 .root 是 align-items:center 的 flex 容器，不加则本项按内容高度参与对齐、面板不居中。
     // Modal 走 headless（卡片直接作 children，宿主的标题栏/关闭钮/content/body 一律不渲染），
     // .dialog 自带的 padding:0 0 24px 与 gap:20px 在此清空（头尾留白与子项间距原为 chrome 而设）。
     // 底色/圆角/阴影取 .panel 的令牌（--dsw-alias-bg-layer-2 与 .card 的 bg-layer-3 分层，容器本身可见，
     // 点击命中容器即不再误落到遮罩）。
-    '.dsh-mf-composerDialog{flex:none;display:flex;flex-direction:column;width:800px;height:min(640px,calc(100vh - 2 * max(24px,var(--dsh-frame-overlay-top,24px))));max-width:calc(100vw - 48px);padding:0;gap:0;overflow:hidden;border-radius:var(--dsw-radius-panel);background:var(--dsw-alias-bg-layer-2);box-shadow:var(--dsw-elevation-prominent);--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2)}',
-    // headless 下 children 直挂 .dialog（flex 列且已封顶），滚动容器由本包裹层承担：
-    // 伸展到面板全高，故内容不足时容器自身即是滚动视口（内容居上，不塌成内容高）
+    '.dsh-mf-composerDialog{flex:none;display:flex;flex-direction:column;width:800px;max-height:min(640px,calc(100vh - 2 * max(24px,var(--dsh-frame-overlay-top,24px))));max-width:calc(100vw - 48px);padding:0;gap:0;overflow:hidden;border-radius:var(--dsw-radius-panel);background:var(--dsw-alias-bg-layer-2);box-shadow:var(--dsw-elevation-prominent);--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2)}',
+    // 滚动容器是包裹层：面板顶到 max-height 时，卡片溢出在此滚动
     '.dsh-mf-composerBody{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}',
     // 面板内的卡片去掉自身描边与底色，透出面板的 --dsw-alias-bg-layer-2，
     // 与设置面板的内容列同观感（那边 .nav/.content 亦无 own fill，面板底色透出）
