@@ -1,9 +1,5 @@
-/**
- * 浏览器半调 Node 半的唯一出口：三个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
- *
- * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与 Node 半一一对应。
- * 卡片只消费本文件产出的 `RpcCarrier`，自己不发起请求。
- */
+/** 浏览器半调 Node 半的唯一出口：三个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
+ * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与 Node 半一一对应。卡片只消费本文件产出的 `RpcCarrier`，自己不发起请求 */
 
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 // channel RPC 的结果信封
@@ -32,12 +28,7 @@ export interface RpcCarrier {
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => Promise<VerifySummary | undefined>
-    /**
-     * 探测档位：走进度流端点，Node 半先把候选档位临时预声明进配置、再对每个模型逐档各发一次最小请求，
-     * 跑完按「自动写入」开关收敛写回或整轮还原；终帧的 `summary.fill` 一律带收敛结论的增删统计
-     * （关闭时是「可补全」的假设统计）。开关须与 Node 半同值。被中止（停止 / 关窗 / 断连）
-     * 回 undefined——中止不发终帧，且未跑完的模型一律还原成预声明之前的形态；没能开跑或中途异常则抛错。
-     */
+    /** 探测档位：走进度流端点，Node 半先把候选档位临时预声明进配置、再对每个模型逐档各发一次最小请求，跑完按「自动写入」开关收敛写回或整轮还原；终帧的 `summary.fill` 一律带收敛结论的增删统计（关闭时是「可补全」的假设统计）。开关须与 Node 半同值。被中止（停止 / 关窗 / 断连）回 undefined——中止不发终帧，且未跑完的模型一律还原成预声明之前的形态；没能开跑或中途异常则抛错 */
     probeEfforts: (
         models: readonly VerifyTarget[],
         flags: { dropUnsupported: boolean; autoWrite: boolean },
@@ -46,25 +37,16 @@ export interface RpcCarrier {
     ) => Promise<VerifySummary | undefined>
 }
 
-/**
- * 取一份调用面。
- *
- * @param rpc - 宿主 connection 服务的 client RPC 面（由调用方在子 fiber 内取用后传入）
- */
+/** 取一份调用面。`rpc` 是宿主 connection 服务的 client RPC 面（由调用方在子 fiber 内取用后传入） */
 export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const channel = `/${PLUGIN_NS}`
     const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(WRITEBACK_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
-    /**
-     * 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
-     *
-     * 用 `fetch` + `getReader()` 而非 `EventSource`：后者自动重连，而重连等于把整轮重新跑一遍。
-     * 非 2xx 时优先用响应体文案（Node 半两条流都会给一句中文原因）。
-     *
-     * @returns 整轮汇总；被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败
-     */
+    /** 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
+     * 用 `fetch` + `getReader()` 而非 `EventSource`：后者自动重连，而重连等于把整轮重新跑一遍。非 2xx 时优先用响应体文案（Node 半两条流都会给一句中文原因）。
+     * 被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败 */
     const streamSummary = async (
         url: string,
         body: unknown,
@@ -111,18 +93,10 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
             throw error
         }
     }
-    /**
-     * 验证模型：载荷是卡片按勾选收敛好的「提供方 / 模型」清单（每模型一条不带档位参数的请求）。
-     *
-     * 走独立的进度流端点而非 channel RPC——一次调用要回持续多帧的响应。用文档相对路由（去掉前导斜杠）
-     * 是宿主对浏览器侧的约定，两侧同取 `src/shared/constants.ts` 的同一常量。
-     */
+    /** 验证模型：载荷是卡片按勾选收敛好的「提供方 / 模型」清单（每模型一条不带档位参数的请求）。走独立的进度流端点而非 channel RPC——一次调用要回持续多帧的响应。用文档相对路由（去掉前导斜杠）是宿主对浏览器侧的约定，两侧同取 `src/shared/constants.ts` 的同一常量 */
     const verifyModels = (models: readonly VerifyTarget[], onFrame: (frame: VerifyProgressUpdate) => void, signal: AbortSignal) =>
         streamSummary(VERIFY_STREAM_URL, { models }, onFrame, signal)
-    /**
-     * 探测档位：载荷与验证同形，另带两个开关，须与 Node 半共用同一个值——
-     * 「剔除不支持」决定收敛口径；「自动写入」关闭时 Node 半在探测结束后只把预声明原样收回。
-     */
+    /** 探测档位：载荷与验证同形，另带两个开关，须与 Node 半共用同一个值——「剔除不支持」决定收敛口径；「自动写入」关闭时 Node 半在探测结束后只把预声明原样收回 */
     const probeEfforts = (
         models: readonly VerifyTarget[],
         flags: { dropUnsupported: boolean; autoWrite: boolean },

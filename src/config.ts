@@ -2,11 +2,7 @@ import { CONFIG_VERSION, MIN_SUPPORTED_VERSION, DEFAULT_CONFIG, parseSnapshot, p
 import type { PluginConfig } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 
-/**
- * 从版本快照段解析运行时配置：优先当前版本；否则取所有版本中 ≥ 最低支持的最高可解析快照
- * （含更高版本——按当前 schema 解析，多余键忽略、缺失字段落默认）；均不可用时回退默认配置。
- * 用于自愈重写取「当前生效值」与运行期配置源；高版本快照读取后不清理，仍供再升级无损。
- */
+/** 解析版本快照段为运行时配置：优先当前版本，否则取 ≥ 最低支持的最高可解析快照（降级解析），均不可用回退默认 */
 export function resolveConfig(section: unknown): PluginConfig {
     if (!isPlainObject(section)) return DEFAULT_CONFIG
     let best: { version: number; config: PluginConfig } | undefined

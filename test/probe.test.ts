@@ -26,10 +26,7 @@ const target = (provider: unknown, model: unknown, hasOff = false) => ({
     efforts: hasOff ? [...EFFORT_LEVELS] : [...EFFORT_LEVELS.filter((l) => l !== 'off')],
 })
 
-/**
- * llm 桩：按「模型@档位 -> 分片序列」应答，未登记的组合默认成功；记录调用顺序。
- * `onCall` 供用例在中途触发中止。
- */
+/** llm 桩：按「模型@档位 -> 分片序列」应答，未登记的组合默认成功；记录调用顺序。`onCall` 供用例在中途触发中止 */
 const stub = (script: Record<string, readonly StreamChunk[]>, onCall?: (callIndex: number) => void) => {
     const calls: string[] = []
     const stream = (options: {

@@ -1,9 +1,5 @@
-/**
- * 探测档位的两步写回：把候选档位**临时预声明**进模型配置，探测跑完后再按结论**收敛**成最终形态。
- *
- * 设计裁决（预声明必要性、写回壳理由、基线比对口径）见 docs/decisions.md「探测档位」。
- * 本文件独有的口径：`targetKey` 用 JSON.stringify([provider, model]) 序列化，因模型 id 可含 '/'，字符串拼接会歧义。
- */
+/** 探测档位的两步写回：把候选档位临时预声明进模型配置，探测跑完再按结论收敛成最终形态。
+ * 裁决见 docs/decisions.md「探测档位」。`targetKey` 用 JSON.stringify([provider, model]) 序列化（模型 id 可含 '/'，字符串拼接会歧义） */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { EFFORT_LEVELS } from '@/shared/constants'
@@ -57,12 +53,7 @@ function declaredLevelsOf(value: unknown): readonly string[] {
     return EFFORT_LEVELS.filter((level) => keys.has(level))
 }
 
-/**
- * 按档位表物化 `reasoningEfforts` 的取值：七档内的键完全由 `levels` 决定——**已有键一律保留原取值**
- * （用户的 wire 拼写属用户配置，如 `xhigh: 'ultra'`、off 的 `none`/`off` 目录拼写），新补的档位取档位名
- * 本身（off 无既有拼写可保时取 null），不在 levels 里的即被剔除/还原要删的档位。七档之外的键原样保留
- * （手改配置文件的残留，宿主读取时忽略），静默删除违背自定义字段保留纪律。
- */
+/** 按档位表物化 `reasoningEfforts` 取值：七档内键由 `levels` 决定（已有键保留原取值——用户 wire 拼写属配置，如 `xhigh:'ultra'`、off 的 `none`/`off`；新补档取档位名本身，off 无既有拼写时取 null），不在 levels 里的剔除；七档外键原样保留（手改残留，宿主忽略，静默删除违背自定义字段保留纪律） */
 function effortsValueOf(levels: readonly string[], existing?: Record<string, unknown>): Record<string, string | null> {
     const value: Record<string, string | null> = {}
     if (existing !== undefined) {
@@ -77,25 +68,10 @@ function effortsValueOf(levels: readonly string[], existing?: Record<string, unk
     return value
 }
 
-/**
- * 档位表改写计划（纯函数，零 ctx 依赖可单测）：
- * 按「提供方 / 模型」把档位表整段设成 `levels`，其余模型字段与同提供方的其他模型原样保留，
- * 仅当某 provider 至少改写一个模型时才整段重建写回（零变更零 op）。
- *
- * **范围只由 `entries` 决定**：它就是发跑那一刻冻结的候选清单，
- * 预声明与收敛因此覆盖同一批目标。遍历的是**当次现读的** `providers`，
- * 故 `entries` 里已被用户删掉的目标自然不命中、不产出 op（而非写出失败）。
- *
- * **目标档位表为空或只剩 off 即整个 `reasoningEfforts` 键删掉**（两者都等同未声明），
- * 不是先写空再删：路径 op 不支持数组下标中间段，只能整段 `set`，而空壳留着会反复触发写入判定。
- * 该键连同其余空壳字段（`input` / `compat`）一律走 `stripEmptyFields` 的统一判据，不在此处另写一份。
- *
- * **两套口径各按各的基线**，别混：
- * - `modelOps` 按**当前值**与目标表比对——只有真要改才产出 op，故收敛阶段算出的表与预声明一致时零写入。
- * - `models` / `added` / `removed` 按 `baseline`（缺省即当前值）比对——探测档位传的是**预声明之前**的档位表，
- *   统计口径要对齐用户视角的那份配置：临时预声明的档位被收回时既不算新增也不算删除，它本不属于用户配置。
- *   正因如此「七档全可用」时收敛是零写入，而统计仍如实报出「补了 7 个档位」。
- */
+/** 档位表改写计划（纯函数、可单测）：按 provider/model 整段设成 `levels`，其余字段原样保留；仅某 provider 至少改写一个模型时才整段重建（零变更零 op）。
+ * 范围只由 `entries` 决定（发跑时冻结的候选清单，预声明与收敛覆盖同一批目标）；遍历当次现读的 `providers`，entries 里已删目标自然不命中、不产 op（而非写出失败）。
+ * 目标档位表为空或只剩 off 即整个 `reasoningEfforts` 键删掉（两者等同未声明）：路径 op 不支持数组下标中间段，只能整段 set，空壳留着会反复触发写入判定；空壳字段一律走 `stripEmptyFields`，不另写判据。
+ * 两套口径各按各的基线：`modelOps` 按当前值与目标表比对（只有真要改才产 op，收敛阶段与预声明一致时零写入）；`models`/`added`/`removed` 按 `baseline`（探测档位传的是预声明之前的档位表，统计对齐用户视角——临时预声明的档位被收回时既不算新增也不算删除，故「七档全可用」时收敛零写入但统计仍报「补了 7 个」） */
 export function planEffortApply(
     providers: Record<string, unknown>,
     entries: readonly EffortApply[],
@@ -143,12 +119,8 @@ function sameLevels(left: readonly string[], right: readonly string[]): boolean 
     return left.length === right.length && left.every((level, index) => level === right[index])
 }
 
-/**
- * 读最新配置 → 出计划 → 写回 `llm-pi-ai` 段（骨架见 `src/writeback.ts`，`SETTINGS_CONFLICT` 时重读重算、限次）。
- *
- * **本函数不碰事件流守卫**：探测档位的守卫持有整轮（预声明 → 探测 → 收敛），故走不带守卫的 `writebackApi`。
- * `compute` 在每次重试里重算，故它必须是纯函数、可对任意一次快照求值。
- */
+/** 读最新配置 → 出计划 → 写回 `llm-pi-ai` 段（骨架见 `src/writeback.ts`，冲突重读重算限次）。
+ * 不碰事件流守卫：探测档位的守卫持有整轮（预声明 → 探测 → 收敛），故走不带守卫的 `writebackApi`；`compute` 每次重试重算，须为纯函数 */
 async function applyEfforts(
     ctx: Context,
     compute: (providers: Record<string, unknown>) => EffortApplyPlan,
@@ -164,14 +136,8 @@ async function applyEfforts(
     })
 }
 
-/**
- * 预声明：把目标模型的档位表补成「原有 ∪ 全部候选档位」，返回**改写前**各模型原有的档位表。
- *
- * 写回范围就是 `targets`（发跑那一刻冻结的候选清单）。
- *
- * 返回的那份原有档位表是收敛阶段的唯一基线（临时预声明的档位不属于用户配置，收回时不计入增删）。
- * 目标模型已不存在于配置里（探测期间被用户删掉）时不出现在返回值里，收敛阶段自然也不会碰它。
- */
+/** 预声明：把目标模型的档位表补成「原有 ∪ 全部候选档位」，返回改写前各模型原有的档位表。
+ * 返回的那份原有档位表是收敛阶段的唯一基线（临时预声明的档位不属于用户配置，收回时不计入增删）；目标模型已不存在（探测期间被删）时不出现，收敛自然不碰它 */
 export async function declareProbeEfforts(
     ctx: Context,
     targets: readonly EffortApply[],
@@ -182,9 +148,8 @@ export async function declareProbeEfforts(
         return planEffortApply(
             providers,
             targets.map((target) => {
-                // 档位表按 EFFORT_LEVELS 排序写入（不按「原有在前」）：配置里的键序是用户会看见的东西，
-                // 预声明是临时形态也不能让档位表显得杂乱；且收敛阶段按同一口径比对，键序不一致会误判成有变更
-                // off 不补：未声明 off 的模型不替它猜——"能通"不等于"能关"（#7）
+                // 按 EFFORT_LEVELS 排序写入（不按「原有在前」）：键序是用户会看见的，预声明也不能让档位表显得杂乱；收敛按同一口径比对，键序不一致会误判成有变更
+                // off 不补：未声明 off 的模型不替它猜——"能通"不等于"能关"
                 const pre = preexisting.get(targetKey(target.provider, target.model)) ?? []
                 const merged = new Set([...pre, ...EFFORT_LEVELS.filter((level) => level !== 'off')])
                 return { ...target, levels: EFFORT_LEVELS.filter((level) => merged.has(level)) }
@@ -194,10 +159,7 @@ export async function declareProbeEfforts(
     return preexisting
 }
 
-/**
- * 收敛：按探测结论把档位表改回最终形态（`levels` 为空数组的模型即删掉该字段）。
- * 写入前判空壳、幂等；增删统计对齐 `baseline`（预声明之前的档位表）。
- */
+/** 收敛：按探测结论把档位表改回最终形态（`levels` 为空数组的模型即删掉该字段）；写入前判空壳、幂等；增删统计对齐 `baseline`（预声明之前的档位表） */
 export function convergeProbeEfforts(
     ctx: Context,
     entries: readonly EffortApply[],

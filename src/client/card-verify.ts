@@ -1,7 +1,4 @@
-/**
- * 「验证模型」的整轮编排 hook（浏览器半）：勾选集、记录区、发跑 / 停止 / 关窗。
- * 只编排不渲染；busy 由卡片传入。
- */
+/** 「验证模型」的整轮编排 hook（浏览器半）：勾选集、记录区、发跑 / 停止 / 关窗。只编排不渲染；busy 由卡片传入 */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TerminalBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'

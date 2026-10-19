@@ -27,20 +27,7 @@ interface FillPlan {
     readonly excluded: number
 }
 
-/**
- * 纯计划函数：遍历提供方，算出模型参数 op 与路由 compat op（零 ctx、可单测）。
- * 两类 op 在 `llm-pi-ai` 的**同一批 mutate** 内提交（二者互不影响）：
- * - 模型参数：缺失推理级别/容量/图片模态且有目录数据则填充（受 autoFill 对应字段控制），
- *   allowUpdate（force 时单次绕过，不落存储）开启则按目录最新值同步；并剔除空壳字段
- *   （判据唯一处在 src/empty.ts，缺失补写也按清理后的值为准）。读 descriptor.user（原始字段），
- *   按 provider 整段覆盖 models；数据无档位不删除已有配置。
- * - 路由 compat：按规则组为 openai-completions 路由添加或**移除**字段（见 src/compat.ts），只写路由级；
- *   非目标协议无论开关如何仅做残留清理（只删不加）。
- * - 提供方排除：`excludes` 命中的 providerId 在循环入口即整条跳过（已写入的值原地保留）。
- * - `efforts` 记忆**不在此处理**：存取在浏览器半、失效清理在 `src/memory.ts`。
- *
- * 理由展开见 docs/decisions.md「解析与填充」「排除与列表」「参数来源」。
- */
+/** 纯计划函数（零 ctx、可单测）：遍历提供方算出模型参数 op 与路由 compat op；`excludes` 命中者在入口整条跳过；`efforts` 记忆不在本文件处理 */
 export function planFill(
     cfg: PluginConfig,
     providers: Record<string, unknown>,
@@ -69,8 +56,7 @@ export function planFill(
                 const model = models[i]
                 if (!isPlainObject(model) || model.id === undefined || model.id === null) continue
                 const modelId = String(model.id)
-                // 取值一律取自剔除空壳后的模型：空壳在 harness 语义上等同未声明，缺失补写就得认它——
-                // 否则 `reasoningEfforts: {}` 会既不被填又被清掉，要等下一轮事件才补上，凭空多一个来回
+                // 缺失补写按剔除空壳后的值认（空壳等同未声明，否则既不被填又被清、要等下一轮才补上）
                 const cleaned = stripEmptyFields(model)
                 const { reasoningEfforts, contextWindow, maxTokens } = cleaned as {
                     reasoningEfforts?: unknown
@@ -138,20 +124,12 @@ export function planFill(
     return { ops, changes, compatChanges, excluded }
 }
 
-/**
- * 填充与写回的编排体：读最新段 → `planFill` 出计划 → 写 `llm-pi-ai` → 返回变更模型数。
- *
- * 只写 `llm-pi-ai` 一段，完全不碰自有 NS，也不参与记忆生命周期。模型写回失败先告警再抛出，
- * 由调用方决定后续处理（RPC 转失败结果，事件侧吞掉 rejection）。冲突重试时重读整段以取最新 revision。
- * 返回变更模型数（不含路由 compat 计数，保持 RPC 契约）。
- *
- * 本函数**不走** `src/writeback.ts` 的写回外壳：守卫不由它托管，骨架与三个写回端点不同形（理由见该文件头）。
- */
+/** 填充与写回：读最新段 → `planFill` 出计划 → 写 `llm-pi-ai` → 返回变更模型数（不含 compat 计数，保持 RPC 契约）
+ * 写回失败先告警再抛出；冲突限次重试时重读整段。刻意不走 writeback.ts 外壳（守卫与端点骨架不同形，理由见该文件头） */
 export async function fix(ctx: Context, force = false): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        // 卸载后不再碰 settings（dispose 会让 inject 的服务不可取，抛 inactive context）
+        // 卸载后不再碰 settings（服务已 dispose，访问即抛 inactive context）
         if (!ctx.fiber.store) return 0
-        // 冲突重试时重读，获取最新 revision
         const descriptor = descriptorOf(ctx, API_NS)
         if (!descriptor) return 0
         const providers = providersOf(descriptor.user)

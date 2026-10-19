@@ -1,6 +1,4 @@
-/**
- * 卡片词典·英文（浏览器半）。键名见 locale-keys.ts，与 locale-zh.ts 逐条对齐。
- */
+/** 卡片词典·英文（浏览器半）。键名见 locale-keys.ts，与 locale-zh.ts 逐条对齐 */
 
 import type { CardKey } from '@/client/locale-keys'
 

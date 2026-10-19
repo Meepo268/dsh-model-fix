@@ -38,10 +38,7 @@ const failureFacts = (code: string): VerifyFailureFacts => ({ code, status: unde
 const probeOf = (): Pick<VerifyProbe, 'provider' | 'model' | 'effort'> =>
     ({ provider: 'a', model: 'm1', effort: 'off' })
 
-/**
- * 永不 settle 且不理会 signal 的流桩：模拟「适配器忽略 signal 并停在未决 await 上」这一宿主回归形态。
- * `probeOnce` 若没有硬兜底，读流就会永远挂在这里。
- */
+/** 永不 settle 且不理会 signal 的流桩：模拟「适配器忽略 signal 并停在未决 await 上」这一宿主回归形态。`probeOnce` 若没有硬兜底，读流就会永远挂在这里 */
 const deafStream = (): Pick<LlmRuntime, 'stream'> => ({
     stream: () => ({
         [Symbol.asyncIterator]: () => ({
@@ -50,10 +47,7 @@ const deafStream = (): Pick<LlmRuntime, 'stream'> => ({
     }) as AsyncIterable<StreamChunk>,
 })
 
-/**
- * 不理 signal 但持续产出的流桩：每 5ms 给一块 text-delta、永不 finish，并记录被消费的块数与是否被请求关闭。
- * 用来观测「硬兜底之后被放弃的循环是否还在后台继续消费」——没修的话它会一直读下去。
- */
+/** 不理 signal 但持续产出的流桩：每 5ms 给一块 text-delta、永不 finish，并记录被消费的块数与是否被请求关闭。用来观测「硬兜底之后被放弃的循环是否还在后台继续消费」——没修的话它会一直读下去 */
 const endlessStream = (): { llm: Pick<LlmRuntime, 'stream'>; chunks: () => number; closed: () => boolean } => {
     let chunks = 0
     let closed = false
@@ -70,12 +64,7 @@ const endlessStream = (): { llm: Pick<LlmRuntime, 'stream'>; chunks: () => numbe
     return { llm: { stream } as unknown as Pick<LlmRuntime, 'stream'>, chunks: () => chunks, closed: () => closed }
 }
 
-/**
- * 先给一块 `block-start`（命中「已开始产出」的提前返回），此后 `next()` 与迭代器 `return()` 都永不 settle，
- * 并按发生顺序记录「中止信号发出」与「迭代器被请求关闭」。
- * 用来钉住 #19：命中时 abort 必须立刻发出——不排在被放弃的迭代器关闭之后，更不等它 settle。
- * 旧写法（`for await` 的隐式关闭）会一直挂在关闭上，`probeOnce` 永不返回。
- */
+/** 先给一块 `block-start`（命中「已开始产出」的提前返回），此后 `next()` 与迭代器 `return()` 都永不 settle，并按发生顺序记录「中止信号发出」与「迭代器被请求关闭」。用来钉住 #19：命中时 abort 必须立刻发出——不排在被放弃的迭代器关闭之后，更不等它 settle。旧写法（`for await` 的隐式关闭）会一直挂在关闭上，`probeOnce` 永不返回 */
 const hitThenHangStream = (): { llm: Pick<LlmRuntime, 'stream'>; order: string[] } => {
     const order: string[] = []
     let nextCalls = 0

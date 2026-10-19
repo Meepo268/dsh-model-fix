@@ -1,8 +1,6 @@
-/**
- * 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（五组布尔 + excludes 列表）。
+/** 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（五组布尔 + excludes 列表）。
  * 跨半共享的常量、类型、解析函数单一来源在 `src/shared/`（经 client 纯度门禁放行，不引 Node 专属值）。
- * 本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生、验证与探测候选的拍取与目标收敛。
- */
+ * 本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生、验证与探测候选的拍取与目标收敛 */
 
 import type { PluginConfig } from '@/shared/types'
 import { isPlainObject, providersOf } from '@/shared/types'
@@ -37,10 +35,7 @@ export type RowKey =
 /** 卡片侧消费的完整当前配置（与 PluginConfig 同形：四组布尔 + excludes + efforts） */
 export type Flags = PluginConfig
 
-/**
- * 解码命名空间整段：只读当前版本快照（键见上方 `VERSION_KEY`；Node 半迁移保证启动后段内必有，见 migrateConfig）；
- * 段非法、快照缺失或非法均回退默认。永不返回 undefined（返回 undefined 会让宿主 scope 永挂 loading）。
- */
+/** 解码命名空间整段：只读当前版本快照（键见上方 `VERSION_KEY`；Node 半迁移保证启动后段内必有，见 migrateConfig）；段非法、快照缺失或非法均回退默认。永不返回 undefined（返回 undefined 会让宿主 scope 永挂 loading） */
 export function decodeSection(section: unknown): Flags {
     return isPlainObject(section) ? parseSnapshot(section[VERSION_KEY]) ?? DEFAULT_CONFIG : DEFAULT_CONFIG
 }
@@ -55,24 +50,16 @@ export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
     return rowsOf(flags, group)[key] === true
 }
 
-/**
- * 某 UI 部件是否应当挂载：读 `behavior` 组对应开关，配置缺席（段未就绪）时按缺省全开处理。
- *
- * 与 `groupValue` 的差别只有缺省方向——配置读不到时若落 `false` 会让首屏凭空少一块界面，
- * 故此处缺省取「可见」。组内取值仍一律按严格布尔判。
- */
+/** 某 UI 部件是否应当挂载：读 `behavior` 组对应开关，配置缺席（段未就绪）时按缺省全开处理。
+ * 与 `groupValue` 的差别只有缺省方向——配置读不到时若落 `false` 会让首屏凭空少一块界面，故此处缺省取「可见」。组内取值仍一律按严格布尔判 */
 export function behaviorVisible(flags: Flags | undefined, key: (typeof BEHAVIOR_KEYS)[number]): boolean {
     if (flags === undefined) return true
     return rowsOf(flags, 'behavior')[key] !== false
 }
 
-/**
- * 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启。
+/** 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启。
  * 宿主那段开启时子智能体自会按授权表选模型，跟随反而推翻宿主的合法选择，此时「跟随中」灯应呈灰态。
- *
- * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启
- * （缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致）。
- */
+ * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启（缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致） */
 export function followingActive(flags: Flags, hostEnabled: boolean | undefined): boolean {
     return groupValue(flags, 'userExperience', 'followParent') && !hostEnabled
 }
@@ -97,10 +84,7 @@ export function toggleCell(flags: Flags, group: Group, key: RowKey): Flags {
     return { ...flags, [group]: rows } as Flags
 }
 
-/**
- * 排除列表逐项比较（**顺序敏感**）：草稿只由已存值经增删派生，顺序不会自行漂移，
- * 故无需排序——插入顺序是用户意图的一部分。
- */
+/** 排除列表逐项比较（顺序敏感）：草稿只由已存值经增删派生，顺序不会自行漂移，故无需排序——插入顺序是用户意图的一部分 */
 function sameIdList(a: readonly string[], b: readonly string[]): boolean {
     if (a.length !== b.length) return false
     return a.every((id, index) => id === b[index])
@@ -116,10 +100,7 @@ export function isDirty(draft: Flags, saved: Flags): boolean {
     return !sameIdList(draft.excludes, saved.excludes)
 }
 
-/**
- * 从 `llm-pi-ai` 的 user 层取提供方 id（与 Node 半 fix 遍历的 `descriptor.user.providers` 同一事实源，
- * 故「命中」判定与本插件真实会跳过的集合零漂移）。非纯对象、无 providers 或 providers 非纯对象一律视为空。
- */
+/** 从 `llm-pi-ai` 的 user 层取提供方 id（与 Node 半 fix 遍历的 `descriptor.user.providers` 同一事实源，故「命中」判定与本插件真实会跳过的集合零漂移）；非纯对象、无 providers 或 providers 非纯对象一律视为空 */
 export function providerIdsOf(user: unknown): string[] {
     return Object.keys(providersOf(user) ?? {})
 }
@@ -148,10 +129,7 @@ export function removeExclude(flags: Flags, id: string): Flags {
 /** 排除项 id 的合法性规则：逐字复制宿主 models 页新增提供方时的 route id 校验（同一权威规则，两侧不得自行放宽） */
 export const EXCLUDE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
-/**
- * 一个待验证的「提供方 / 模型」：附带该模型在配置里声明的推理级别（`reasoningEfforts` 的键，
- * 按 `EFFORT_LEVELS` 由低到高排序去重；无该字段即 `[]`，表示不带档位探测）。
- */
+/** 一个待验证的「提供方 / 模型」：附带该模型在配置里声明的推理级别（`reasoningEfforts` 的键，按 `EFFORT_LEVELS` 由低到高排序去重；无该字段即 `[]`，表示不带档位探测） */
 export interface VerifyCandidate {
     provider: string
     model: string
@@ -163,10 +141,7 @@ export function verifyKey(provider: string, model: string): string {
     return JSON.stringify([provider, model])
 }
 
-/**
- * 候选遍历的唯一实现：验证与探测共用。
- * 保持录入顺序；提供方非对象、无 models 数组、模型无 id 的行一律跳过。
- */
+/** 候选遍历的唯一实现（验证与探测共用）：保持录入顺序；提供方非对象、无 models 数组、模型无 id 的行一律跳过 */
 function candidatesOf(user: unknown, keep: (provider: string, candidate: VerifyCandidate) => boolean): VerifyCandidate[] {
     const candidates: VerifyCandidate[] = []
     for (const [provider, entry] of Object.entries(providersOf(user) ?? {})) {
@@ -174,7 +149,7 @@ function candidatesOf(user: unknown, keep: (provider: string, candidate: VerifyC
         for (const model of entry.models) {
             if (!isPlainObject(model) || typeof model.id !== 'string' || model.id === '') continue
             const declared = isPlainObject(model.reasoningEfforts) ? model.reasoningEfforts : undefined
-            // 档位取配置里的**键**（即模型页送出、宿主校验的那个 id），并按规范次序归一
+            // 档位取配置里的键（即模型页送出、宿主校验的那个 id），并按规范次序归一
             const efforts = declared === undefined ? [] : EFFORT_LEVELS.filter((level) => Object.hasOwn(declared, level))
             const candidate: VerifyCandidate = { provider, model: model.id, efforts: [...efforts] }
             if (keep(provider, candidate)) candidates.push(candidate)
@@ -193,9 +168,7 @@ export function isUnfilled(efforts: readonly string[]): boolean {
     return efforts.length === 0 || efforts.every((effort) => effort === 'off')
 }
 
-/**
- * 探测档位的**请求计划**：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；**off 仅当模型已声明时才探测**。
- */
+/** 探测档位的请求计划：每个模型按 `EFFORT_LEVELS` 由低到高各试一档；off 仅当模型已声明时才探测 */
 export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTarget[] {
     return candidates.map((candidate) => ({
         provider: candidate.provider,
@@ -204,11 +177,7 @@ export function probeTargetsOf(candidates: readonly VerifyCandidate[]): VerifyTa
     }))
 }
 
-/**
- * 一次诊断的**请求计划**里的一条：一个待跑的「提供方 / 模型」。
- * 验证只验模型本身（一条不带 `reasoningEffort` 的请求，`efforts` 缺省）；
- * 探测档位才带上「这轮要试的档位」逐档展开。
- */
+/** 一次诊断的请求计划里的一条：一个待跑的「提供方 / 模型」。验证只验模型本身（一条不带 `reasoningEffort` 的请求，`efforts` 缺省）；探测档位才带上「这轮要试的档位」逐档展开 */
 export interface VerifyTarget {
     provider: string
     model: string
@@ -216,12 +185,7 @@ export interface VerifyTarget {
     efforts?: string[]
 }
 
-/**
- * 从勾选的候选算出验证的请求计划：每模型一条不带 `reasoningEffort` 的请求。
- *
- * 「不带档位」而不是挑一个最低档位：不带参数验的是用户实际会走的那条路径——
- * 端点可能有自己的默认推理级别，发 `off` 验出来的结论与默认路径未必一致。
- */
+/** 从勾选的候选算出验证的请求计划：每模型一条不带 `reasoningEffort` 的请求。「不带档位」而不是挑一个最低档位：不带参数验的是用户实际会走的那条路径——端点可能有自己的默认推理级别，发 `off` 验出来的结论与默认路径未必一致 */
 export function verifyTargets(
     candidates: readonly VerifyCandidate[],
     keys: ReadonlySet<string>,
@@ -231,13 +195,7 @@ export function verifyTargets(
         .map((candidate) => ({ provider: candidate.provider, model: candidate.model }))
 }
 
-/**
- * 该组是否已全选：判据取 `every` 而非 `any`——部分选中时仍显示「全选」，全选中才翻成「取消全选」，
- * 与官方 `allVisibleCandidatesPicked` 同语义。
- *
- * **按钮文案与点击方向必须共用本函数**：两处各写一遍 `every` 一旦不同步，就会出现
- * 「文案显示取消全选、点击却是全选」的反直觉行为且不报错。
- */
+/** 该组是否已全选：判据取 `every` 而非 `any`——部分选中时仍显示「全选」，全选中才翻成「取消全选」，与官方 `allVisibleCandidatesPicked` 同语义。按钮文案与点击方向必须共用本函数（两处各写一遍 `every` 一旦不同步，就会出现「文案显示取消全选、点击却是全选」的反直觉行为且不报错） */
 export function groupAllPicked(picked: ReadonlySet<string>, models: readonly VerifyCandidate[]): boolean {
     return models.every((candidate) => picked.has(verifyKey(candidate.provider, candidate.model)))
 }

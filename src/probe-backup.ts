@@ -1,9 +1,7 @@
 /**
- * 「探测档位」的崩溃兜底备份：探测开始前把**探测目标的档位表原值**存进自有段，
- * 启动末尾若还留着它，说明上一轮探测没能收尾，按这份备份把那些档位表撤回去。
- *
- * 备份只覆盖预声明动过的那一个字段：既不碰其他模型、也不碰同一模型的其他字段，更不会复活
- * 用户在探测期间删掉的模型。设计裁决见 docs/decisions.md「探测档位」。
+ * 「探测档位」的崩溃兜底备份：探测开始前把探测目标档位表原值存进自有段；
+ * 启动末尾若还留着，按备份撤掉上一轮没收尾的档位表。
+ * 备份只覆盖预声明动过的那一个字段：不碰其他模型/字段，不复活探测期间被删的模型。见 docs/decisions.md「探测档位」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
@@ -24,8 +22,7 @@ const PROBE_BACKUP_KEY = 'probeBackup'
 /** 回退只动这一个模型字段 */
 const FILL_FIELD = 'reasoningEfforts'
 
-/** 备份的形状：提供方 id → 模型 id → 该模型 `reasoningEfforts` 的**原值**深拷贝；
- * `null` 哨兵表示「探测前就没有该字段」，回退时删键而不是写回 null。 */
+/** 备份形状：提供方 id → 模型 id → 该模型 `reasoningEfforts` 原值深拷贝；`null` 哨兵表示探测前没有该字段，回退时删键。 */
 type ProbeBackup = Record<string, Record<string, unknown>>
 
 /** 「提供方 / 模型」二元组键：模型 id 可含 '/'，故用序列化而非字符串拼接（与 fill.ts 同口径） */
@@ -33,7 +30,7 @@ function targetKey(provider: string, model: string): string {
     return JSON.stringify([provider, model])
 }
 
-/** 采集探测目标的档位表原值：只认当前存在的目标模型，逐字深拷贝（保留用户自己的 wire 拼写） */
+/** 采集探测目标的档位表原值：只认当前存在的目标模型，深拷贝保留用户 wire 拼写 */
 export function captureProbeBackup(
     providers: Record<string, unknown>,
     targets: readonly EffortApply[],
@@ -77,12 +74,9 @@ export function decodeProbeBackup(text: unknown): ProbeBackup | undefined {
 }
 
 /**
- * 回退计划（纯函数，零 ctx 依赖可单测）：
- * 把备份里那些**当前仍在**的模型的档位表整字段写回原值；提供方被整删、模型被删都跳过（不复活），
- * 同一模型的其余字段原样保留。遍历的是当次现读的 `providers`，故备份里没有的（窗口内新增）不会被删。
- * 写入前过 `stripEmptyFields`（与另几条写回路径同一判据）：探测前若只剩 off，恢复后按统一口径清成未声明。
- * 仅当某 provider 至少改写一个模型时才产出整段 set op（零变更零 op）。
- *
+ * 回退计划（纯函数，零 ctx 依赖可单测）：把备份里**当前仍在**的模型档位表整字段写回原值；
+ * 被删的提供方/模型跳过（不复活），备份里没有的新增项不删；幂等（档位表与备份一致即零变更）；
+ * 写入前过 `stripEmptyFields`（与另几条写回路径同一判据）；某 provider 至少改写一个模型才产出 set op。
  * @returns `{ modelOps, changed }`，`changed` 为被撤掉预声明的模型数
  */
 function planProbeRestore(
@@ -101,7 +95,7 @@ function planProbeRestore(
             if (!isPlainObject(model) || typeof model.id !== 'string') continue
             if (!Object.hasOwn(savedModels, model.id)) continue
             const saved = savedModels[model.id]
-            // 幂等：档位表已与备份一致（常见于收敛已落盘、只差清备份就被杀）即零变更
+            // 幂等：档位表与备份一致即零变更
             if (deepEqualJson(model[FILL_FIELD] ?? null, saved)) continue
             next ??= list.slice()
             const replaced = { ...model }
@@ -132,11 +126,7 @@ async function mutateOwn(ctx: Context, ops: readonly SettingsPathOp[]): Promise<
     throw new Error(`${PLUGIN_NAME}: 写入探测备份冲突重试耗尽`)
 }
 
-/**
- * 探测开始前落备份。**失败即中止整轮**：没有退路就不动用户配置。调用方（`probeAndFill`）已持有事件流守卫。
- *
- * @param targets - 本轮探测的目标清单：备份范围就是它
- */
+/** 探测开始前落备份；失败即中止整轮（没有退路就不动用户配置）。调用方已持有事件流守卫；备份范围就是 `targets` */
 export async function saveProbeBackup(ctx: Context, targets: readonly EffortApply[]): Promise<void> {
     const providers = providersOf(descriptorOf(ctx, API_NS)?.user)
     if (!providers) throw new Error(`${PLUGIN_NAME}: 当前 ${API_NS} 无 providers 段，无法生成探测前的兜底备份`)
@@ -152,13 +142,13 @@ export function clearProbeBackup(ctx: Context): Promise<void> {
     return mutateOwn(ctx, [{ op: 'unset', path: [PROBE_BACKUP_KEY] }])
 }
 
-/** 按备份撤掉预声明（语义见 `planProbeRestore`）。刻意不走 `src/writeback.ts` 的写回外壳：本回退不打任何逐次日志 */
+/** 按备份撤掉预声明（语义见 `planProbeRestore`）；刻意不走 writeback.ts 的写回外壳——本回退不打逐次日志 */
 async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         if (!ctx.fiber.store) return 0
         const descriptor = descriptorOf(ctx, API_NS)
         const providers = providersOf(descriptor?.user)
-        // 与 restoreModels 同理：读不到段时显式失败，返回 0 会被当成「本就一致」而静默吞掉真故障
+        // 读不到段时显式失败（返回 0 会被当成「本就一致」而吞掉真故障，与 restoreModels 同理）
         if (!providers) throw new Error(`${PLUGIN_NAME}: 当前 ${API_NS} 无 providers 段，无法回退`)
         const { modelOps, changed } = planProbeRestore(backup, providers)
         if (modelOps.length === 0) return 0
@@ -175,8 +165,7 @@ async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<numb
 
 /**
  * 启动末尾的崩溃回退：段里没有备份即无事可做；有则按备份撤掉预声明并清掉备份，返回被撤的模型数。
- * 回退全程持事件流守卫（撤预声明那次若被放过去，`fix` 会把预声明又填回来）。
- * 理由见 docs/decisions.md「探测档位」。
+ * 回退全程持事件流守卫（否则 `fix` 会把预声明又填回来）。见 docs/decisions.md「探测档位」。
  */
 export async function restoreProbeBackup(ctx: Context): Promise<number> {
     const section = ownSection(ctx)

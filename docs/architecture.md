@@ -1,61 +1,76 @@
 # 目录职责与数据流
 
-`AGENTS.md` 只留四条目录要点与索引，正文在此；仅供开发查阅，不进 `files`。
-
-技术栈：Node.js（ESM）+ `@deepseek-ai/cordis`；tsdown 双配置构建到 `lib/`（Node 半 + 浏览器半，clean 只由 Node 半承担）；TS 严格模式，产物不带 sourcemap；ESLint 10 扁平配置。
-
-## 目录职责（只写非显而易见的部分）
+## 目录职责
 
 | 路径 | 职责 |
 | --- | --- |
-| `src/index.ts` | Node 半入口：`Config`（宿主经 `entry.fiber.runtime.Config` 取用）+ 单一 `apply` 编排体（备份 → 配置源与段变更接线 → **installSubagentFollowParent** → installRpc → 启动链） |
-| `src/subagent.ts` | 子智能体推理级别的**请求期改写面**（唯一对外挂钩是宿主 `agent/request` 瀑布）：三个宿主服务经 `ctx.inject` 子 fiber 注入（全就绪才注册监听，缺席 PENDING 静默），监听 `{ prepend: true }` 钉最外层即覆盖全部 Agent；跟随判定与取路由口径见 `decisions.md`「子智能体」 |
-| `src/self-tune.ts` | 推理档位自调的**工具注入面**（对外挂钩是宿主 `tools` / `systemPrompt` / `sessionController` / `sessionProjections` 四个服务）：按 `userExperience.selfTune` 开关装/卸注入面——两枚工具（查当前模型可用档位、经 `sessionController.selectModel` 设档）与一段静态系统提示词。四个宿主服务**均契约复制、不引包类型**（理由同 `src/subagent.ts`），经 `ctx.inject` 子 fiber 门控；插件零状态（档位状态全在宿主），HMR 无损 |
-| `src/shared/` | 跨半共享层（零 Node 依赖 / 零 schemastery / 零非基线 `@deepseek-ai/*`）：常量、异常文案取法 `errorText`（两个半都要）、`isPlainObject`/`providersOf`、当前版本配置的解析与物化与各组行键表、**验证与探测档位共用**的探测契约（明细 / 汇报 / 进度帧 / 可用与不支持档位明细 / 写回统计，浏览器半须据此解析回传，禁反向 import Node 半）。**推理级别记忆查表 `lookupEffort` 留在浏览器半的 `effort.ts`**（查表为何归浏览器半见 `decisions.md`「推理级别记忆」） |
-| `src/config.ts` `src/migrate.ts` `src/upgrade.ts` `src/catalog.ts` `src/lookup.ts` `src/compat.ts` | 配置解析与配置源 / 当前版本侧的启动迁移、旧快照清理与自愈（`migrateConfig`；选迁移源时才调 `upgradeConfig`）/ **冻结的升级台阶链** `upgradeTo8`（只有一级，v7 形态升到当前 v8，自持 `MIN_SUPPORTED_VERSION` 守卫；**刻意不引用 `CONFIG_VERSION` 或当前版本默认值**，见 `docs/versioning.md`）/ 缓存读写与目录拍平 / id 匹配与档位转换 / 路由 compat 纯写入计划 |
-| `src/fix.ts` | 填充与写回：两层遍历是**纯计划函数 `planFill`**（零 ctx，出 `FillPlan`：模型参数 op、路由 compat op），`fix` 只做编排（`force` 供强制更新单次绕过；读最新段 → 出计划 → 写回 `llm-pi-ai` 一段 → 冲突重试时重读）；`excludes` 命中者在 provider 循环入口整条跳过。`efforts` 不在此处理（记忆存取在浏览器半、清理在 Node 半） |
-| `src/memory.ts` | 推理级别记忆的**失效清理**（Node 半唯一碰记忆的地方）：`collectLiveModels` 取存活清单（**只对有记忆条目的 provider** 调 `listModels`；读失败标 `null`＝未知而非不存在；整体退化读返回 `null`＝本轮不剪）→ 纯函数 `planPruneMemory`（缺席即删除、段删空则折叠）→ 经 `queueTask` 只写自有段的 `efforts` 一个键。`updateMemory` 是串行化入口：在途时来的触发只置 `pending`、结束后补跑一轮 |
-| `src/empty.ts` | 空壳字段的唯一判据 `stripEmptyFields`：`reasoningEfforts` / `input` / `compat` 的空形态一律等同「未声明」，**全部写回路径（`fix` 填充、`reset`、`restore`、`fill` 探测档位的预声明与收敛、`probe-backup` 崩溃回退）统一过它**；无空壳时返回原引用，调用方以引用相等判「无需重建」。它只清**空形态**：把某个键整个删掉得由调用方显式 `delete` |
-| `src/reset.ts` `src/restore.ts` `src/guard.ts` `src/host.ts` `src/section.ts` `src/writeback.ts` | 重置推理级别（仅剔除 `reasoningEfforts`，配置段零写入）/ 启动备份捕获与恢复（共有 provider 的共有 model 回退 + 其下被删 model 复活） / 事件流守卫（写回期间短路整条事件链）/ **全部 settings 写回必经的 `queueTask`**（hmr 执行上下文经子 fiber 注入，注入落地前有界等待一次、超时才降级为裸 `task()`）/ **settings 节读取的唯一收口**（`descriptorOf` / `sectionOf` / `ownSection`，读不到一律返回 `undefined`）/ **写回 `llm-pi-ai` 段的统一外壳**（读最新段 → 纯函数出计划 → 经 `queueTask` 写回 → `SETTINGS_CONFLICT` 限次重试；`guardedWritebackApi` 自带守卫，`writebackApi` 给守卫持有整轮的探测档位。`fix` 与探测兜底回退**刻意留在原处不套壳**） |
-| `src/probe-verdict.ts` | **验证与探测档位共用的判定层**（零 ctx、不触网的纯函数）：失败**只按** `LlmFailure` 的 `code` 分类（限流与超时单列瞬态）、`isEffortRejection`（判「档位不支持」的第一条件）、**两级短路的判据**（只有一条：**能断定后续必然失败才短**）、`sameModelTail`（该模型档位尾还剩几条，供进度帧记 `skipped`） |
-| `src/probe-plan.ts` | **验证与探测档位共用的计划层**：把浏览器半发来的未信任载荷校验并展开成待跑清单（`planProbes`，清单一条即一次实际请求：验证每模型一条、探测档位逐档展开）、两条硬闸配额 `ProbeLimits`（超出即拒绝而非静默截断；两个功能各给一份）、按 provider 分组（`groupProbesByProvider`，分组即「每 provider 单并发」的结构保证）、`planProbeGroups`（与执行拆两步：探测档位的 `done` 帧要含收敛写回结果） |
-| `src/probe-report.ts` | **验证与探测档位共用的汇报层**：`reportProvider`（单组结论折一份汇报：可用模型去重、档位不可用单列、**可达与凭据取自全程**（每次发出的请求都计入）、额度耗尽两者都不翻）与 `summarizeProviders`（全局求和并同源产出 `usableEfforts` / `unsupportedEfforts` 两种明确状态的档位明细）。纯函数、零 ctx、不触网 |
-| `src/probe-engine.ts` | **验证与探测档位共用的执行引擎**：`probeOnce`（只认 `block-start`、30s 软超时发中止信号、3s 宽限期满即硬兜底返回——与每一次 `next()` 赛跑而非整段赛跑，被放弃的循环不再消费分片并请求关闭迭代器；中止单列 `'aborted'`，失败分类转交判定层）、`runProbeGroups`（跨 provider ≤5 路并发与进度帧；已中止即不再开新组，从未开跑的组被排除在汇报之外）、`finishRun`（中止不发终帧）。两个功能只差注入的 `runGroup` |
-| `src/verify.ts` | 「验证模型」执行器：每勾选模型一次不带 `reasoningEffort` 的请求，只短 provider 级（端点不通 / 凭据无效 / 本组首个请求超时，判据全在 `probe-verdict.ts`；逐档可用性与写回归「探测档位」，验证只读不写配置，理由见 `decisions.md`「验证」） |
-| `src/probe.ts` `src/fill.ts` `src/probe-backup.ts` | 「探测档位」执行器、两次写回与崩溃兜底：`probeAndFill(ctx, llm, payload, options)` = 校验两个开关（剔除不支持 / 自动写入）→ 展开至多七档计划（off 仅已声明时才探测） → **兜底备份**（`probe-backup` 把探测目标那批模型的 `reasoningEfforts` 原值 base64 存进自有段顶层键 `probeBackup`，与 `version-N` 同级、故不进快照也**不动 `CONFIG_VERSION`**；只编码不压缩，存不下即整轮中止，没有退路就不动用户配置）→ **预声明**（`fill.ts` 按 `EFFORT_LEVELS` 排序写进配置并返回预声明之前的原有档位表）→ 逐档探测 → **收敛结论**（口径见 [`decisions.md`](decisions.md)「探测档位」；只算不写——「自动写入」关闭时写回端走整轮还原，统计为「可补全」假设值）→ 清备份 → 统计随终帧回传（`VerifySummary.fill` 一律携带，开启即已写入的补全、关闭即假设值）。守卫**持有整轮**；两次写回共用 `planEffortApply`，其范围只由发跑时冻结的勾选清单决定（预声明与收敛覆盖同一批目标；逐次遍历现读的配置，清单里已被用户删掉的模型自然不命中、不产出 op），`modelOps` 按当前值比对、增删统计按传入基线（预声明之前那份）比对 |
-| `src/rpc.ts` `src/rpc-route.ts` `src/refresh.ts` | 三个 channel RPC 写回端点（以守卫互斥、验证只读不参与）+ **两条进度流**（`connection.fetch` 的 exact 路由，SSE 分帧，客户端断开即中止执行）：两者共用 `progressStreamFetch`，探测那条因一轮之内要写两次配置而**入口先查守卫**（已开回 409 + 中文文案）/ 保鲜刷新 |
-| `src/official-filter.ts` | 「隐藏官方API」（只读，零配置写入）：`installOfficialFilter(ctx)` 在 `ctx.llm` 实例上以自有属性遮蔽原型 `listModels`——命中名单（`HIDDEN_OFFICIAL_PROVIDERS`，当前只有 `deepseek-official`）且判定未配置密钥时返回空清单，宿主 `buildModelCatalog` 随即把模型数为 0 的组从 UI 目录里滤掉；否则直通原方法。判定口径同「设置→模型」小红点（configurable-provider 目录取 settingsNs/settingsPath → 段上 `apiKeyEnv` → `credentials.describe().configured`），每次调用现算，**不缓存、不挂任何事件**；凭据服务缺席 / 目录无该提供方 / 引用名非法 / 读取抛错四类情况一律放行不隐藏。名单里不放 `deepseek-account`（该段无 `apiKeyEnv`，判定会错配到 `DEEPSEEK_API_KEY` 而误隐藏可用的账号组；且宿主自 `0.1.7-rc.2` 起已自带登录门） |
-| `src/client/index.tsx` | 浏览器半入口：整套编排挂 `configForms` 子 fiber（卸载即级联撤销；理由见 `decisions.md`「宿主与卡片」）——两席直接经 `ctx.slots.inject` 注册（插件详情页 / 组件实例详情页）、另三个 slot 上四个部件的挂载与卸载委托 `visibility.tsx`、词典注册、调用面接线、三个 scope 释放（自有段 / llm-pi-ai 段 / 宿主 subagent-model-selection-settings 段）、记忆监听子 fiber、界面语言上报 |
-| `src/client/visibility.tsx` | 「UI 与行为」组的执行面（`applySlotVisibility`）：把**三个 slot 上的四个部件**（模型页 footer、内置插件 tab、输入框工具行的「模型优化」与「跟随」两条）按 `behavior` 开关做**真正的挂载与卸载**——按 slot 各挂一个 `ctx.slots.inject`（同一 slot 下的多个部件共用同一次声明等待），在宿主声明到达后的回调里订阅自有段 scope，开则 `ctx.slots.register`、关则调该次注册的 disposer 撤销条目（`settings.plugins.tab` 的 tab 头由宿主按注册账本画出，不撤销就会留下一个点进去空白的选项卡）。闭包内 `mounted` 按部件键保证幂等；inject 回调返回的清理函数随该次声明的 effect 生命周期走 |
-| `src/client/memory-listener.ts` | 浏览器半的推理级别记忆监听（`applyEffortMemoryListener`，与卡片零共享状态）：订阅会话 `modelSelection` 投影，按 `classifyTransition` 翻译成「换模型恢复记忆」与「换级别存回记忆 + `defaultHigh` 自动设置」，另按 `rememberEfforts` 写记忆、按 `defaultHigh` 自动设级别（两者与卡片同属一条监听链）。**只管存取，不管整理**——失效清理由 Node 半的 `memory.ts` 按全量模型列表执行。记忆写入带三条护栏（见 `decisions.md`「浏览器半记忆写入的三条护栏」）：段未 ready 时放弃本次保存、带 `expectedRevision` 围栏、`SETTINGS_CONFLICT` 时重读快照重算 + 限次重试。与卡片分居两处是因为一个管用户在设置页看见的配置、一个管所有活着会话的后台行为 |
-| `src/effort-name.ts` | 档位名本地化（`installEffortNameLocale`，Node 半只读支线）：`efforts[].name` 只在 `ctx.llm.resolveModelInfo` 的返回里出现（目录、UI 菜单、subagent list-models 工具全取它），故在 `ctx.llm` 实例上以自有属性遮蔽该方法，命中「开关开 + 中文界面」即替换 `efforts[].name`（`localizeEfforts` 开着时再看 `showOriginalEfforts` 决定是否在中文名后追加 ` · 原档位名`），`id` 与 `defaultEffort` 一律不动（纯函数 `localizeEffortNames` 可单测；词表键取宿主口径的首字母大写形式，键集由共享层 `EFFORT_LEVELS` 约束）。语言三路判定：settings 文档 `locale.preference` → 浏览器上报（`reportLocale`，rpc 端点 `reportLocale` 落点）→ 回退 `en`；判定每次调用现算，不缓存、不挂事件；卸载只清活状态位、遮蔽层退化直通 |
-| `src/client/rpc-carrier.ts` | 浏览器半调 Node 半的**唯一出口**（`makeRpcCarrier`）：三个写回端点的 channel RPC、**语言上报**（`reportLocale`）与**两条进度流的读流**（共用 `streamSummary`，非 2xx 取响应体文案作报错）。`RpcCarrier` 是调用面的单一来源（卡片取其中五个方法：`CardProps extends Omit<RpcCarrier, 'reportLocale'>`），故卡片只管状态与编排、不认 Connection |
-| `src/client/card-styles.ts` | 卡片的样式层（**全部样式数值的唯一出处**）：`STYLE_TEXT` 内嵌样式表（类名 `dsh-mf-` 前缀防撞、取值逐条照官方同类组件）、`ensureStyles` 幂等注入（带 `data-plugin` 标记供宿主 HMR 认领）、说明气泡宽度上限 `TIP_MAX_WIDTH` |
-| `src/client/tile.tsx` | 卡片的瓦片层（六张瓦片的两种形态，顺序由 `TILE_ORDER` 单一分发）：`GroupTile` 布尔矩阵配置组瓦片（组开关 + 子开关行 + 行内说明气泡；`lockedRow` 在组内真键**之前**插一条恒开且禁用的展示行，供「插件管理」用——它不绑配置、不受组总控与脏检测影响）、`ExcludesTile` 动态集合瓦片（手填 id、「N 命中」徽标常驻，输入文本与校验反馈是留在本地的纯 UI 暂态）。**瓦片只管自己的 summary 与展开体**，展开态 / 启用态 / 写回回调全由卡片经 props 传入，故不碰 Connection |
-| `src/client/confirm.tsx` | 二次确认层的唯一外壳 `ConfirmModal`（宿主 Modal + Button 原语）：卡片里的四层二次确认（强制更新 / 重置推理级别 / 恢复备份 / 清空记忆）差异只有标题、说明、两键文案与**红 tint 语义**（恢复不删用户任何东西故不上红），把这四处差异显式列成 props，别再复制粘贴四份 JSX |
-| `src/client/diagnose-dialog.tsx` | 「验证模型」/「探测档位」两弹层共用的**自足外壳** `DiagnoseDialog`（宿主 Modal + `TerminalBlock` 记录区）：两个选项卡（模型列表 / 验证或探测记录），选项卡行右端小键由调用方给 `tools`，插槽 `extras` 渲染在选项卡容器之下，额度提示对两页都成立，底部是 取消 / 发跑（在途就地变「停止」）行。**状态与动作全由卡片经 props 递进来**；当前页签是本层状态（开窗回「模型列表」、在途自动切记录页）；关窗即中止在途诊断，记在 `onClose` 上 |
-| `src/client/probe-dialog.tsx` | 「探测档位」弹层组装层：递自己的文案键、两个开关（经 `extras` 渲染在选项卡容器之下；「剔除不支持」在「自动写入」关闭或在途时禁用）与选项卡行右侧快捷勾选键给共用外壳 `DiagnoseDialog` |
-| `src/client/card-meta.tsx` | 卡片末尾的联系行（自成一体：三个常量 + 四个 Octicons 图标 + 一次 issue 正文合成，除翻译函数外不外泄）：`REPO_URL`/`ISSUES_URL`/`REPO_LABEL` 与 README「安装」段的仓库地址同源、`__PLUGIN_VERSION__`（构建期 define 内联，声明随本文件搬来，配置见 `tsdown.config.ts`）、仓库 / 版本 / star / 反馈四个小片（版本标记只读、不做成链接） |
-| `src/client/card.tsx` | 五席共用的可折叠卡片**外壳编排**（四席可折叠、弹层席传 `collapsible={false}`）：草稿与保存、三个写回动作与四层二次确认、六张瓦片与 footer 的渲染、两个诊断弹层的状态挂接。瓦片本体见 `tile.tsx`，联系行见 `card-meta.tsx`，样式数值全在 `card-styles.ts` |
-| `src/client/card-verify.ts` / `card-probe.ts` | 「验证模型」/「探测档位」的**整轮编排 hook**（`useVerifyRun` / `useProbeRun`）：弹层开关态、勾选集与快捷勾选（未填充键按 `isUnfilled` 筛子清单）、记录区、发跑 / 停止 / 关窗（关窗即中止在途）。只编排不渲染；占用态由卡片传入；探测对象是**发跑那一刻冻结的勾选项**，补全结果经回调落卡片状态行（验证只读、无此回调）。弹层见 `diagnose-dialog.tsx` / `probe-dialog.tsx` |
-| `src/client/card-records.ts` / `card-notice.ts` | 两条诊断记录区的**纯文案层**（TerminalBlock 文案、探测结论→文案键对照、记录行合成；零状态零 React）与卡片状态行**助手**（`Notice`、占用态 `CardBusy`、超长截断、写回超时判定） |
-| `src/client/composer.tsx` | 输入框工具行（`conversation.input.left`）的两个组件，各注册一个席位条目：`ComposerEntry`（「模型优化」常驻入口，点开弹层面板；受 `behavior.showInComposer` 支配）、`FollowLamp`（「跟随」状态灯，按 `followingActive(flags, hostEnabled)` 切换，点击 toggle `userExperience.followParent`；受 `behavior.showFollowStatus` 支配）。`hostEnabled` 读宿主 `subagent-model-selection-settings` 段的 `enabled`，段缺席即视为未开启 |
-| `src/client/model.ts` / `effort.ts` / `scope.ts` | 快照↔配置纯映射（验证与探测候选拍取、两种目标收敛、探测的「未填充 = 无档位或只有 off」判据）/ 记忆纯逻辑（**只管存取**：查表、写后形态、目标模型是否公告该档位；失效清理不在此处） / ConfigForm 的 decode 包装；「跟随父智能体」是「用户体验」组的一行，写入口与其他布尔项一样是 `commitDraft(toggleCell(shown, 'userExperience', 'followParent'))`，`isDirty` 随 `GROUPS` 遍历一并覆盖 |
-| `src/client/locale-keys.ts` / `locale-zh.ts` / `locale-en.ts` | 卡片文案的键与词典分居三处：`locale-keys.ts` 只管键契约（`CARD_NS` 并入宿主 `LocaleNamespaceMap`、`CardKey` 联合、四张「配置项 → 文案键」映射——按用途分表，同轴上标题与释义本是两句话），两种语言各一文件 `locale-zh.ts` / `locale-en.ts`（都标注 `Record<CardKey, string>`，漏改一侧 typecheck 即报） |
-| `public/models-cache.json` | 构建期平铺复制到 `lib/` 根：models.dev 拍平缓存（首启离线可用） |
-| `icon.svg` / `cordis.patch.yml` / `locale/*.json` | 包根静态资源，不经 tsdown，`files` 单列；补丁行的 `id` 即 settings 命名空间键 |
+| `src/index.ts` | Node 半入口：`Config` schema + 单一 `apply`（备份 → 配置源与段变更接线 → 各功能安装 → 启动链） |
+| `src/config.ts` | 配置解析（快照优先级）与配置源持有 |
+| `src/migrate.ts` | 启动迁移、旧快照清理与自愈（排除列表去重） |
+| `src/upgrade.ts` | 冻结的升级台阶链（v7 → 当前版） |
+| `src/catalog.ts` | models.dev 目录拉取、缓存读写与拍平索引 |
+| `src/lookup.ts` | 模型 id 匹配（三级归一）与档位转换 |
+| `src/compat.ts` | 路由 compat 纯写入计划 |
+| `src/fix.ts` | 填充与写回：纯计划函数 `planFill` 出 op，`fix` 只做编排 |
+| `src/memory.ts` | 推理级别记忆的失效清理：存活清单 → 纯 `planPruneMemory` → 只写 `efforts` 键 |
+| `src/empty.ts` | 空壳字段判据 `stripEmptyFields`，所有写回路径共用 |
+| `src/reset.ts` | 重置推理级别（仅剔除 `reasoningEfforts`） |
+| `src/restore.ts` | 启动备份捕获与恢复 |
+| `src/guard.ts` | 事件流守卫：写回期间短路整条事件链 |
+| `src/host.ts` | settings 写回必经的 `queueTask` 收口（HMR 事务感知） |
+| `src/section.ts` | settings 节读取收口（读不到一律 `undefined`） |
+| `src/writeback.ts` | 写回 `llm-pi-ai` 段的统一外壳（计划 → 写回 → 冲突限次重试） |
+| `src/probe-verdict.ts` | 验证与探测共用的判定层（失败分类、两级短路判据） |
+| `src/probe-plan.ts` | 共用的计划层（入参校验、展开、分组、配额） |
+| `src/probe-report.ts` | 共用的汇报层（逐组结论、全局统计） |
+| `src/probe-engine.ts` | 共用执行引擎（单次请求受理判定、并发、进度帧） |
+| `src/verify.ts` | 「验证模型」执行器（只读） |
+| `src/probe.ts` | 「探测档位」执行器：兜底备份 → 预声明 → 逐档探测 → 收敛写回 |
+| `src/fill.ts` | 探测档位的两次写回（预声明 / 收敛） |
+| `src/probe-backup.ts` | 探测的崩溃兜底：备份与启动回退 |
+| `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点（channel 自注册） |
+| `src/rpc-route.ts` | RPC 信封解码与路由分发 |
+| `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
+| `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单 |
+| `src/effort-name.ts` | 档位名本地化：遮蔽 `resolveModelInfo`，按开关 + 界面语言换显示名 |
+| `src/subagent.ts` | 「跟随父智能体」：`agent/request` 瀑布最外层按三条件改写路由 |
+| `src/self-tune.ts` | 「自主调节档位」：装/卸两枚工具与一段系统提示词 |
+| `src/types.ts` | 当前版本配置形态与冻结的旧版类型 |
+| `src/constants.ts` | Node 半常量 |
+| `src/shared/` | 跨半共享层（零 Node 依赖）：常量、`errorText`、探测/验证契约、当前版本配置 schema 与行键表 |
+| `src/client/index.tsx` | 浏览器半入口：席位注册、卡片、词典、调用面接线、scope 释放，全挂 `configForms` 子 fiber |
+| `src/client/card.tsx` | 五席共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
+| `src/client/tile.tsx` | 瓦片层：布尔矩阵组 / 动态排除集合两种形态 |
+| `src/client/card-meta.tsx` | 卡片联系行（仓库 / 版本 / 反馈） |
+| `src/client/card-styles.ts` | 卡片样式层：全部样式数值的唯一出处 |
+| `src/client/confirm.tsx` | 四层二次确认的共用外壳 |
+| `src/client/diagnose-dialog.tsx` | 验证 / 探测弹层的共用外壳（双选项卡 + 记录区） |
+| `src/client/probe-dialog.tsx` | 探测弹层组装层 |
+| `src/client/card-verify.ts` | 验证的整轮编排 hook |
+| `src/client/card-probe.ts` | 探测的整轮编排 hook |
+| `src/client/card-records.ts` | 两条诊断记录区的纯文案层 |
+| `src/client/card-notice.ts` | 卡片状态行助手 |
+| `src/client/composer.tsx` | 输入框工具行的「模型优化」入口与「跟随」状态灯 |
+| `src/client/model.ts` | 快照↔配置纯映射（候选拍取、收敛目标、未填充判据） |
+| `src/client/effort.ts` | 记忆纯逻辑（查表、写后形态、档位公告判定） |
+| `src/client/scope.ts` | ConfigForm 的 decode 与写回转发包装 |
+| `src/client/memory-listener.ts` | 记忆存取监听（换模型恢复、换级别写回 + 自动设置） |
+| `src/client/rpc-carrier.ts` | 浏览器半调 Node 半的唯一出口 |
+| `src/client/effort-name.ts` | 浏览器界面语言上报（补 Node 侧探测盲区） |
+| `src/client/locale-patch.ts` | 宿主 model NS 词典的 Default 词条本地化 |
+| `src/client/locale-keys.ts` | 卡片文案键契约（键并入宿主 `LocaleNamespaceMap`） |
+| `src/client/locale-zh.ts` `locale-en.ts` | 卡片词典（中 / 英） |
+| `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
+| `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用） |
+| `icon.svg` `cordis.patch.yml` `locale/*.json` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |
 
-`docs/` 下的专题文档（决策记录、宿主契约、本文、UI 纪律、版本纪律、工作流）都不是构建产物，一律不进 `files`；索引见 `AGENTS.md` 的「专题文档」一节。
+## 数据流
 
-## 数据流骨架
+- 段变更按 ns 分流：自有段「自愈 → 填充 → 记忆清理」，llm-pi-ai 段「填充 → 保鲜刷新 → 记忆清理」，入口先判事件流守卫。
+- 记忆三条链：浏览器半 `memory-listener` 管存取；Node 半 `memory.ts` 按宿主全量模型列表做失效清理；两条诊断链路（验证只读 / 探测写回）共用 probe 四层，进度走 SSE。
+- 请求期链：`agent/request` 瀑布判定「跟随父智能体」；工具链：`self-tune` 按开关装/卸注入面。两者均不写配置。
+- 只读遮蔽支线：`official-filter` 遮 `listModels`、`effort-name` 遮 `resolveModelInfo`，判定逐次现算，不挂事件。
 
-段变更按 ns 分流为两条链：自有段「自愈 → 填充」、llm-pi-ai 段「填充 → 保鲜刷新」，入口先判事件流守卫。浏览器半：`configForms` → `makeScope` → **三个 scope** → 四席卡片共用同一张卡 + 记忆监听子 fiber + 输入框工具行 chip（**存取全在前端**、不经 `fix`）；记忆的**失效清理**是第三条支线（Node 半 `memory.ts`）：由 `llm/adapters-updated`、llm-pi-ai 段变更后与启动首轮触发，按全量模型列表缺席即删除。第三条链是**请求期**的（不经事件、不写配置）：宿主委派子智能体时 `agent/request` 瀑布 → `src/subagent.ts` 判三条（是子智能体 / `followParent` 开着 / 宿主那条设置关着）皆满足才把整条路由覆盖为父 Agent 下一次请求该用的路由，否则原样放行。第四条链是**工具调用期**的（不经事件、自身零写入）：`selfTune` 开启时 `src/self-tune.ts` 注入两枚工具与一段系统提示词，设置走 `sessionController.selectModel`——与 UI 手选同一条链路，落 `model/selection` 事件、由记忆监听支线照常接住。
+## 文档纪律
 
-另有**模型目录过滤**这条只读支线（Node 半 `src/official-filter.ts`，无事件、零配置写入）：在 `listModels` 上以实例自有属性遮一层，命中名单且未配置密钥即返回空清单，宿主随即把该组从目录里滤掉；判定每次调用现算，**插件侧不挂任何事件**。**宿主自 `0.2.1-alpha.2` 起对 `deepseek-official` 自己做了同一件事**，故这条支线在新宿主上是冗余但无害的兜底（老宿主上仍是唯一手段）。
-
-与它同一遮蔽面、同在 Node 半的还有**档位名本地化**（`src/effort-name.ts`）：在 `resolveModelInfo` 这层把档位显示名换成中文（按 `showOriginalEfforts` 追加 ` · 原档位名`；`id` / `defaultEffort` 不动）。判定每次调用现算，同样不缓存、不挂事件。
-
-两条诊断链路：
-
-- **验证**（只读）：卡片弹层 → `verifyTargets` → 进度流端点 → `ctx.llm`。
-- **探测档位**（写回，是否落结论随「自动写入」开关）：卡片弹层（点开时冻结候选）→ `probeTargetsOf` → 探测进度流端点 → Node 半「兜底备份 → 预声明 → 逐档探测 → 收敛结论照算 → 清备份」→ 终帧带统计；全程持事件流守卫。崩在中途则由**启动链末尾**的回退收拾（`restoreProbeBackup` → 补一轮 `fix`）。
+`docs/` 下文件不是构建产物，不进 `files`。索引见 `AGENTS.md`「专题文档」。

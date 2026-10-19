@@ -1,11 +1,6 @@
-/**
- * 浏览器半入口（dsh.client 声明的 web 侧 cordis 插件）。宿主 settings 面为 ctx.configForms，
- * 经 makeScope 包装后供卡片与记忆监听消费。
- * 五个席位一律经 `ctx.slots.inject` 注册：对无声明方的席位只挂一个 pending wait（声明到达才跑回调，
- * fiber 卸载即取消），故缺席者静默不发生；向未声明的 slot 直接 register 会抛 `slot "..." is not declared`，
- * 且该抛错发生在 fiber 启动期、连累同一 fiber 里后续的全部注册。
- * 其中两席在此直接注册；另三个 slot 承载的四个部件受「UI 与行为」组支配，由 visibility.tsx 编排挂载与卸载。
- */
+/** 浏览器半入口（dsh.client 声明的 web 侧 cordis 插件）。宿主 settings 面为 ctx.configForms，经 makeScope 包装后供卡片与记忆监听消费。
+ * 五个席位一律经 `ctx.slots.inject` 注册：对无声明方的席位只挂一个 pending wait（声明到达才跑回调，fiber 卸载即取消），故缺席者静默不发生；向未声明的 slot 直接 register 会抛 `slot "..." is not declared`，且该抛错发生在 fiber 启动期、连累同一 fiber 里后续的全部注册。
+ * 其中两席在此直接注册；另三个 slot 承载的四个部件受「UI 与行为」组支配，由 visibility.tsx 编排挂载与卸载 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // ctx.slots 服务面（SlotRegistry）
@@ -58,15 +53,8 @@ export function apply(ctx: ClientContext): void {
     })
 }
 
-/**
- * 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。
- * @param ctx - 子 fiber 的 ctx（`apply` 里那个 `ctx.inject` 的 child）：注册一律挂它，
- *   子 fiber 卸载即级联撤销；挂父 ctx 则卸载不清理、重建时重复注册（理由见 docs/decisions.md「宿主与卡片」）
- * @param scope - 本插件命名空间的 decode 后段视图（卡片与记忆监听消费）
- * @param providersScope - llm-pi-ai 命名空间的 decode 后段视图（只消费 user 层的提供方 id）
- * @param hostModelScope - 宿主 subagent-model-selection-settings 的 decode 后视图（输入框「跟随」状态灯消费）
- * @param rpc - 宿主 connection 的 client RPC 面（由子 fiber 取出后传入，避免 ctx.get）
- */
+/** 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。
+ * `ctx` 是子 fiber 的 ctx（`apply` 里那个 `ctx.inject` 的 child）：注册一律挂它，子 fiber 卸载即级联撤销；挂父 ctx 则卸载不清理、重建时重复注册（理由见 docs/decisions.md「宿主与卡片」） */
 function boot(
     ctx: ClientContext,
     scope: DecodedScope<Flags>,

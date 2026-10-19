@@ -1,21 +1,9 @@
 import type { ProviderProbeOutcome, UnsupportedEffort, UsableEffort, VerifyProbeResult, VerifyProviderReport, VerifySummary } from '@/shared/verify-progress'
 
-/**
- * 探测的汇报层：把一组的结论折成一份汇报，再把各组汇报折成一份全局汇总。
- *
- * 「折」这一步的口径与执行、判定都无关：请求已经发完、结论已经定了，剩下的只是数字怎么加、
- * 哪些失败有资格翻某个开关。摘出来单独成文件，是为了让它能脱离网络与 ctx 被直接测——
- * 计数口径（可用档位只计带档位的请求、可达与凭据取自全程而非首个）正是最容易随改动悄悄漂移的地方。
- * 纯函数、零 ctx、不触网。
- */
+/** 探测汇报层（纯函数、零 ctx）：把一组结论折成一份汇报，再把各组折成全局汇总；计数口径（可用档位只计带档位的请求、可达与凭据取自全程）最易随改动悄悄漂移，独立成文件便于直接测 */
 
-/**
- * 单组结论 -> 汇报：可用模型按「提供方 / 模型」去重；档位不可用单独计数，不与其它失败混计。
- * 可达 / 凭据取自**全程**结果（每一次发出的请求都计入）而非首个。
- *
- * **只认能否定整个提供方的失败**：端点不通翻 `reachable`，凭据无效翻 `keyValid`，额度耗尽两者都不翻
- * （它多半是按模型设的额度，属模型级事实）。理由见 docs/decisions.md「验证」。
- */
+/** 单组结论 -> 汇报：可用模型按「提供方 / 模型」去重；档位不可用单独计数；可达 / 凭据取自全程。
+ * 只认能否定整个提供方的失败（端点不通翻 reachable、凭据无效翻 keyValid，额度耗尽属模型级不翻，见 docs/decisions.md「验证」） */
 export function reportProvider(result: ProviderProbeOutcome): VerifyProviderReport {
     const usable = new Set<string>()
     let efforts = 0

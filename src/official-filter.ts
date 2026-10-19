@@ -1,10 +1,6 @@
-/**
- * 「隐藏官方API」：开关开启且官方提供方未配置密钥时，让它在 UI 模型选择列表里不出现。
- *
- * 宿主目录的唯一生成链路逐 provider 调 `ctx.llm.listModels`，末了滤掉「模型数为 0」的组。
- * 故本模块只在 `listModels` 上遮一层：命中判定即返回空清单、否则直通原方法，前端零改动。
- * 判定逐次实时现算，故不监听任何事件。宿主契约见 `docs/host-api.md`，取舍见 `docs/decisions.md`。
- */
+/** 隐藏官方 API：开关开启且官方提供方未配置密钥时，让它在 UI 模型列表里不出现。
+ * 宿主目录逐 provider 调 `ctx.llm.listModels` 末了滤掉模型数为 0 的组，故只在 `listModels` 上遮一层：命中返回空清单、否则直通，前端零改动。
+ * 判定逐次实时现算，不监听事件。契约见 `docs/host-api.md`，取舍见 `docs/decisions.md` */
 import { credentialRef, isCredentialRefName } from '@deepseek-ai/dsh-credentials'
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmModelInfo } from '@deepseek-ai/dsh-llm'
@@ -52,10 +48,8 @@ async function isUnconfigured(ctx: Context, provider: string): Promise<boolean> 
     }
 }
 
-/**
- * 实时判定某个提供方本次是否该被隐藏：开关开 → 名单命中 → 判定为「未配置密钥」，三者缺一即放行——
- * 过滤是展示层诉求，判不准时宁可照常显示。每次目录生成时现算，不缓存、不监听事件。
- */async function isHiddenNow(ctx: Context, provider: string): Promise<boolean> {
+/** 实时判定某提供方本次是否该被隐藏：开关开 + 名单命中 + 未配置密钥，三者缺一即放行（展示层诉求，判不准宁可照常显示）；每次目录生成时现算，不缓存、不监听事件 */
+async function isHiddenNow(ctx: Context, provider: string): Promise<boolean> {
     if (!HIDDEN_OFFICIAL_PROVIDERS.includes(provider)) return false
     if (!getConfig().userExperience.hideOfficial) return false
     return isUnconfigured(ctx, provider)
@@ -70,12 +64,9 @@ interface HiddenLayer {
     [HIDDEN_LAYER]?: boolean
 }
 
-/** 装上官方提供方过滤：把 `ctx.llm` 的 `listModels` 遮成「命中隐藏即返回空清单」的一层
- *
- * 链式遮蔽是特性：卸载不动服务上的属性（后装插件记住的 original 正是我们的 wrapped，动属性会抹掉别人的遮蔽）。
- * wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫——不通过即直通 original。
- * HMR 重载会整函数重跑，靠品牌标记幂等。理由见 docs/decisions.md「宿主与卡片」。
- */
+/** 装上官方提供方过滤：把 `ctx.llm` 的 `listModels` 遮成「命中隐藏即返回空清单」的一层。
+ * 链式遮蔽是特性（卸载不动服务上的属性——后装插件记住的 original 正是我们的 wrapped，动属性会抹掉别人的遮蔽）；
+ * wrapped 捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫；HMR 重载整函数重跑，靠品牌标记幂等。理由见 docs/decisions.md「宿主与卡片」 */
 export function installOfficialFilter(ctx: Context): void {
     const llm = ctx.llm
     const original = llm.listModels

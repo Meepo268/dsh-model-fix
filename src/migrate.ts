@@ -14,13 +14,10 @@ import { errorText, isSettingsConflict } from '@/shared/errors'
 
 /**
  * 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。
- *
- * 与升级链的两条分工——本文件只处理**当前版本**与**段内多版本共存**，
- * 「把某个旧版本升上来」交给 `src/upgrade.ts` 的冻结台阶链（这里只在选迁移源时调它）。
- * 本文件与升级链共用的落盘口都在当前版本键 `CURRENT_KEY` 上，物化函数单一来源在 `src/shared/config-schema.ts` 的 `toStored`。
+ * 旧版本「升上来」交给 `src/upgrade.ts` 的冻结台阶链（选迁移源时调它）；落盘口都在 `CURRENT_KEY`，物化用 `toStored`。
  */
 
-/** 全新用户的规范默认快照（与升级链对空输入的结果一致，由 test 守护）；物化函数单一来源在 src/shared/config-schema.ts 的 `toStored` */
+/** 全新用户的规范默认快照（与升级链对空输入的结果一致，由 test 守护） */
 export const DEFAULT_STORED: PluginConfigSnapshot = toStored(DEFAULT_CONFIG)
 
 /** 当前版本的快照键（当前为 `version-8`，N 取 `CONFIG_VERSION`），全文件的规范化/迁移/自愈写回共用 */
@@ -38,11 +35,9 @@ function collectVersions(section: VersionedSection | undefined): number[] {
 }
 
 /**
- * 两阶段清理旧快照（versions 升序）：
- * - Phase A：清理低于 MIN_SUPPORTED_VERSION 的快照（已失效，不读取不处理）
- * - Phase B：清理低于当前版本且超出 MAX_OLD_SNAPSHOTS 上限的 excess（从最低版本起淘汰）
- * 等于或高于当前版本的快照始终保留（当前在使用，高版本供回退后无损读取）。
- * configVersion/minSupported/maxOld 默认取当前常量，测试可覆写以覆盖更高版本台阶。
+ * 两阶段清理旧快照（versions 升序）：低于 MIN_SUPPORTED_VERSION 的不读不处理；
+ * 低于当前版本且超出 MAX_OLD_SNAPSHOTS 上限的从最低起淘汰；等于或高于当前版本的始终保留（高版本供回退后无损读取）。
+ * 参数默认取当前常量，测试可覆写。
  */
 export function pruneOps(
     versions: number[],
@@ -65,36 +60,27 @@ export function pruneOps(
 
 /**
  * 当前版本快照的规范化 op：以「当前生效值」物化规范完整快照（`resolveConfig` → `toStored`），
- * 与盘上当前版本键逐键比较；不一致才产出 set op，幂等——第二轮同值零写入即收敛。
- * 仅在 migrateConfig 的「当前版本已存在」分支调用。
- *
- * 覆盖三类重写动因：**非法**（`parseSnapshot` 判 undefined）、**残缺**（`parseSnapshot` 对缺失字段
- * 一律补默认，会把只有 `efforts` 的段判为合法完整配置，故须按规范化结果比对）、**多余键**
- * （`toStored` 物化只保留已知键，比对不一致即剥离重写）。
+ * 与盘上当前版本键逐键比较；不一致才产出 set op，幂等。仅 migrateConfig 的「当前版本已存在」分支调用。
+ * 覆盖三类重写动因：**非法**（`parseSnapshot` 判 undefined）、**残缺**（缺失字段补默认会把只有 `efforts` 的段判为合法，须按规范化结果比对）、**多余键**（物化只保留已知键）。
  */
 export function canonicalizeCurrentOp(section: VersionedSection | undefined): SettingsPathOp[] {
     if (!section) return []
-    if (!(CURRENT_KEY in section)) return [] // 当前版本键不存在 → 交给迁移分支，不在此产出
+    if (!(CURRENT_KEY in section)) return [] // 当前版本键不存在，交给迁移分支
     const onDisk = section[CURRENT_KEY]
     const canonical = toStored(resolveConfig(section))
     return deepEqualJson(onDisk, canonical) ? [] : [{ op: 'set', path: [CURRENT_KEY], value: canonical }]
 }
 
-/**
- * 0.1.7 现代栈下本插件 Config schema 命名空间由宿主 Loader 异步登记，晚于 apply——启动时 describe() 可能尚未含本 NS。
- * 有界轮询等待其出现后再迁移（dsh-settings 无「命名空间注册」事件或 ready promise）。
- */
+/** NS 登记晚于 apply（宿主 Loader 异步）：迁移前先有界轮询等 `describe()` 含本 NS（dsh-settings 无注册事件 / ready promise） */
 const MIGRATE_POLL_MS = 50
 const MIGRATE_WAIT_MS = 2000
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
  * 启动时配置迁移：
- * - 有当前版本快照 → 规范化校验（不一致即重写自愈），并两阶段清理低版本旧快照（先清低于最低支持版本，
- *   再清低于当前版本且超出上限的 excess；高版本快照保留）
- * - 无当前版本 → 段内所有 ≥ 最低支持版本中取最高可解析快照：高版本降级解析、低版本走升级链；
- *   均不可解析或段内无版本则视为全新用户，直接写入规范默认快照
- * - 写回带 `SETTINGS_CONFLICT` 限次重试，且**重读描述并重算 op**、绝不回放（理由见 docs/decisions.md「写回端点」）
+ * - 有当前版本快照 → 规范化校验（不一致即重写自愈），并两阶段清理旧快照
+ * - 无当前版本 → 取段内 ≥ 最低支持版本中最高可解析快照：高版本降级解析、低版本走升级链；均不可解析视为全新用户，写默认快照
+ * - 写回带 `SETTINGS_CONFLICT` 限次重试，且**重读描述并重算 op**、绝不回放（见 docs/decisions.md「写回端点」）
  */
 export async function migrateConfig(ctx: Context): Promise<void> {
     // 轮询等待 describe() 含本 NS；超时/卸载即放弃，按当前生效配置继续
@@ -166,9 +152,8 @@ export async function migrateConfig(ctx: Context): Promise<void> {
 }
 
 /**
- * 从当前版本快照算出去重写回 op：仅当 `excludes` 经 Set 收窄后**变短**（即存在重复项）才产出，
- * 保留首次出现；无重复返回 []（一个字节都不写，这是 onChange 自愈的终止条件，防反馈循环）。
- * 元素含非字符串即整段非法，同样返回 []。存储侧不做静默去重是 UI 录入端已拦截重复的前提下的兜底。
+ * 从当前版本快照算出去重写回 op：仅当 `excludes` 存在重复项（保留首次出现）才产出；
+ * 无重复返回 []（一个字节都不写——这是 onChange 自愈的终止条件，防反馈循环）；元素含非字符串即整段非法，同样返回 []。
  */
 export function dedupeExcludesOp(snapshot: unknown): SettingsPathOp[] {
     if (!isPlainObject(snapshot)) return []
@@ -180,10 +165,7 @@ export function dedupeExcludesOp(snapshot: unknown): SettingsPathOp[] {
     return [{ op: 'set', path: [CURRENT_KEY, 'excludes'], value: [...seen] }]
 }
 
-/**
- * 自有配置的通用自愈入口（onChange 调用）：读 user 层当前版本快照，逐条套用自愈规则，
- * 有 op 才写入。当前唯一规则：excludes 去重（手改兜底）。
- */
+/** 自有配置的通用自愈入口（onChange 调用）：读 user 层当前版本快照，有 op 才写入。当前唯一规则：excludes 去重 */
 export async function selfHealConfig(ctx: Context): Promise<void> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         if (!ctx.fiber.store) return

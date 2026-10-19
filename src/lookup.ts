@@ -1,12 +1,7 @@
 import { HINTS, LEVELS } from '@/constants'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 
-/**
- * 归一化模型 id：小写并去 -latest / -openai-compact 后缀噪音。
- *
- * 由本模块导出：目录索引的匹配键在 `src/catalog.ts` 建索引时就取自这里——目录 id 保留原始大小写与
- * 命名空间前缀，而三级匹配只在归一空间进行，故归一规则只有这一处实现。
- */
+/** 归一化模型 id：小写并去 `-latest` / `-openai-compact` 后缀；归一规则仅此一处（目录匹配键建索引时取自这里） */
 export function normalizeId(id: string): string {
     return id.toLowerCase().replace(/-openai-compact$/, '').replace(/-latest$/, '')
 }
@@ -14,7 +9,7 @@ export function normalizeId(id: string): string {
 /** 日期式数字组（2/4 位数字、总计 4/6/8 位，长形优先）；不锚定末尾，中缀亦提取；-? 连带消费相邻连字符避免 base 残留 -- */
 const DATE_GROUP_WITH_HYPHEN = /-?(?:\d{8}|\d{4}-\d{4}|\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}|\d{6}|\d{2}-\d{4}|\d{4}-\d{2}|\d{4}|\d{2}-\d{2})/g
 
-/** 拆 id 为 { base, digits }：digits 为各日期组剥除连字符后直接拼接的纯数字串（08-31 与 0831 视作同一），base 为去各组后的主体 */
+/** 拆 id 为 { base, digits }：digits 为各日期组剥连字符后的拼接，base 为去组后的主体 */
 function stem(id: string): { base: string; digits: string } {
     const normalized = normalizeId(id)
     let digits = ''
@@ -27,11 +22,7 @@ function stem(id: string): { base: string; digits: string } {
     return { base, digits }
 }
 
-/**
- * 匹配本地模型 id 与目录 id：精确、词干、前缀三级。
- *
- * `ids` 必须是建索引时归一过的匹配键（见 `ProviderGroup.ids`），返回的也是归一键，供 `byId` 反查条目本体。
- */
+/** 匹配本地模型 id 与目录 id：精确、词干、前缀三级（`ids` 须为归一匹配键，返回归一键供 `byId` 反查） */
 function matchId(localId: string, ids: readonly string[]): string | undefined {
     const normalized = normalizeId(localId)
     if (ids.includes(normalized)) return normalized
@@ -57,24 +48,11 @@ function hintedProviders(id: string): readonly string[] {
     return HINTS.find(([prefix]) => bare === prefix || bare.startsWith(`${prefix}-`) || bare.startsWith(`${prefix}.`))?.[1] ?? []
 }
 
-/**
- * 在目录中查找模型条目。定位分两级：
- *
- * - **组内**（provider 精确命中目录时）：依次试**完整 id** → **裸名** → **末段唯一匹配**。前两级是
- *   `matchId` 的三级匹配（完整 id 优先是因为目录 id 常自带命名空间前缀，如 `tencent/Hy3`），
- *   key 相同时只查一次；末段匹配见 `matchIn` 的 `tailMatch`。
- * - **全局**：官方提供方提示依序试到命中即认（模型名前缀自带定位依据）；其余走兜底，只在跨提供方唯一命中时才认。
- *
- * 宁可漏也不错配：多命中一律判歧义放弃，不猜。
- */
+/** 在目录中查找模型条目：组内依次 完整 id → 裸名 → 末段唯一匹配；全局官方提示依序试、兜底仅跨提供方唯一命中才认。多命中判歧义放弃（宁可漏不错配，见 decisions.md「参数来源」） */
 export function lookup(indexed: IndexedCatalog, providerId: string, modelId: string): IndexEntry | undefined {
     const { groups } = indexed
     const bare = modelId.slice(modelId.lastIndexOf('/') + 1)
-    /**
-     * 组内匹配。`tailMatch` 只在 provider 严格匹配时开启——用户指定了提供方即已定域，此时「裸名等于
-     * 目录 id 末段且唯一」不构成歧义。兜底遍历与官方提示两处不开：那里没有定域依据，裸名撞末段会把
-     * 别家的条目也纳入候选，正是要防的跨提供方错配。
-     */
+    /** 组内匹配；`tailMatch` 只在 provider 严格匹配（已定域）时开启，避免裸名撞别家末段造成跨提供方错配 */
     const matchIn = (provider: string, tailMatch: boolean): IndexEntry | undefined => {
         const group = groups.get(provider)
         if (!group) return

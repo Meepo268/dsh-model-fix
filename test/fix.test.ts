@@ -1,9 +1,6 @@
 /**
-  * src/fix.ts 编排集成测试（stub ctx）：用内存 settings 文档驱动真实 fix()，
-  * 覆盖填充 / 覆盖 / force / excludes / compat 增删 / 空字段剔除 / 记忆不归 fix 管（只写 llm-pi-ai 一段）/ 冲突重试。
-  *
-  * 不覆盖：事件链与守卫（src/guard.ts + test/guard.test.ts）、缓存读盘与网络拉取（readCache/fetchLatest）、
-  * 浏览器半。这些需要真实宿主或 fs/mock，不在 stub ctx 的可达面内。
+  * src/fix.ts 编排集成测试（stub ctx）：用内存 settings 文档驱动真实 fix()，覆盖填充 / 覆盖 / force / excludes / compat 增删 / 空字段剔除 / 记忆不归 fix 管（只写 llm-pi-ai 一段）/ 冲突重试。
+  * 不覆盖：事件链与守卫（src/guard.ts + test/guard.test.ts）、缓存读盘与网络拉取（readCache/fetchLatest）、浏览器半。这些需要真实宿主或 fs/mock，不在 stub ctx 的可达面内
   */
 
 import type { Context } from '@deepseek-ai/cordis'

@@ -1,9 +1,4 @@
-/**
- * 诊断弹层的自足外壳 `DiagnoseDialog`（浏览器半）：「验证模型」与「探测档位」共用——
- * 两个选项卡（模型列表 / 验证或探测记录）+ 选项卡行右侧小键 + 底部动作行。
- *
- * 状态与动作全由卡片经 props 递进来。样式数值见 `card-styles.ts`。
- */
+/** 诊断弹层的自足外壳 `DiagnoseDialog`（浏览器半）：「验证模型」与「探测档位」共用——两个选项卡（模型列表 / 验证或探测记录）+ 选项卡行右侧小键 + 底部动作行。状态与动作全由卡片经 props 递进来。样式数值见 `card-styles.ts` */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'

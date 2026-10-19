@@ -1,15 +1,7 @@
-/**
- * 「UI 与行为」组（`behavior`）的执行面：把四个可隐匿部件按开关做**真正的挂载 / 卸载**。
- *
- * 为什么必须是装卸而非组件内显隐：`settings.plugins.tab` 的 tab 头由宿主按**注册账本**画出，
- * 组件返回 `null` 只会让内容空掉、tab 头照旧。撤销 `ctx.slots.register` 的 disposer 才是让部件从宿主账本里消失的唯一途径。
- *
- * 为什么注册动作写在 `ctx.slots.inject` 的回调里：向未声明的 slot 直接 `register` 会抛
- * `slot "..." is not declared`，而声明到达前本席不能注册。`ctx.effect` 会把回调返回的清理函数
- * 挂进该次声明的 effect 生命周期，故 fiber 卸载或声明坍缩时最后挂载的条目一并撤销。
- *
- * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），list 席位按 `id` 记账、id 不同可并存。
- */
+/** 「UI 与行为」组（`behavior`）的执行面：把四个可隐匿部件按开关做**真正的挂载 / 卸载**。
+ * 为什么必须是装卸而非组件内显隐：`settings.plugins.tab` 的 tab 头由宿主按**注册账本**画出，组件返回 `null` 只会让内容空掉、tab 头照旧。撤销 `ctx.slots.register` 的 disposer 才是让部件从宿主账本里消失的唯一途径。
+ * 为什么注册动作写在 `ctx.slots.inject` 的回调里：向未声明的 slot 直接 `register` 会抛 `slot "..." is not declared`，而声明到达前本席不能注册。`ctx.effect` 会把回调返回的清理函数挂进该次声明的 effect 生命周期，故 fiber 卸载或声明坍缩时最后挂载的条目一并撤销。
+ * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），list 席位按 `id` 记账、id 不同可并存 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { behaviorVisible } from '@/client/model'
@@ -43,14 +35,8 @@ const TAB_ORDER = 20
 const COMPOSER_ORDER = 5
 const FOLLOW_ORDER = 6
 
-/**
- * 挂上装卸编排：每个部件在所属 slot 声明到达后按开关决定挂不挂，之后每次配置变更重算。
- *
- * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：注册与订阅都挂在它上面，fiber 卸载即级联撤销
- * @param scope - 本插件命名空间的 decode 后段视图（读 behavior 组的开关）
- * @param shared - 卡片入参的共有部分（六个写回出口）
- * @param composerProps - 两枚 chip 的入参（宿主 model-selection 段的 scope 等）
- */
+/** 挂上装卸编排：每个部件在所属 slot 声明到达后按开关决定挂不挂，之后每次配置变更重算。
+ * `ctx` 是注册所挂的 ctx（`boot` 传入的子 fiber ctx）：注册与订阅都挂在它上面，fiber 卸载即级联撤销 */
 export function applySlotVisibility(
     ctx: ClientContext,
     scope: DecodedScope<Flags>,

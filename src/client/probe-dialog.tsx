@@ -1,7 +1,4 @@
-/**
- * 「探测档位」弹层（浏览器半）：`DiagnoseDialog` 外壳的组装层——
- * 两个开关经 `extras` 插槽渲染在选项卡容器之下，选项卡行右侧快捷勾选键经 `tools` 递入。
- */
+/** 「探测档位」弹层（浏览器半）：`DiagnoseDialog` 外壳的组装层——两个开关经 `extras` 插槽渲染在选项卡容器之下，选项卡行右侧快捷勾选键经 `tools` 递入 */
 
 import { useMemo } from 'react'
 // primitives 由宿主模块表注入

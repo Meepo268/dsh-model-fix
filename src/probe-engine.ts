@@ -1,7 +1,6 @@
 /**
  * 最小请求的执行引擎：验证（每模型一次不带档位的请求）与探测档位（逐档请求）共用。
- *
- * 设计裁决（四级分层、受理判据、失败分类、短路判据、并发与中止语义）见 docs/decisions.md「验证」与「探测档位」。
+ * 设计裁决见 docs/decisions.md「验证」与「探测档位」。
  */
 
 import type { LlmRuntime, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -17,11 +16,11 @@ const PROBE_PROMPT = 'Just say OK'
 /** 单次探测的等待上限（毫秒）：超时视为本次没跑成，防个别端点把整批拖死 */
 const PROBE_TIMEOUT_MS = 30_000
 /**
- * 软超时后的宽限（毫秒）：软超时只发中止信号、等适配器自己收尾并回报真实失败事实，宽限期满即硬兜底。
- * 兜底与「读流」赛跑而非只等它——适配器即使忽略 `signal`，probeOnce 也必然返回（理由见 docs/decisions.md「验证」）。
+ * 软超时后的宽限（毫秒）：软超时只发中止信号、等适配器收尾并回报真实失败事实，宽限期满即硬兜底。
+ * 兜底与「读流」赛跑，适配器即使忽略 `signal`，probeOnce 也必然返回（见 docs/decisions.md「验证」）。
  */
 const PROBE_TIMEOUT_GRACE_MS = 3_000
-/** 同时在跑的**提供方**数（不是单提供方并发数——后者恒为 1，由分组串行保证） */
+/** 同时在跑的**提供方**数（单提供方并发恒为 1，由分组串行保证） */
 const PROBE_PROVIDER_CONCURRENCY = 5
 
 /** 取失败事实的可序列化子集（供调用方自行细分，不参与本插件的判定） */
@@ -32,12 +31,10 @@ function failureFacts(failure: LlmFailure): VerifyFailureFacts {
 /**
  * 发一次探测并判定：收到首个 `block-start` 即判「受支持」；否则读到终止块、据其失败事实分类。
  * 中止（外部或上游）没有结论，单列 `'aborted'`；我方超时归 `'timeout'`。
+ * 到点必然返回，不依赖适配器配合：宽限期满即不再调用 `next()`。见 docs/decisions.md「验证」。
  *
- * **到点必然返回，不依赖适配器配合**：宽限期满由 `giveUp` 赢下与读流的赛跑，赛跑的对象是
- * **每一次 `next()`** 而非整段循环，到点即不再调用 `next()`。理由与收尾方式见 docs/decisions.md「验证」。
- *
- * @param timeoutMs 软超时（毫秒）：到点只发中止信号、不判结论；仅测试传更小的值，生产取 `PROBE_TIMEOUT_MS`
- * @param graceMs 软超时后的宽限（毫秒）：期满即硬兜底返回；同样仅测试为缩短等待而传
+ * @param timeoutMs 软超时（毫秒）：到点只发中止信号、不判结论；仅测试传更小的值
+ * @param graceMs 软超时后的宽限（毫秒）：期满即硬兜底返回；仅测试为缩短等待而传
  */
 export async function probeOnce(
     llm: Pick<LlmRuntime, 'stream'>,
@@ -57,8 +54,7 @@ export async function probeOnce(
     const iterator = llm.stream({
         provider: probe.provider,
         model: probe.model,
-        // 档位 id 取自宿主自己的 reasoningEfforts 配置键（即模型页送出的同一个值），断言只为满足品牌类型，
-        // 免为此引入 @deepseek-ai/dsh-llm 的运行期值导入
+        // 档位 id 取自宿主配置键（模型页送出的同一个值）；断言只为满足品牌类型，免引入 dsh-llm 运行期值导入
         ...(probe.effort === undefined ? {} : { reasoningEffort: probe.effort as ReasoningEffortId }),
         messages: [{ role: 'user', content: [{ type: 'text', text: PROBE_PROMPT }] }],
         // 我方超时与外部中止合成一路，两者都该停在探测边界上。
@@ -66,13 +62,11 @@ export async function probeOnce(
         signal: AbortSignal.any([signal, controller.signal]),
     })[Symbol.asyncIterator]()
     try {
-        // 只认 block-start——它证明适配器已真正开始产出内容块。不能沿用「首个非 finish 块即成功」：
-        // 额度耗尽的 key 也会先来一条 usage（实测踩过，见 docs/decisions.md「验证」）。
-        // 命中即返回，随后的 finally 中断请求、不再消耗生成额度
+        // 只认 block-start（证明适配器已开始产出内容块）：额度耗尽的 key 也会先来一条 usage（实测踩过，见 docs/decisions.md「验证」）
         while (true) {
             const step = await Promise.race([iterator.next(), giveUp])
             if (step === 'give-up') {
-                // 外部中止优先：用户按的停止不是失败，不能入账、更不能据此短整组（与 aborted 终帧那支同口径）
+                // 外部中止优先：用户按的停止不是失败，不能入账、更不能据此短整组
                 return signal.aborted ? { outcome: 'aborted', failure: undefined } : { outcome: 'timeout', failure: undefined }
             }
             if (step.done) break
@@ -82,12 +76,11 @@ export async function probeOnce(
                 const reason = chunk.reason
                 // stop / tool-calls / max-tokens：正常终止却没有内容块，宿主归为退化完成，同样没跑成
                 if (reason.kind !== 'error' && reason.kind !== 'aborted') return { outcome: 'other', failure: undefined }
-                // 外部中止单列：没有结论，既不是不可用也不能断后续请求。
-                // 只认外部那一路——我方超时也走 `aborted` 终帧（合成信号被中止），归下面的 timeout
+                // 外部中止单列：没有结论。只认外部那一路——我方超时也走 `aborted` 终帧（合成信号被中止），归下面的 timeout
                 if (reason.kind === 'aborted' && signal.aborted) {
                     return { outcome: 'aborted', failure: failureFacts(reason.failure) }
                 }
-                // 我方超时不算端点不可达，也不算不可用——但原始失败事实照留，供调用方自行判断
+                // 我方超时不算端点不可达、不算不可用；原始失败事实照留，供调用方判断
                 return {
                     outcome: timedOut ? 'timeout' : classifyFailure(reason.failure),
                     failure: failureFacts(reason.failure),
@@ -104,8 +97,8 @@ export async function probeOnce(
         clearTimeout(timer)
         clearTimeout(giveUpTimer)
         controller.abort()
-        // 收尾：请求关闭迭代器，被放弃的循环不再继续消费分片。**不 await**——适配器若忽略 signal，
-        // `return` 会排在未决的 `next()` 之后永不 settle，await 等于把刚兜底回来的函数又挂回去
+        // 收尾关闭迭代器。**不 await**：适配器若忽略 signal，`return` 会排在未决的 `next()` 之后永不 settle，
+        // await 等于把刚兜底回来的函数又挂回去
         const close = iterator.return?.bind(iterator)
         if (close !== undefined) void close().catch(() => {})
     }
@@ -114,11 +107,7 @@ export async function probeOnce(
 /** 「永不中止」的占位信号（AbortSignal 没有 null 态，未给 signal 时用它） */
 const NEVER_ABORTED = new AbortController().signal
 
-/**
- * 一帧的进度交代：`settled` 是进度增量（`done` 只数计划条目），`skipped` 是因短路而未发出的条数。
- *
- * 恒有 `settled === skipped + (当前条目确已发出 ? 1 : 0)`（口径见共享层 `VerifyProgressFrame`）。
- */
+/** 一帧的进度交代：`settled` 是进度增量，`skipped` 是因短路而未发出的条数；恒有 `settled === skipped + (当前条目确已发出 ? 1 : 0)` */
 interface ProbeFrameProgress {
     /** 本帧了结的计划条目数（含因短路而未发出的），`done` 只数计划条目 */
     settled: number
@@ -151,9 +140,7 @@ export interface ProbeRunOptions {
 
 /**
  * 跑完一组清单（组内零并发、组间最多五路）并汇总；**不发 `done` 帧**——终帧由调用方在收尾时发。
- *
- * 中止的处理在这里已经定型：已中止即不再开新组，从未开跑的组保持 undefined 并被排除在汇报之外
- * （把它们报成「全可用」或「全不可用」都是撒谎）。
+ * 已中止即不再开新组，从未开跑的组保持 undefined、被排除在汇报之外。
  */
 export async function runProbeGroups(
     llm: Pick<LlmRuntime, 'stream'>,
@@ -162,7 +149,7 @@ export async function runProbeGroups(
     options: ProbeRunOptions = {},
 ): Promise<VerifySummary> {
     const signal = options.signal ?? NEVER_ABORTED
-    // 分母只数计划条目（一条即一次请求，口径同 `planned` / `probed`），故 `done ≤ total` 恒成立
+    // 分母只数计划条目（口径同 `planned`），故 `done ≤ total` 恒成立
     const total = groups.reduce((sum, group) => sum + group.probes.length, 0)
     // 稀疏数组：中止时从未开跑的组保持 undefined，汇报时据实排除
     const outcomes = new Array<ProviderProbeOutcome>(groups.length)
@@ -182,8 +169,7 @@ export async function runProbeGroups(
         })
     }
     options.onProgress?.({ type: 'opened', total })
-    // 第 w 个 worker 只跑下标 ≡ w (mod workers) 的组：一个普通 for 即可切分，无需共享游标，
-    // 各 worker 拿到的组数相差至多一个；组内逐条 await 即「同一 provider 零并发」
+    // 第 w 个 worker 只跑下标 ≡ w (mod workers) 的组；组内逐条 await 即「同一 provider 零并发」
     const workers = Math.min(PROBE_PROVIDER_CONCURRENCY, groups.length)
     await Promise.all(Array.from({ length: workers }, (_, worker) => (async () => {
         for (let at = worker; at < groups.length; at += workers) {
@@ -203,9 +189,8 @@ export async function runProbeGroups(
 }
 
 /**
- * 收尾发终帧：**中止不发 `done`**——消费方见「流自然结束却没等到 done」即知这轮没跑完，
- * 据此保留进度而不是报成功。由调用方在全部收尾动作（探测档位的收敛写回）之后调用，
- * 故终帧里的汇总已是最终形态。
+ * 收尾发终帧：**中止不发 `done`**——消费方见「流结束却无 done」即知这轮没跑完。
+ * 由调用方在全部收尾动作（收敛写回）之后调用，终帧里的汇总已是最终形态。
  */
 export function finishRun(summary: VerifySummary, options: ProbeRunOptions = {}): void {
     if (options.signal?.aborted) return

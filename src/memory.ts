@@ -1,9 +1,4 @@
-/**
- * 推理级别记忆的失效清理（Node 半）：按宿主的**全量**模型列表剪掉已不存在的条目。
- *
- * 设计裁决（覆盖面取活路由、缺席即删、读失败不删、开关关闭不剪）见 docs/decisions.md「推理级别记忆」。
- * 本文件独有的口径：三态 `LiveModels`（`undefined` = 未读 / `null` = 读失败 / 集合 = 成功）。
- */
+/** 推理级别记忆的失效清理：按宿主全量模型列表剪掉已不存在的条目（口径见 docs/decisions.md「推理级别记忆」） */
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_ATTEMPTS } from '@/constants'
 import { getConfig } from '@/config'
@@ -14,28 +9,16 @@ import { PLUGIN_NS, PLUGIN_NAME } from '@/shared/constants'
 import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
 import type { EffortMemory } from '@/shared/types'
 
-/**
- * 存活模型清单：provider id → 该 provider 现存的模型 id 集合。
- * 三态：`undefined` = 该 provider 已无活路由（真删了）；`null` = 在路由上但目录读失败（读不到 ≠ 不存在）；
- * 集合 = 读成功，集合外即已删除。
- */
+/** 存活模型清单：`undefined` = 无活路由（真删了）/ `null` = 读失败（读不到 ≠ 不存在）/ 集合 = 成功 */
 export type LiveModels = ReadonlyMap<string, ReadonlySet<string> | null>
 
-/** 剪枝计划：清理后的整段记忆 + 本轮删掉的条目数（供日志，一条也不白记） */
+/** 剪枝计划：清理后的整段记忆 + 本轮删除条数 */
 interface PrunePlan {
     readonly memory: EffortMemory
     readonly removed: number
 }
 
-/**
- * 按存活清单剪枝记忆（不改入参、产出不共享嵌套引用）。返回清理后的记忆，`null` = 无需写回。
- *
- * 口径（理由见 docs/decisions.md「推理级别记忆」）：
- * - **缺席即删除**：provider 已无活路由 ⇒ 整段删；模型不在其存活集合里 ⇒ 删该模型，段被删空则整个折叠。
- * - **读失败不等于删除**：provider 在路由上但 `listModels` 抛错 ⇒ 整段原样保留。
- * - **开关关闭即不剪**：`forgetRemoved` 关时本函数直接返回 `null`。
- * - **不看档位**：模型还在就保留，哪怕记忆的档位已不被 `reasoning.efforts` 广告。
- */
+/** 按存活清单剪枝记忆（不改入参）：缺席即删、段删空则折叠；读失败整段保留；`forgetRemoved` 关或无需写回返回 `null` */
 export function planPruneMemory(memory: EffortMemory, live: LiveModels, forgetRemoved: boolean): PrunePlan | null {
     if (!forgetRemoved) return null
     const next: EffortMemory = {}
@@ -73,12 +56,7 @@ export function planPruneMemory(memory: EffortMemory, live: LiveModels, forgetRe
     return changed ? { memory: next, removed } : null
 }
 
-/**
- * 采集存活清单：只对有记忆条目的 provider 调 `listModels`，其余 provider 一律不查。
- *
- * 返回 `null` = 本轮不剪（`listProviders()` 为空，即退化读：此刻宣称「全都不存在」等于全删）。
- * 单个 provider 的 `listModels` 抛错不影响其他 provider，只把它标成未知（`null`）。
- */
+/** 采集存活清单：只对有记忆条目的 provider 调 `listModels`；单 provider 读失败标 `null` 不影响其余；`listProviders()` 为空（退化读）返回 `null` = 本轮不剪 */
 export async function collectLiveModels(ctx: Context, providerIds: readonly string[]): Promise<LiveModels | null> {
     const registered = new Set(ctx.llm.listProviders().map((provider) => provider.id))
     if (registered.size === 0) return null
@@ -95,17 +73,11 @@ export async function collectLiveModels(ctx: Context, providerIds: readonly stri
     return live
 }
 
-/** 剪枝在途标志 + 待补跑标志：事件密集时合并（模型列表变化常连发数个事件），但不丢事件 */
+/** 在途与待补跑标志：事件密集时合并补跑，不丢事件 */
 let pruning = false
 let pending = false
 
-/**
- * 按全量模型列表剪一次记忆：读当前生效配置 → 采存活清单 → 出计划 → 经 `queueTask` 写回自有段
- * （带 revision 围栏，冲突时重读重算，限次）。
- *
- * 与 `fix` 分开：记忆生命周期不由填充触发。写回失败只告警不抛出——记忆是可丢数据。
- * 在途时到来的事件不丢弃、只置 `pending`，本轮结束后按最新状态补跑一次。
- */
+/** 剪一次记忆：读配置 → 采存活清单 → 出计划 → 经 `queueTask` 写回（冲突重读重算，限次）；写失败只告警（记忆可丢）；在途时的事件置 `pending` 补跑 */
 export async function updateMemory(ctx: Context): Promise<void> {
     if (pruning) {
         pending = true

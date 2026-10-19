@@ -1,24 +1,18 @@
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
-/**
- * 卡片末尾的联系行（浏览器半）：仓库地址 + 版本标记 + 两个跳转键。
- *
- * 自成一体——一行里没有任何卡片状态，只有几个常量、四个图标和一次文案合成，故从卡片组件里抽出来。
- */
+/** 卡片末尾联系行：仓库地址、版本标记与 star / 反馈跳转键，内容全在本文件内合成。 */
 
-/** 项目仓库与反馈入口：仓库地址与 README「安装」段同源，改地址只改这两行 */
 const REPO_URL = 'https://github.com/TikaFlow/dsh-model-fix'
 const ISSUES_URL = `${REPO_URL}/issues/new`
-/** 行内展示的短地址（去掉协议前缀，不重复手写字面量） */
 const REPO_LABEL = REPO_URL.replace(/^https?:\/\//, '')
 
-/** 插件版本号：由 tsdown 构建期从 package.json 读入并 define 内联（见 tsdown.config.ts） */
+/** 插件版本号：tsdown 构建期 define 内联，见 tsdown.config.ts */
 declare const __PLUGIN_VERSION__: string
 const PLUGIN_VERSION = __PLUGIN_VERSION__
 
-// ---------- 行内项目链接行的图标：Octicons（GitHub 官方图标集，MIT），统一 16×16 / viewBox 0 0 16 16 / `fill="currentColor"` ----------
+// 图标：Octicons（GitHub 官方图标集，MIT，https://primer.style/octicons），统一 16×16 / viewBox 0 0 16 16 / `fill="currentColor"`
 
-/** 仓库图标：Octicons mark-github-16（https://primer.style/octicons/mark-github-16/） */
+// mark-github-16
 function IconGitHub() {
     return (
         <svg className="dsh-mf-linkIcon" viewBox="0 0 16 16" width="16" height="16" aria-hidden>
@@ -27,7 +21,7 @@ function IconGitHub() {
     )
 }
 
-/** 版本标记图标：Octicons tag-16（https://primer.style/octicons/tag-16/） */
+// tag-16
 function IconTag() {
     return (
         <svg className="dsh-mf-linkIcon" viewBox="0 0 16 16" width="16" height="16" aria-hidden>
@@ -36,7 +30,7 @@ function IconTag() {
     )
 }
 
-/** star 键图标：Octicons star-16（https://primer.style/octicons/star-16/） */
+// star-16
 function IconStar() {
     return (
         <svg className="dsh-mf-linkIcon" viewBox="0 0 16 16" width="16" height="16" aria-hidden>
@@ -45,7 +39,7 @@ function IconStar() {
     )
 }
 
-/** 问题反馈键图标：Octicons issue-opened-16（https://primer.style/octicons/issue-opened-16/） */
+// issue-opened-16
 function IconIssue() {
     return (
         <svg className="dsh-mf-linkIcon" viewBox="0 0 16 16" width="16" height="16" aria-hidden>
@@ -55,17 +49,15 @@ function IconIssue() {
     )
 }
 
-/** 末尾联系行：只吃一个翻译函数，其余全在本文件内合成（地址、版本、issue 正文都不外泄给卡片） */
+/** 卡片末尾联系行：只吃一个翻译函数，地址、版本与 issue 正文均在本文件内合成。 */
 export function CardMeta(props: { t: TranslateNS<'settings.modelFix'> }) {
     const { t } = props
-    // 反馈链接预填版本 + 标准 issue 模板：用户点开即在正文里看到骨架，不必回忆要写哪几项
+    // 反馈链接预填版本与 issue 模板
     const issuesHref = `${ISSUES_URL}?body=${encodeURIComponent(t('issueBody', { version: PLUGIN_VERSION }))}`
-    // 分割线 + 仓库地址 + 两个跳转键：整行同一套描边小片（.dsh-mf-chip），不做主次层级
     return (
         <div className="dsh-mf-meta">
             <span className="dsh-mf-metaLeft">
                 <a className="dsh-mf-chip dsh-mf-chipAddress" href={REPO_URL} target="_blank" rel="noreferrer noopener"><IconGitHub />{REPO_LABEL}</a>
-                {/* 版本标记只读，不做成链接 */}
                 <span className="dsh-mf-chip dsh-mf-chipVersion"><IconTag />v{PLUGIN_VERSION}</span>
             </span>
             <span className="dsh-mf-actions">

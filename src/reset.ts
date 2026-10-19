@@ -11,15 +11,8 @@ import { guardedWritebackApi } from '@/writeback'
 /** 重置清除的模型字段：仅推理级别——最大上下文 / 输出上限 / 图片模态可在模型页自行设置，不清除 */
 const RESET_FIELD = 'reasoningEfforts'
 
-/**
- * 重置推理级别的模型参数计划（纯函数，零 ctx 依赖可单测）：
- * 每个非排除 provider 逐模型剔除推理级别字段、其余键原样保留
- * （contextWindow / maxTokens / input 不在清除范围），
- * 仅当该 provider 至少一个模型有推理级别键时才整段重建写回（零变更零 op，与 fix 写回纪律一致）；
- * 重建值里的其余空壳字段按 `stripEmptyFields` 的统一判据一并清掉，不在本模块另写一份空值判据。
- * 配置段一律不写——开关保持原值，重置后修改配置仍会按原开关触发填充。
- * 返回 { modelOps, changed }，changed 为受影响（至少剔除一个推理级别）的模型数，与 fix 的模型计数口径一致。
- */
+/** 重置推理级别的模型参数计划（纯函数、可单测）：非排除 provider 逐模型仅剔除 `reasoningEfforts`（其余字段原样保留），
+ * 带该键的模型所在 provider 才整段重建写回；重建值过 `stripEmptyFields`；配置段（开关）不写；`changed` 为受影响模型数 */
 export function planResetModels(config: PluginConfig, providers: Record<string, unknown>): {
     modelOps: SettingsPathOp[]
     changed: number
@@ -41,12 +34,10 @@ export function planResetModels(config: PluginConfig, providers: Record<string, 
                 if (key === RESET_FIELD) continue
                 kept[key] = value
             }
-            // 写回触发仍只看「带没带推理级别」：重置只对带推理级别的模型生效，
-            // 否则带空壳字段的模型会被算进 changed，卡片上的「重置 N 个模型」就虚高了
+            // 触发只看「带没带推理级别」：带空壳字段的模型不算 changed（否则卡片「重置 N 个」虚高）
             if (!Object.hasOwn(model, RESET_FIELD)) continue
             changed++
             next ??= models.slice()
-            // 顺手按统一判据清掉其余空壳字段，不在此处另写一份空值判据
             next[i] = stripEmptyFields(kept)
         }
         if (next) modelOps.push({ op: 'set', path: ['providers', providerId, 'models'], value: next })
@@ -54,13 +45,8 @@ export function planResetModels(config: PluginConfig, providers: Record<string, 
     return { modelOps, changed }
 }
 
-/**
- * 重置全部推理级别：剔除各非排除 provider 模型上的 reasoningEfforts，其余模型字段
- * （含可在模型页自行设置的最大上下文 / 输出上限 / 图片模态）、用户自定义字段与配置段
- * （开关）原样保留——重置后修改配置仍按原开关触发填充。事件流守卫全程打开，写回触发的
- * settings/document-updated 事件被入口判定拦下，不会反向触发填充。
- * 返回受影响（至少剔除一个推理级别）的模型数；写失败先告警再抛出，由调用方转 RPC 失败结果。
- */
+/** 重置全部推理级别（仅剔除 `reasoningEfforts`，配置段与其余字段原样保留，见 docs/decisions.md「写回端点」）；
+ * 全程持事件流守卫，写回触发的事件被入口拦下不会反向填充；返回受影响模型数，写失败先告警再抛出 */
 export async function resetModels(ctx: Context): Promise<number> {
     const { changed } = await guardedWritebackApi(ctx, {
         label: '重置',

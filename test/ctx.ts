@@ -1,16 +1,5 @@
-/**
-  * fix / probeAndFill 编排测试的 ctx 桩：内存 settings 文档 + revision 围栏 + queueTask 降级路径。
-  *
-  * 仅覆盖这两个编排体实际消费的 ctx 面：
-  *   - settings.describe() → [{ns, user, revision}]（user 为可变段值，每次 describe 返回实时引用与最新 revision）
-  *   - settings.mutate(ns, ops, revision) → 校验 revision 围栏（陈旧即抛 SETTINGS_CONFLICT）、应用 path op、bump revision
-  *   - 每次 mutate 记下调用当次的事件流守卫状态
-  *   - get('hmr') → undefined（使 src/host.ts 的 queueTask 走 task() 降级路径，不依赖 AsyncLocalStorage）
-  *   - logger.{info,warn,error} → 空实现
-  *
-  * 不实现事件发射（settings/document-updated）：编排体本身不订阅事件，
-  * 事件链守卫由 src/guard.ts 与 test/guard.test.ts 单独覆盖。
-  */
+/** fix / probeAndFill 编排测试的 ctx 桩：内存 settings 文档 + revision 围栏 + queueTask 降级路径。
+ * 仅覆盖这两个编排体实际消费的 ctx 面：settings.describe()、settings.mutate()、get('hmr') → undefined、logger.{info,warn,error} → 空实现。不实现事件发射（settings/document-updated）：编排体本身不订阅事件，事件链守卫由 src/guard.ts 与 test/guard.test.ts 单独覆盖 */
 
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { API_NS, PLUGIN_NS } from '@/shared/constants'

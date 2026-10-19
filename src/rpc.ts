@@ -1,10 +1,6 @@
-/**
- * Connection RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点
- * 与 reportLocale 语言上报端点，写回共用同一守卫做互斥；验证与探测档位的进度各开一条 `connection.fetch` 的 exact 路由。
- *
- * 路由由本插件自注册而不走宿主 `connection.rpc.handle`（后者在服务自己的 ctx 上求值 `owner.webServer`，
- * 而 connection 插件不再注入 webServer，必然抛错，详见 rpc-route.ts）。设计裁决见 docs/decisions.md「写回端点」。
- */
+/** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报；
+ * 验证与探测档位的进度各开一条 `connection.fetch` exact 路由。
+ * 路由自注册而非宿主 `connection.rpc.handle`（后者在 connection 服务 ctx 上求值 `owner.webServer`，而 connection 不再注入它必抛，详见 docs/decisions.md「写回端点」） */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/dsh-client-connection'
@@ -80,8 +76,7 @@ function handleReportLocale(payload: unknown): ConnectionRpcResult<unknown> {
 
 /** 注册一个 channel（三个写回端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
-    // 子 fiber 声明 connection + webServer：webServer 用于注册前缀路由，connection 用于信任围栏。
-    // 无 webServer 的 profile（如 headless）下子 fiber 不启动，插件其余功能不受影响。
+    // 子 fiber 声明 connection + webServer；无 webServer 的 profile（如 headless）下子 fiber 不启动，其余功能不受影响
     ctx.inject(['connection', 'webServer'], (rpcCtx) => {
         const connection = rpcCtx.get('connection') as Pick<HostConnectionService, 'requestRejection' | 'fetch'>
         const webServer = rpcCtx.get('webServer') as WebServer
@@ -99,8 +94,7 @@ export function installRpc(ctx: Context): void {
                 }
             }
             const disposeChannel = webServer.register({ kind: 'prefix', path: channel, handler: createChannelRoute(connection, channel, handler) })
-            // 两条进度流走 connection.fetch 的 exact 路由而非 channel：它们要的是一个持续多帧的响应，
-            // 而 RPC 的一次调用只对应一个 JSON 结果
+            // 两条进度流走 connection.fetch exact 路由（RPC 一次调用只对应一个 JSON 结果，装不下持续多帧的响应）
             const disposeStream = connection.fetch.register({
                 path: VERIFY_STREAM_ROUTE,
                 methods: ['POST'],
@@ -116,26 +110,17 @@ export function installRpc(ctx: Context): void {
             })
             return () => {
                 disposeChannel()
-                // fetch.register 的 disposer 是异步的；effect 只负责同步调用它
-                void disposeStream()
+                void disposeStream() // fetch.register 的 disposer 是异步的，effect 只负责同步调用它
                 void disposeProbe()
             }
         }, `${PLUGIN_NAME}: rpc`)
     })
 }
 
-/**
- * 进度流的 Fetch 实现：请求体是模型清单，响应是以 SSE 分帧的进度。
- *
- * 走 `connection.fetch.register` 而非 `webServer.register` 是刻意的：前者由 Connection 代管信任围栏、
- * 浏览器认证与**客户端断开 → `request.signal`**，后者这些都得自己再搭一遍。
- *
- * 验证与探测档位共用这一份实现：两者的线上形状逐字段同形，差别的只有执行器本身。
- *
- * `needsIdleGuard` 只给会写配置的那条流用：它与写回端点共用事件流守卫做互斥，已开即拒（409）。
- *
- * 执行器抛错时收于 `failed` 终帧；客户端已中止则不发——用户点停止不是失败。
- */
+/** 进度流的 Fetch 实现：请求体是模型清单，响应以 SSE 分帧。
+ * 走 `connection.fetch.register` 而非 `webServer.register`：前者代管信任围栏、浏览器认证与客户端断开 → `request.signal`。
+ * 验证与探测档位共用此实现（线上形状同形，只有执行器不同）；`needsIdleGuard` 只给写配置的那条流（与写回端点互斥，已开即拒 409）。
+ * 执行器抛错收于 `failed` 终帧，客户端已中止则不发（停止不是失败） */
 export function progressStreamFetch(
     run: ProgressRunner,
     needsIdleGuard = false,
@@ -148,8 +133,7 @@ export function progressStreamFetch(
         } catch {
             return new Response('invalid json body', { status: 400 })
         }
-        // 写配置的流（探测档位）在此查守卫：载荷先解析，故判定与执行器的守卫置位之间无 await，
-        // 并发请求不可能双双通过检查
+        // 写配置的流（探测档位）在此查守卫：载荷先解析，判定与执行器置位之间无 await，并发请求不会双双通过
         if (needsIdleGuard && isIgnoreAll()) return new Response('另一操作进行中，请稍后重试', { status: 409 })
         const stream = new ReadableStream<Uint8Array>({
             start(controller) {
@@ -157,19 +141,18 @@ export function progressStreamFetch(
                     try {
                         controller.close()
                     } catch {
-                        // 客户端已断开，控制器随之失效；无可挽回，也不必上报
+                        // 客户端已断开，控制器随之失效，不必上报
                     }
                 }
                 const push = (frame: VerifyProgressFrame): void => {
                     try {
                         controller.enqueue(encoder.encode(encodeProgressFrame(frame)))
                     } catch {
-                        // 同上：流已不可写。执行器随即随 signal 停下，不会再压更多帧
+                        // 同上：流已不可写，执行器随即随 signal 停下
                     }
                 }
                 run(payload, {
-                    // 客户端断开时 request.signal 会中止，据此让执行循环早停——
-                    // 这一轮是即用即弃的诊断，用户已经不在之后继续跑等于白烧他的额度
+                    // 客户端断开时 request.signal 中止，让执行循环早停（即用即弃的诊断，用户已不在）
                     signal: request.signal,
                     onProgress: push,
                 }).then(settle, (error: unknown) => {

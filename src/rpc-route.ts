@@ -1,12 +1,5 @@
-/**
- * 浏览器↔宿主 channel 路由：由本插件自注册前缀路由，而不是用宿主 `connection.rpc.handle`。
- *
- * 不用宿主通道的原因：`handle` 在**服务自己的 ctx** 上求值 `owner.webServer`，而 connection 插件的
- * `inject` 不再含 webServer，故 `owner.webServer` 必抛 `cannot get property "webServer" without inject`。
- *
- * 与宿主通道对齐的部分：同一把信任围栏（`connection.requestRejection`）+ 同一套信封字段与两条错误文案。
- * 类型面直接取宿主 devDep（全部 type-only，构建期擦除）。
- */
+/** 浏览器↔宿主 channel 路由：自注册前缀路由而非宿主 `connection.rpc.handle`（后者在 connection 服务 ctx 上求值 `owner.webServer`，而 connection 不再注入它必抛）；
+ * 信任围栏与信封字段、错误文案与宿主通道对齐，类型面全取宿主 devDep（type-only，构建期擦除） */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {

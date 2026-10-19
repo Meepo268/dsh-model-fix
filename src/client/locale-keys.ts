@@ -1,10 +1,5 @@
-/**
- * 卡片文案的键契约（浏览器半）：命名空间、键名联合、宿主 ui-slots 的类型表并入，
- * 以及「配置项 → 文案键」的四张映射。
- *
- * 这里只管「有哪些键、配置项对上哪个键」，键各自说了什么见 locale-zh.ts 与 locale-en.ts。
- * 四张映射按用途分：同一轴上「标题」与「释义」本是两句话，故行名与行内释义、组标题与组释义各成一张。
- */
+/** 卡片文案的键契约（浏览器半）：命名空间、键名联合、宿主 ui-slots 的类型表并入，以及「配置项 → 文案键」的四张映射。
+ * 这里只管「有哪些键、配置项对上哪个键」，键各自说了什么见 locale-zh.ts 与 locale-en.ts。四张映射按用途分：同一轴上「标题」与「释义」本是两句话，故行名与行内释义、组标题与组释义各成一张 */
 
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { Group, RowKey } from '@/client/model'
@@ -121,8 +116,7 @@ export type CardKey =
     | 'verifyDoneModels'
     | 'verifyFailed'
     | 'verifyFinished'
-    // 探测档位：与验证弹层共用外壳与行模板（复用 verifyOut* / verifySkipped / verifyStopped / 全选文案），
-    // 只有标题、开关、快捷勾选键与收尾几行是它自己的说法
+    // 探测档位：与验证弹层共用外壳与行模板（复用 verifyOut* / verifySkipped / verifyStopped / 全选文案），只有标题、开关、快捷勾选键与收尾几行是它自己的说法
     | 'probe'
     | 'probeTitle'
     | 'probeTabRecords'

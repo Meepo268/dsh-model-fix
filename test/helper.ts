@@ -9,10 +9,7 @@ let module = ''
 let modulePassed = 0
 let moduleFailed = 0
 
-/**
- * 断言一条用例。**通过时不逐条打印**——全量用例有数百条，逐条打印会刷十几屏，信噪比接近零；
- * 只累加计数，失败才记下来。失败明细在 summary 里统一列出。
- */
+/** 断言一条用例。通过时不逐条打印——全量用例有数百条，逐条打印会刷十几屏，信噪比接近零；只累加计数，失败才记下来。失败明细在 summary 里统一列出 */
 export function check(name: string, ok: boolean, detail?: unknown): void {
     if (ok) {
         passed++
@@ -50,9 +47,7 @@ export function stable(value: unknown): string {
     return JSON.stringify(value)
 }
 
-/**
- * 汇总输出：先补最后一个模块的进度行，再逐条列出失败明细，最后给总判据行。
- */
+/** 汇总输出：先补最后一个模块的进度行，再逐条列出失败明细，最后给总判据行 */
 export function summary(): void {
     closeSection()
     for (const item of failures) {

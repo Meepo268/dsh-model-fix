@@ -1,25 +1,23 @@
 /**
- * 当前版本（v8）配置形态的完整定义与解析/物化（跨半共享、零 Node 依赖、零 schemastery、零非基线 `@deepseek-ai/*`）。
+ * 当前版本（v8）配置形态的完整定义与解析/物化（跨半共享、零 Node 依赖）：
+ * 版本常量、键前缀、最低支持版本、旧快照上限、各组键名清单、默认值、解析函数、存储物化函数的单一入口，
+ * 浏览器半 `decodeSection` 与 Node 半 `resolveConfig`/`migrateConfig`/`upgradeConfig` 共用。
  *
- * 版本常量、键前缀、最低支持版本、旧快照上限、各组键名清单、默认值、解析函数、存储物化函数全部收归此处——
- * 当前形态的**单一入口**，浏览器半 `decodeSection` 与 Node 半 `resolveConfig`/`migrateConfig`/`upgradeConfig` 共用。
- *
- * 解析约定：
- * - 整项缺失 → 落该项默认；存在但非对象、或字段存在但非布尔 → 返回 undefined（整段快照非法）
- * - excludes 缺失落空数组、非数组或元素非字符串判非法；efforts 宽松解析（结构不符回落 {}，不判非法）
- * - 产物只含当前 schema 的已知键（剥离 configVersion 等运行时不消费的键）；缺省容器均为新对象/新数组，不与 DEFAULT_CONFIG 共享引用
+ * 解析约定：整项缺失落默认；非对象、字段非布尔判非法（返回 undefined）；
+ * excludes 缺失落空数组、非数组或元素非字符串判非法；efforts 宽松解析（结构不符回落 {}）；
+ * 产物只含当前 schema 的已知键，缺省容器均为新对象/新数组。
  */
 
 import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, PluginConfig, PluginConfigSnapshot, UserExperienceRules } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 
-/** 当前配置快照版本号（段内键 `version-N` 的 N）；只有不兼容才递增，约定见 docs/versioning.md */
+/** 当前配置快照版本号（段内键 `version-N` 的 N）；只有不兼容才递增（见 docs/versioning.md） */
 export const CONFIG_VERSION = 8
 
-/** 低于此值的快照视为已失效：运行时不读取、迁移源不选取、清理阶段 unset */
+/** 低于此值的快照视为已失效（不读取、不选为迁移源、清理时 unset） */
 export const MIN_SUPPORTED_VERSION = 7
 
-/** 低于当前版本的旧快照保留上限（段内低于当前版本合计最多留 maxOld 个，其余从最低起淘汰；当前版本与更高版本永不删） */
+/** 低于当前版本的旧快照保留上限（超出从最低起淘汰；当前与更高版本永不删） */
 export const MAX_OLD_SNAPSHOTS = 1
 
 /** 版本快照键前缀，段内键形如 version-N */
@@ -42,9 +40,7 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
 
 /**
  * behavior 组默认值（整组缺失或字段缺失落此）：四项全开。
- *
- * 全开是唯一与「装本插件但看不见任何 UI」相容的缺省；缺段的老快照落此即保持既有观感
- * （缺省与「该段不存在时的行为」一致，故不升版本，见 docs/versioning.md）。
+ * 全开是唯一与「装本插件但看不见任何 UI」相容的缺省；缺段的老快照落此即保持既有观感（见 docs/versioning.md）。
  */
 const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showInModels: true,
@@ -53,7 +49,7 @@ const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showFollowStatus: true,
 }
 
-/** 默认配置：全新用户的配置基线（存储形态经 `toStored` 物化；取值改动须同步 src/upgrade.ts 的台阶字面量默认值） */
+/** 默认配置：全新用户的配置基线（存储形态经 `toStored` 物化；取值改动须同步 src/upgrade.ts 的台阶字面量） */
 export const DEFAULT_CONFIG: PluginConfig = {
     allowUpdate: { reasoning: false, context: false, image: false },
     autoFill: { reasoning: true, context: true, image: true },
@@ -101,10 +97,7 @@ export function versionKey(version: number): string {
     return `${VERSION_PREFIX}${version}`
 }
 
-/**
- * 解析一组字段规则：整体缺失落该项默认；
- * 存在但非对象、或字段存在但非布尔 => 返回 undefined（镜像 schema 抛错语义）。
- */
+/** 解析一组字段规则：整体缺失落默认；非对象、字段非布尔 => undefined */
 function parseRules(value: unknown, dflt: boolean): FieldRules | undefined {
     if (value === undefined) return { reasoning: dflt, context: dflt, image: dflt }
     if (!isPlainObject(value)) return
@@ -121,7 +114,7 @@ function parseRules(value: unknown, dflt: boolean): FieldRules | undefined {
     return rules
 }
 
-/** 解析 compat 组：整体缺失落默认；非对象、或字段存在但非布尔 => undefined */
+/** 解析 compat 组：整体缺失落默认；非对象、字段非布尔 => undefined */
 function parseCompat(value: unknown): CompatRules | undefined {
     if (value === undefined) return { ...COMPAT_DEFAULTS }
     if (!isPlainObject(value)) return
@@ -150,7 +143,7 @@ function parseExcludes(value: unknown): string[] | undefined {
     return ids
 }
 
-/** 解析 behavior 组：整体缺失落默认；非对象、或字段存在但非布尔 => undefined */
+/** 解析 behavior 组：整体缺失落默认；非对象、字段非布尔 => undefined */
 function parseBehavior(value: unknown): BehaviorRules | undefined {
     if (value === undefined) return { ...BEHAVIOR_DEFAULTS }
     if (!isPlainObject(value)) return
@@ -182,7 +175,7 @@ export function parseEfforts(value: unknown): EffortMemory {
     return result
 }
 
-/** 解析 userExperience 组：整体缺失落默认；非对象、或字段存在但非布尔 => undefined */
+/** 解析 userExperience 组：整体缺失落默认；非对象、字段非布尔 => undefined */
 function parseUserExperience(value: unknown): UserExperienceRules | undefined {
     if (value === undefined) return { ...USER_EXPERIENCE_DEFAULTS }
     if (!isPlainObject(value)) return
@@ -218,7 +211,7 @@ export function parseSnapshot(value: unknown): PluginConfig | undefined {
     return { allowUpdate, autoFill, compat, excludes, efforts, behavior, userExperience }
 }
 
-/** 运行时配置 -> 规范 v8 存储快照。字段一律拷贝传出，防回落共享的 DEFAULT_CONFIG 被就地改写污染 */
+/** 运行时配置 -> 规范 v8 存储快照。字段一律拷贝，防 DEFAULT_CONFIG 被就地改写 */
 export function toStored(config: PluginConfig): PluginConfigSnapshot {
     return {
         configVersion: CONFIG_VERSION,

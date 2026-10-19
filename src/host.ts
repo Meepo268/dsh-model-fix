@@ -1,12 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-/**
- * 宿主 HMR 事务感知的通用执行原语：把 task 从宿主事务的 AsyncLocalStorage 上下文中摘出执行，
- * 无论从哪条链调用（事件响应、RPC、启动链）都不会因事务嵌套失败。
- * hmr 服务经 `src/index.ts` 的子 fiber 注入，而其装载是异步的——注入落地前的写回若直接降级，
- * 就会裸跑进宿主事务的上下文。故首个写回在收口处**有界等待**注入落地：落地即放行，
- * 超时才降级为裸 task()，且只等这一次。裁决见 docs/decisions.md「写回端点」。
- */
+/** 把写回 task 从宿主 HMR 事务的 AsyncLocalStorage 上下文中摘出执行；注入落地前有界等待（2s 封顶、只等一次，超时降级裸 task()），裁决见 docs/decisions.md「写回端点」 */
 
 let _hmrExecuting: unknown | undefined
 
@@ -14,16 +8,15 @@ let _hmrExecuting: unknown | undefined
 let signalHmrInjected: () => void = () => {}
 const hmrInjected = new Promise<void>((resolve) => { signalHmrInjected = resolve })
 
-/** 有界等待上限：与 migrate 的 NS 注册轮询同量级（同为宿主 boot 期的异步装载） */
 const HMR_WAIT_MS = 2000
 
-/** 单一计时器（模块加载即起算，早于一切写回）；unref 防测试进程为它多挂 2s */
+/** 单一计时器（模块加载即起算）；unref 防测试进程为它多挂 2s */
 const hmrWait = new Promise<void>((resolve) => { setTimeout(resolve, HMR_WAIT_MS).unref() })
 
-/** 等待已结算（注入落地或超时降级）：只等一次，之后的写回零等待开销 */
+/** 等待已结算（注入落地或超时降级）：只等一次，之后写回零等待开销 */
 let hmrSettled = false
 
-/** 由 `src/index.ts` 的子 fiber 设置 hmr 执行上下文（缺席时为 undefined）；首次调用即解除等待 */
+/** 由 `src/index.ts` 的子 fiber 设置 hmr 执行上下文（缺席为 undefined）；首次调用即解除等待 */
 export function setHmrExecuting(value: unknown | undefined): void {
     _hmrExecuting = value
     hmrSettled = true

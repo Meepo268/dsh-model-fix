@@ -1,9 +1,5 @@
-/**
- * Node 半类型定义与纯类型守卫。
- *
- * 本文件只保留 Node 专属：models.dev 目录类型、`isCapacity`、冻结历史版本（当前只剩 v7）快照形态。
- * 跨半共享类型与守卫单一来源在 `src/shared/types.ts`，两半均直连。
- */
+/** Node 半类型定义与纯类型守卫：models.dev 目录类型、`isCapacity`、冻结历史版本（当前只剩 v7）快照形态。
+ * 跨半共享类型与守卫单一来源在 `src/shared/types.ts`，两半均直连 */
 
 import { CAPACITY_UNLIMITED } from '@/constants'
 import type { EffortMemory } from '@/shared/types'
@@ -21,10 +17,7 @@ export interface ModelEntry {
     image?: boolean
 }
 
-/**
- * 磁盘缓存条目：去掉 provider/id 两字段（分组键与嵌套键已承担），体积更小。
- * 内存索引（IndexEntry）为补全分组键的完整条目，供 lookup/fix 消费。
- */
+/** 磁盘缓存条目：去掉 provider/id 两字段（分组键与嵌套键已承担），体积更小；内存索引（IndexEntry）为补全分组键的完整条目 */
 export interface CacheRecord {
     /** 可选推理级别，'off'/'none' 为目录原值（表示可关闭推理）；无可选档位时为空数组 */
     efforts: string[]
@@ -48,12 +41,7 @@ export interface IndexEntry {
     image?: boolean
 }
 
-/**
- * 按 provider 分组的内存索引，供 lookup 复用。
- *
- * `ids` 存经 `normalizeId` 归一后的匹配键（三级匹配一律在归一空间进行，故键须先归一），
- * `byId` 是归一键到条目的直查表；同组内归一后重复时保留首个。口径见 docs/decisions.md「参数来源」。
- */
+/** 按 provider 分组的内存索引（供 lookup 复用）：`ids` 存归一后的匹配键（三级匹配在归一空间进行，键须先归一），`byId` 是归一键到条目的直查表（同组内归一后重复保留首个）。口径见 docs/decisions.md「参数来源」 */
 export interface ProviderGroup {
     ids: string[]
     byId: Map<string, IndexEntry>

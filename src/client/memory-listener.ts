@@ -1,12 +1,6 @@
-/**
- * 浏览器半的推理级别记忆监听：订阅会话的模型选择投影，把每次切换翻译成两件事——
- * 换模型时按记忆恢复级别，换级别时存回记忆（外加 `defaultHigh` 的自动设置）。
- *
- * 这里只管记忆的存取，不管整理：失效清理在 Node 半按宿主的全量模型列表执行（`src/memory.ts`）。
- * 存取覆盖面与 UI 选型一致——宿主模型目录里的全部模型都参与。
- *
- * 单独成文件是因为它与卡片不共享任何状态：卡片管的是设置页看见的那份配置，本文件管的是所有活着的会话在后台发生了什么。
- */
+/** 浏览器半的推理级别记忆监听：订阅会话的模型选择投影，把每次切换翻译成两件事——换模型时按记忆恢复级别，换级别时存回记忆（外加 `defaultHigh` 的自动设置）。
+ * 这里只管记忆的存取，不管整理：失效清理在 Node 半按宿主的全量模型列表执行（`src/memory.ts`）。存取覆盖面与 UI 选型一致——宿主模型目录里的全部模型都参与。
+ * 单独成文件是因为它与卡片不共享任何状态：卡片管的是设置页看见的那份配置，本文件管的是所有活着的会话在后台发生了什么 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // ctx.sessions 服务面（ISessions 声明合并）
@@ -25,12 +19,7 @@ import { applyEffort, classifyTransition, sameSelection } from '@/client/effort'
 import type { DecodedScope } from '@/client/scope'
 import { isSettingsConflict } from '@/shared/errors'
 
-/**
- * 挂上记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用）。
- *
- * @param ctx - 注册所挂的 ctx（`boot` 传入的子 fiber ctx）：监听子 fiber 再挂其下，其 fiber 卸载即级联撤销
- * @param scope - 本插件命名空间的 decode 后段视图（记忆经它直写）
- */
+/** 挂上记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用） */
 export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScope<Flags>): void {
     // 记忆写入带三条护栏（理由见 docs/decisions.md「推理级别记忆」）：
     // 1. 段未 ready 放弃——ConfigForm loading 时 value 回落 DEFAULT_CONFIG（efforts={}），整段 set 等于清空全部记忆。
