@@ -8,7 +8,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 
 /** decode 后的段视图：快照 value 为解析结果，set 返回 void、mutate 返回宿主裁决，另附订阅释放 */
 export interface DecodedScope<T> {
-    getSnapshot(): ConfigFormSnapshot<T>
+    getSnapshot(): DecodedSnapshot<T>
     subscribe(listener: () => void): () => void
     set(field: string, value: unknown): Promise<void>
     /** 透传宿主裁决：true 为接受，false 为拒绝/跳过（含 memory 模式），传输失败 reject */
@@ -16,10 +16,14 @@ export interface DecodedScope<T> {
     dispose(): void
 }
 
+/** 宿主快照的收窄面：`status` 等状态字段原样保留（消费方要区分 loading / unavailable），只收紧 `value` */
+export type DecodedSnapshot<T> = Omit<ConfigFormSnapshot<T>, 'value'> & { value: T }
+
 export function makeScope<T>(form: ConfigForm<unknown>, decode: (raw: unknown) => T): DecodedScope<T> {
-    let snap: ConfigFormSnapshot<T> = {
+    const fallback = decode(undefined)
+    let snap: DecodedSnapshot<T> = {
         status: 'loading',
-        value: undefined,
+        value: fallback,
         base: undefined,
         user: undefined,
         revision: undefined,

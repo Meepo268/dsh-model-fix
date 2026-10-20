@@ -19,7 +19,7 @@ import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { CARD_NS } from '@/client/locale-keys'
-import { behaviorVisible } from '@/client/model'
+import { groupValue } from '@/client/model'
 import type { Flags } from '@/client/model'
 import type { DecodedScope } from '@/client/scope'
 import { PLUGIN_NAME } from '@/shared/constants'
@@ -136,7 +136,7 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
 
         const mount = (): void => {
             if (container !== null) return
-            if (!behaviorVisible(scope.getSnapshot().value, 'backToChat')) return
+            if (!groupValue(scope.getSnapshot().value, 'behavior', 'backToChat')) return
             const target = centerColumn()
             if (target === null) return
             ensureStyles()
@@ -169,7 +169,7 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
         }
 
         const reconcile = (): void => {
-            if (behaviorVisible(scope.getSnapshot().value, 'backToChat')) mount()
+            if (groupValue(scope.getSnapshot().value, 'behavior', 'backToChat')) mount()
             else unmount()
         }
 

@@ -85,10 +85,10 @@ export function FollowLamp(props: SlotProps & ComposerProps): ReactNode {
     const snapFlags = useSyncExternalStore(scope.subscribe, scope.getSnapshot, scope.getSnapshot)
     const snapHost = useSyncExternalStore(hostModelScope.subscribe, hostModelScope.getSnapshot, hostModelScope.getSnapshot)
 
-    // 「跟随实际生效」的判据：插件配置就绪 + 宿主设置未显式开启
+    // 「跟随实际生效」的判据：插件开关开着 + 宿主设置未显式开启
     const flags = snapFlags.value
-    const hostEnabled = snapHost.status === 'ready' ? snapHost.value?.enabled : undefined
-    const active = flags !== undefined && followingActive(flags, hostEnabled)
+    const hostEnabled = snapHost.status === 'ready' ? snapHost.value.enabled : undefined
+    const active = followingActive(flags, hostEnabled)
 
     // 上一次切换写入是否失败：失败时压过亮/灰态走琥珀色（followState 取 'fail'）
     const [chipFail, setChipFail] = useState(false)
@@ -96,7 +96,7 @@ export function FollowLamp(props: SlotProps & ComposerProps): ReactNode {
     const [busy, setBusy] = useState(false)
 
     const onToggle = useCallback(async () => {
-        if (!snapFlags.writable || snapFlags.status !== 'ready' || flags === undefined) return
+        if (!snapFlags.writable || snapFlags.status !== 'ready') return
         if (busy) return
         setBusy(true)
         const target = !flags.userExperience.followParent

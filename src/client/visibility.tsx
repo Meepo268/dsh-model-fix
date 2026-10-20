@@ -4,7 +4,7 @@
  * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），list 席位按 `id` 记账、id 不同可并存 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { behaviorVisible } from '@/client/model'
+import { groupValue } from '@/client/model'
 import type { Flags } from '@/client/model'
 import type { DecodedScope } from '@/client/scope'
 import { CARD_NS } from '@/client/locale-keys'
@@ -105,7 +105,7 @@ export function applySlotVisibility(
         // 编排表是本文件的字面量，key 必在其中；缺失即内部错误
         if (part === undefined) return
         const dispose = mounted.get(key)
-        if (behaviorVisible(scope.getSnapshot().value, part.flag)) {
+        if (groupValue(scope.getSnapshot().value, 'behavior', part.flag)) {
             if (dispose === undefined) mounted.set(key, part.mount())
         } else if (dispose !== undefined) {
             dispose()

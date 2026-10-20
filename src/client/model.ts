@@ -50,13 +50,6 @@ export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
     return rowsOf(flags, group)[key] === true
 }
 
-/** 某 UI 部件是否应当挂载：读 `behavior` 组对应开关，配置缺席（段未就绪）时按缺省全开处理。
- * 与 `groupValue` 的差别只有缺省方向——配置读不到时若落 `false` 会让首屏凭空少一块界面，故此处缺省取「可见」。组内取值仍一律按严格布尔判 */
-export function behaviorVisible(flags: Flags | undefined, key: (typeof BEHAVIOR_KEYS)[number]): boolean {
-    if (flags === undefined) return true
-    return rowsOf(flags, 'behavior')[key] !== false
-}
-
 /** 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启。
  * 宿主那段开启时子智能体自会按授权表选模型，跟随反而推翻宿主的合法选择，此时「跟随中」灯应呈灰态。
  * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启（缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致） */
