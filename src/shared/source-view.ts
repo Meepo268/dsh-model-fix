@@ -57,3 +57,33 @@ export interface SourceSnapshot {
 export function formatEfforts(efforts: readonly string[] | undefined): string {
     return efforts === undefined ? '' : efforts.join(' / ')
 }
+
+/** 容量压成短写：`1000000` → `1M`、`128000` → `128K`、`64000` → `64K`；无值/哨兵返回空串。
+ * 下拉的每个选项只有一行，`1000000` 这种七位数挤掉的正是档位摘要，故统一压短 */
+export function capacityText(value: number | undefined): string {
+    if (value === undefined || !Number.isFinite(value) || value <= 0 || value >= 99_999_999) return ''
+    if (value >= 1_000_000) {
+        const millions = Math.round((value / 1_000_000) * 10) / 10
+        return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`
+    }
+    if (value >= 1000) return `${Math.round(value / 1000)}K`
+    return String(value)
+}
+
+/** 一行能力摘要：`1M/128K · low/high/xhigh · 图`（缺项跳过；档位用 `/` 省宽）。`imageMark` 由调用方按语言传 */
+export function candidateSummary(fields: SourceFieldsView, imageMark = '图'): string {
+    const parts: string[] = []
+    const capacity = [capacityText(fields.contextWindow), capacityText(fields.maxTokens)]
+        .filter((value) => value !== '')
+        .join('/')
+    if (capacity !== '') parts.push(capacity)
+    if (fields.efforts !== '') parts.push(fields.efforts.replaceAll(' / ', '/'))
+    if (fields.image) parts.push(imageMark)
+    return parts.join(' · ')
+}
+
+/** 单行截断：超长补省略号（原生 `<option>` 不会自己加省略号，只能先截好再交给它） */
+export function fitLabel(text: string, limit = 64): string {
+    if (text.length <= limit) return text
+    return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
+}

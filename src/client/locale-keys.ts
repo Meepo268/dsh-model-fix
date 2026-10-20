@@ -207,6 +207,7 @@ export type CardKey =
     | 'sourceNoMatch'
     | 'sourceSeat'
     | 'sourceSeatHint'
+    | 'sourceImageMark'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {

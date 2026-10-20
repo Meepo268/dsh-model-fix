@@ -201,6 +201,7 @@ export const zh: Record<CardKey, string> = {
     sourceNow: '当前生效：{label}',
     sourceCurrent: '现值',
     sourceImage: '图片',
+    sourceImageMark: '图',
     sourceExcluded: '（该提供方已在排除列表，本插件不会动它）',
     sourceEmpty: '没有可配置的模型',
     sourceFailed: '取数或保存失败：{message}',

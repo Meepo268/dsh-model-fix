@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
-import type { SourceModelView, SourceSnapshot } from '@/shared/source-view'
+import { candidateSummary, fitLabel, type SourceModelView, type SourceSnapshot } from '@/shared/source-view'
 
 const { Button, Modal } = primitives
 
@@ -183,12 +183,13 @@ export function SourcesDialog({
                                         >
                                             <option value="">{t('sourceAuto')}</option>
                                             <option value="upstream">{t('sourceUpstreamOnly')}</option>
-                                            {model.candidates.map((candidate) => (
-                                                <option key={candidate.key} value={candidate.key}>
-                                                    {candidate.provider} · {candidate.id}
-                                                    {candidate.also === undefined ? '' : ` (+${candidate.also})`}
-                                                </option>
-                                            ))}
+                                            {model.candidates.map((candidate) => {
+                                                // 一行里给全判断依据：提供方 · 目录 id · 能力摘要（容量/档位/图片）
+                                                const summary = candidateSummary(candidate.fields, t('sourceImageMark'))
+                                                const extra = candidate.also === undefined ? '' : ` (+${candidate.also})`
+                                                const label = `${candidate.provider} · ${candidate.id}${summary === '' ? '' : ` · ${summary}`}${extra}`
+                                                return <option key={candidate.key} value={candidate.key}>{fitLabel(label, 78)}</option>
+                                            })}
                                         </select>
                                         <p className="dsh-mf-sourceHint">
                                             {t('sourceNow', { label: describeSource(model, t) })}

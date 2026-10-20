@@ -202,6 +202,7 @@ export const en: Record<CardKey, string> = {
     sourceNow: 'Effective: {label}',
     sourceCurrent: 'Current',
     sourceImage: 'image',
+    sourceImageMark: 'img',
     sourceExcluded: ' (provider is excluded; this plugin will not touch it)',
     sourceEmpty: 'No configurable models',
     sourceFailed: 'Failed to load or save: {message}',

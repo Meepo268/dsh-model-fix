@@ -6,6 +6,7 @@ import { SOURCE_UPSTREAM, type PluginConfig } from '@/shared/types'
 import type { DeclarationMap } from '@/upstream'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { buildSourceSnapshot, resolveSource } from '@/source'
+import { candidateSummary, capacityText, fitLabel } from '@/shared/source-view'
 import { sourceKey } from '@/lookup'
 
 /** 套件入口（	est/index.ts 注册） */
@@ -101,5 +102,14 @@ const UPSTREAM = declarations('gw', 'cn:deepseek-v4-pro', { efforts: ['high', 'x
     check('快照：pin 回显', acme.pin === 'deepseek/deepseek-v4-pro')
     check('快照：排除标记', snapshot.providers[2].models[0].excluded === true && gw.excluded === false)
     check('快照：无来源行', buildSourceSnapshot(cfg(), { gw: { models: [{ id: 'mystery' }] } }, index(), undefined).providers[0].models[0].source === 'none')
+
+    // ---------- 候选选项的一行摘要：容量压短、档位省宽、超长截断 ----------
+    check('容量：百万压成 M', capacityText(1_000_000) === '1M' && capacityText(1_048_576) === '1M', capacityText(1_048_576))
+    check('容量：千压成 K', capacityText(128_000) === '128K' && capacityText(512_000) === '512K' && capacityText(64_000) === '64K')
+    check('容量：无值/哨兵/0 -> 空串', capacityText(undefined) === '' && capacityText(0) === '' && capacityText(99_999_999) === '')
+    check('摘要：容量/档位/图片', candidateSummary({ efforts: 'low / high', contextWindow: 1_000_000, maxTokens: 128_000, image: true }) === '1M/128K · low/high · 图')
+    check('摘要：缺项跳过 + 图片标记可换', candidateSummary({ efforts: '', image: true }, 'img') === 'img' && candidateSummary({ efforts: '', image: false }) === '')
+    check('截断：不超长原样返回', fitLabel('abc', 3) === 'abc')
+    check('截断：超长补省略号', fitLabel('abcdef', 4) === 'abc…', fitLabel('abcdef', 4))
 }
 }
