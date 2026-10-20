@@ -24,6 +24,7 @@ import {
     verifyKey,
     verifyTargets,
     GROUP_KEYS,
+    TILE_ORDER,
 } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { EFFORT_LEVELS } from '@/shared/constants'
@@ -183,6 +184,8 @@ export function run(): void {
     // 带 forgetRemoved false 的往返一致（关掉「忘记已删除模型」的存取回路）
     const WITHOUT_FORGET: Flags = { ...ALL_ON, userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }
     check('snapshot -> decode 往返含 forgetRemoved false', stable(decodeSection({ [VERSION_KEY]: toStored(WITHOUT_FORGET) })) === stable(WITHOUT_FORGET))
+    // ---------- 瓦片顺序：覆盖全部布尔组与「排除提供方」，无重复无遗漏（布尔组清单由它派生） ----------
+    check('TILE_ORDER 覆盖全部配置组与排除提供方', stable([...TILE_ORDER].sort()) === stable([...Object.keys(GROUP_KEYS), 'excludes'].sort()))
     // ---------- 组总控显示：全开才开，部分选中显示关（判据 every，与验证弹层分组「全选」同口径） ----------
     check('master 全开为开', masterValue(ALL_ON, 'autoFill') === true)
     check('master 全关为关', masterValue(DEFAULT_FLAGS, 'allowUpdate') === false)

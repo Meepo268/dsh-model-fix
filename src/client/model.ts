@@ -22,8 +22,11 @@ export const GROUP_KEYS: Record<Group, readonly RowKey[]> = {
     userExperience: USER_EXPERIENCE_KEYS,
 }
 
-/** 全部布尔配置组：仅脏检测遍历用，顺序无关紧要；渲染顺序见 tile.tsx 的 TILE_ORDER */
-const GROUPS: readonly Group[] = ['autoFill', 'allowUpdate', 'compat', 'behavior', 'userExperience']
+/** 瓦片顺序（含动态集合瓦片「排除提供方」）：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 / UI 与行为 */
+export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience', 'behavior']
+
+/** 全部布尔配置组：脏检测遍历用，由 TILE_ORDER 派生（去掉动态集合瓦片），顺序无关紧要 */
+const GROUPS: readonly Group[] = TILE_ORDER.filter((tile): tile is Group => tile !== 'excludes')
 
 /** 组内行键全集（词典键映射与各组行表的类型） */
 export type RowKey =

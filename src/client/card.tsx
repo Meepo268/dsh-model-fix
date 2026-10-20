@@ -25,9 +25,10 @@ import {
     resolveHits,
     toggleCell,
     verifyCandidatesOf,
+    TILE_ORDER,
 } from '@/client/model'
 import type { Flags, Group, RowKey } from '@/client/model'
-import { ExcludesTile, GroupTile, TILE_ORDER } from '@/client/tile'
+import { ExcludesTile, GroupTile } from '@/client/tile'
 import { CardMeta } from '@/client/card-meta'
 import { ConfirmModal } from '@/client/confirm'
 import { DiagnoseDialog } from '@/client/diagnose-dialog'

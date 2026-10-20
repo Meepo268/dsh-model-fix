@@ -8,7 +8,7 @@ import type { CardKey } from '@/client/locale-keys'
 import { COLUMN_KEYS, HINT_KEYS, ROW_KEYS, TIP_KEYS } from '@/client/locale-keys'
 import { TIP_MAX_WIDTH } from '@/client/card-styles'
 
-/** 卡片的瓦片层：展开体里六张瓦片的两种形态——布尔矩阵配置组瓦片（官方「插件列表」项卡同款）与「排除提供方」的动态集合瓦片，渲染顺序由 TILE_ORDER 单一分发。
+/** 卡片的瓦片层：展开体里六张瓦片的两种形态——布尔矩阵配置组瓦片（官方「插件列表」项卡同款）与「排除提供方」的动态集合瓦片，渲染顺序由 model.ts 的 TILE_ORDER 单一分发。
  * 瓦片只管自己的 summary 与展开体结构，外加「排除提供方」那一份纯 UI 暂态（输入文本与校验反馈不属于配置）；展开态、启用态与全部写回回调都由卡片经 props 传入，故这里既不发请求也不碰 Connection。样式数值不在本文件，见 card-styles.ts */
 
 /** 瓦片 chevron：宿主 ui-primitives 导出的描边 chevron 图标 */
@@ -17,9 +17,6 @@ const { Pill, Switch, Tag, StateDot, Tooltip, IconInfoOutlineRegular, IconTrashO
 
 /** 瓦片文案函数：与卡片 props 的 t 同型，同为 slots.register 的 locale 席位合成注入 */
 type TileTranslate = TranslateNS<'settings.modelFix'>
-
-/** 瓦片渲染顺序：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 / UI 与行为 */
-export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience', 'behavior']
 
 /** Pill 组阈值：组内行数（真键 + 恒定展示行）≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
 const PILL_THRESHOLD = 5
