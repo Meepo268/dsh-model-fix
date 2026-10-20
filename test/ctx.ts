@@ -23,9 +23,9 @@ interface StubSection {
 interface StubCtxOpts {
     /** llm-pi-ai 段值（通常 {providers: {...}}） */
     api?: Record<string, unknown>
-    /** tikaflow-model-fix 段值（版本快照容器，需存在以使 efforts 写回的 revision 围栏可用） */
+    /** tikaflow-model-fix 段值（版本快照容器：配置快照与推理级别记忆都在其下） */
     plugin?: Record<string, unknown>
-    /** 不登记自有段（模拟「自有段还没被 Loader 登记」）：读不到时依赖 excludes 的写回路径必须显式失败 */
+    /** 不登记自有段（模拟自有段不可读）：存兜底备份的路径必须显式失败 */
     noPlugin?: boolean
     /** 前 N 次 mutate 调用抛 SETTINGS_CONFLICT（测试 fix 的冲突重试环）；默认 0 */
     conflictFirst?: number

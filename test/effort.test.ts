@@ -11,7 +11,6 @@ import {
 import type { ModelProviderGroup } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { EffortMemory } from '@/shared/types'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // ---------- lookupEffort ----------
     check('lookupEffort 命中', lookupEffort({ a: { m: 'high' } }, 'a', 'm') === 'high')
@@ -61,7 +60,6 @@ export function run(): void {
     // defaultHigh 关闭的用例段（defaultHigh 专段另用 DH_ON）
     const DH_OFF = false
 
-    // 模型变化：有记忆且受支持且与当前不同 → 改写
     check('classify 模型变化改写记忆', stable(classifyTransition(
         { provider: 'b', model: 'x' },
         { provider: 'a', model: 'm1', reasoningEffort: 'low' },
@@ -79,7 +77,6 @@ export function run(): void {
         DH_OFF,
     )) === stable({ kind: 'model-change', resolved: { provider: 'a', model: 'm1', reasoningEffort: 'high' } }))
 
-    // 模型变化：无记忆 → 不改写
     check('classify 模型变化无记忆不改写', stable(classifyTransition(
         { provider: 'b', model: 'x' },
         { provider: 'a', model: 'm3', reasoningEffort: 'low' },
@@ -97,7 +94,6 @@ export function run(): void {
         DH_OFF,
     )) === stable({ kind: 'model-change', resolved: { provider: 'a', model: 'm2', reasoningEffort: 'low' } }))
 
-    // 模型变化：记忆 provider 存在但 model 不在 groups → 不改写
     check('classify 模型变化 provider 存在但 model 不在 groups 不改写', stable(classifyTransition(
         { provider: 'b', model: 'x' },
         { provider: 'a', model: 'm9', reasoningEffort: 'low' },
@@ -153,7 +149,6 @@ export function run(): void {
 
     // ---------- defaultHigh：无记忆分支下，未设置级别且模型公告 high → 设为 high ----------
     const DH_ON = true
-    // 无记忆、未设置级别、模型有 high → 设为 high
     check('defaultHigh 无记忆未设置级别且模型有 high → 设为 high', stable(classifyTransition(
         { provider: 'b', model: 'x' },
         { provider: 'a', model: 'm1' },
@@ -216,7 +211,6 @@ export function run(): void {
         DH_ON,
     )) === stable({ kind: 'model-change', resolved: { provider: 'a', model: 'm1', reasoningEffort: 'high' } }))
 
-    // 首帧 + defaultHigh + 无记忆 + 模型有 high → 设为 high
     check('defaultHigh 首帧无记忆模型有 high → 设为 high', stable(classifyTransition(
         null,
         { provider: 'a', model: 'm1' },

@@ -10,7 +10,6 @@ function modelsValueOf(modelOps: SettingsPathOp[], providerPath: string): Record
     return op !== undefined && op.op === 'set' ? (op.value as Record<string, unknown>[]) : undefined
 }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // 备份：provider a 有两个模型（a1 被插件填了字段、a2 干净）；provider gone 在启动后被删除
     const backup = {

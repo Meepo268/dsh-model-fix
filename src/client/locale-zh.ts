@@ -112,8 +112,8 @@ export const zh: Record<CardKey, string> = {
     verifyStopped: '已停止',
     verifyStoppedLine: '已停止，本轮不再继续验证。',
     // 收尾统计统一为「共验证 n 个模型，可用 [x/y] 个模型」，n 取 tested（勾选去重数），
-    // x 取实际可用数，y 取勾选模型数。模型数一律取 tested
-    // （计划里的去重模型数，而非 report.models 的可用模型数——全失败的模型不计入那个数，会让总数小于用户勾选数）
+    // x 取实际可用数，y 取勾选模型数。模型数一律取 tested（计划里的去重模型数），
+    // 不用 report.models（它只含可用模型数，全失败的模型不计入，会让总数小于用户勾选数）
     verifyDoneModels: '共验证 {tested} 个模型，可用 [{models}/{tested}] 个模型',
     verifyFailed: '验证失败：{message}',
     // 收尾末行：逐条记录只交代过程，不交代「总共怎么样」，否则用户只能自己数末行才知道结论

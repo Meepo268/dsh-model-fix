@@ -4,7 +4,6 @@ import { resolveConfig } from '@/config'
 import { CONFIG_VERSION, parseEfforts, toStored, versionKey } from '@/shared/config-schema'
 import { check, stable } from '@test/helper'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // 当前版本默认值（台阶侧的逐级升级语义见 test/upgrade.test.ts）
     const COMPAT = { disableDeveloper: true, disableStore: true }

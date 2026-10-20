@@ -58,7 +58,6 @@ const TARGETS = [
     { provider: 'acme', model: 'm3', levels: [] },
 ]
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     // ---------- 采集与编解码 ----------
     {

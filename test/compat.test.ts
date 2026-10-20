@@ -10,7 +10,6 @@ const OFF: CompatRules = { disableDeveloper: false, disableStore: false }
 /** 两项全开时应写入的整段（顺序无关，比对口径见 stable） */
 const ON_VALUE = { supportsDeveloperRole: false, supportsStore: false }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // ---------- 开启：缺失即添加（与模型参数填充的「关闭即忽略」相反，这里是「关闭即移除」） ----------
     check(

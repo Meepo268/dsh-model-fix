@@ -2,7 +2,6 @@
 import { stripEmptyFields } from '@/empty'
 import { check, stable } from '@test/helper'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     const model = {
         id: 'm',

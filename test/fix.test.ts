@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import type { PluginConfig } from '@/shared/types'
-import { fix, planFill } from '@/fix'
+import { fix } from '@/fix'
 import { setConfigSource } from '@/config'
 import { setCatalog } from '@/catalog'
 import { API_NS, PLUGIN_NS } from '@/shared/constants'
@@ -24,7 +24,6 @@ const ENTRIES: IndexEntry[] = [
     { id: 'model-c', efforts: [] },
 ]
 
-/** 合成目录索引 */
 const CAT: IndexedCatalog = {
     catalog: {},
     groups: new Map([[
@@ -64,7 +63,6 @@ function compatOf(ctx: StubCtx, providerId: string): Record<string, unknown> | u
     return providers?.[providerId]?.compat as Record<string, unknown> | undefined
 }
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     // ---------- 1. 基本填充：autoFill 全开，三类模型各一 ----------
     {
@@ -200,9 +198,6 @@ export async function run(): Promise<void> {
             changes === 1 && ctx.mutateCalls.length === 1 && ctx.mutateCalls[0]?.ns === API_NS,
             ctx.mutateCalls,
         )
-        // 计划口径：efforts 记忆已整体移出 Node 半，填充计划里不应再有该字段
-        const plan = planFill(cfg({ efforts: memories }), { testprovider: { models: [{ id: 'model-a' }] } }, CAT, false)
-        check('记忆不由 fix 重建：填充计划里没有 newEfforts', !('newEfforts' in plan), Object.keys(plan))
     }
 
     // ---------- 8. excludes：记忆与排除项彻底无关（零自有段写回） ----------

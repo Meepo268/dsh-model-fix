@@ -69,7 +69,7 @@ export function Card(props: CardProps) {
         () => providerIdsOf(providersSnap.status === 'ready' ? providersSnap.user : undefined),
         [providersSnap],
     )
-    // 验证候选与提供方 id 同源（同一份 llm-pi-ai user 层），故列表里出现的正是 fix 会遍历的那些模型
+    // 验证候选与提供方 id 同源（同一份 llm-pi-ai user 层）
     const verifyCandidates = useMemo(
         () => verifyCandidatesOf(providersSnap.status === 'ready' ? providersSnap.user : undefined),
         [providersSnap],
@@ -81,7 +81,7 @@ export function Card(props: CardProps) {
     const collapsible = props.collapsible !== false
     // 折叠态为卡片本地状态（读姿而非配置）；草稿跨折叠存活
     const [open, setOpen] = useState(collapsible ? (props.defaultOpen ?? false) : true)
-    // 保存后自动收起只对默认收起的席位有意义：默认展开的席位保存后保持展开，否则用户刚配完就被收起
+    // 保存后自动收起只对默认收起的席位生效（默认展开的席位保存后保持展开）
     const autoCollapse = props.defaultOpen !== true
     // 瓦片折叠态：官方手风琴语义（同时只开一个、默认全收起）
     const [tileOpen, setTileOpen] = useState<string | null>(null)
@@ -133,7 +133,7 @@ export function Card(props: CardProps) {
     // 五个动作键共用一个占用态：任一处在途或任一弹层开着，其余四个一并禁用
     const configLocked = busy !== null || verify.open || probe.open
 
-    // 配置服务不可用：保留静态外壳（无展开语义）便于发现与排查
+    // 配置服务不可用：保留静态外壳（无展开语义）
     if (snap.status === 'unavailable') {
         return (
             <div className="dsh-mf-card">
@@ -149,7 +149,7 @@ export function Card(props: CardProps) {
 
     /**
      * 三个写回动作的结果汇报同形：成功按条数出一句、失败取原因出一句、传输层 reject 与 `ok:false`
-     * 走同一条展示路径、收尾一律清占用态，差异只有文案键，故收在一处。
+     * 走同一条展示路径、收尾一律清占用态，差异只有文案键。
      */
     const reportWriteback = (
         call: Promise<ConnectionRpcResult<unknown>>,
@@ -264,7 +264,7 @@ export function Card(props: CardProps) {
             (message) => setNotice({ text: t('resetFailed', { message: truncateMessage(message) }), tone: 'error' }),
         )
     }
-    // 恢复备份：与重置同形（次级样式 + 二次确认），仅回退「备份与当前都存在」的 provider+model
+    // 恢复备份：与重置同形（次级样式 + 二次确认）；回退「备份与当前都存在」的 provider+model，其下被删的 model 复活
     const onRestore = () => {
         if (!ready || busy) return
         setNotice(null)
@@ -362,7 +362,6 @@ export function Card(props: CardProps) {
             </div>
             <div className="dsh-mf-bar">
                 <span className="dsh-mf-actions">
-                    {/* 五个动作键共用一个占用态：在途或任一弹层开着，其余四个一并禁用 */}
                     <button
                         type="button"
                         className="dsh-mf-force"

@@ -3,7 +3,6 @@ import { resolveConfig } from '@/config'
 import { DEFAULT_CONFIG, parseSnapshot, parseVersion, versionKey } from '@/shared/config-schema'
 import { check, stable } from '@test/helper'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     check('versionKey 拼接', versionKey(1) === 'version-1')
     check('parseVersion 合法', parseVersion('version-12') === 12 && parseVersion('version-0') === 0)

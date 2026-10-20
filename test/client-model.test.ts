@@ -46,7 +46,6 @@ const WITH_EXCLUDES: Flags = { ...ALL_ON, excludes: ['acme-gateway', 'lab-7'] }
 /** 带推理级别记忆的配置（efforts 用例基准） */
 const WITH_EFFORTS: Flags = { ...ALL_ON, efforts: { 'z-ai': { 'glm-5.2': 'high' } } }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // ---------- decodeSection：v8 正常解析 ----------
     check(
@@ -174,7 +173,6 @@ export function run(): void {
     check('snapshot 键名为 version-8', VERSION_KEY === 'version-8', VERSION_KEY)
     // 序列化产物与自身解码必须互逆（保存后立即读回不得变化）
     check('snapshot -> decode 往返一致', stable(decodeSection({ [VERSION_KEY]: toStored(WITH_EXCLUDES) })) === stable(WITH_EXCLUDES), toStored(WITH_EXCLUDES))
-    // 带 efforts 的往返一致
     check('snapshot -> decode 往返含 efforts', stable(decodeSection({ [VERSION_KEY]: toStored(WITH_EFFORTS) })) === stable(WITH_EFFORTS))
     // 带 userExperience false 的往返一致（关掉记住推理级别的存取回路）
     const WITHOUT_REMEMBER: Flags = { ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }
@@ -189,7 +187,7 @@ export function run(): void {
     check('master 全开为开', masterValue(ALL_ON, 'autoFill') === true)
     check('master 全关为关', masterValue(DEFAULT_FLAGS, 'allowUpdate') === false)
     check('master 部分选中显示为关', masterValue(toggleCell(DEFAULT_FLAGS, 'autoFill', 'image'), 'autoFill') === false)
-    // 部分选中点总控应「补全为开」而非抹掉已勾的行：点击值取 masterValue 的取反
+    // 部分选中点总控应「补全为开」：点击值取 masterValue 的取反
     const mixedAutoFill = toggleCell(DEFAULT_FLAGS, 'autoFill', 'image')
     check(
         'master 部分选中点击后整组补全为开',
@@ -199,7 +197,7 @@ export function run(): void {
     // compat 组多行：部分选中显示关，全开才显示开（与 userExperience 同一「全开」判据）
     check('master compat 行为开则为开', masterValue(ALL_ON, 'compat') === true)
     check('master compat 行为关则为关', masterValue({ ...ALL_ON, compat: { disableDeveloper: false, disableStore: false } }, 'compat') === false)
-    // userExperience 组多行：部分选中显示关，三项全开才显示开
+    // userExperience 组多行：部分选中显示关，全开才显示开
     check('master userExperience 部分选中显示为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }, 'userExperience') === false)
     check('master userExperience 仅两项为开仍为关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }, 'userExperience') === false)
     check('master userExperience 全关则关', masterValue({ ...ALL_ON, userExperience: { rememberEfforts: false, defaultHigh: false, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false } }, 'userExperience') === false)
@@ -324,8 +322,8 @@ export function run(): void {
     // ---------- 选择键：模型 id 含 '/' 也不能与拼接方案撞车 ----------
     check('verifyKey 二元组序列化', verifyKey('a', 'x/y') === '["a","x/y"]')
     check('verifyKey 不同提供方的同名模型互不相同', verifyKey('a', 'm') !== verifyKey('b', 'm'))
-    // ---------- 校验目标：只取勾选项；每模型一条不带档位参数的请求（不带档位而非挑最低档——
-    // 不带参数验的才是用户实际会走的那条路径，端点可能有自己的默认推理级别） ----------
+    // ---------- 校验目标：只取勾选项；每模型一条不带档位参数的请求（不带参数验的才是用户实际会走的那条路径，
+    // 端点可能有自己的默认推理级别） ----------
     const candidates = verifyCandidatesOf(verifyUser)
     const keys = new Set([verifyKey('acme-gateway', 'z-ai/glm-5'), verifyKey('acme-gateway', 'no-efforts')])
     check(
@@ -345,7 +343,6 @@ export function run(): void {
     const labKey = verifyKey('lab-7', 'only-one')
     check('groupAllPicked 全不选为否', groupAllPicked(new Set<string>(), acmeGroup) === false)
     check('groupAllPicked 全选为真', groupAllPicked(new Set([acmeKeyA, acmeKeyB]), acmeGroup) === true)
-    // 部分选中仍为否：若取 any 这里会误判为真，点击方向就会与文案（此时显示「全选」）相反
     check('groupAllPicked 部分选中为否', groupAllPicked(new Set([acmeKeyA]), acmeGroup) === false)
     check('groupAllPicked 他组已选不影响本组', groupAllPicked(new Set([labKey]), acmeGroup) === false)
     check(
@@ -354,7 +351,6 @@ export function run(): void {
         [...toggleGroupPicks(new Set<string>(), acmeGroup)],
     )
     check('toggleGroupPicks 全选 -> 整组取消', toggleGroupPicks(new Set([acmeKeyA, acmeKeyB]), acmeGroup).size === 0)
-    // 部分选中应「补全为全选」而非抹掉已勾的，且不得牵连他组
     const partial = new Set([acmeKeyA, labKey])
     const completed = toggleGroupPicks(partial, acmeGroup)
     check(
@@ -381,7 +377,6 @@ export function run(): void {
         ]),
         unfilledOf(probeUser),
     )
-    // ---------- isUnfilled：「选择未填充」快捷键的筛子 ----------
     check('isUnfilled 无档位声明为真', isUnfilled([]) === true)
     check('isUnfilled 只有 off 也算未填充（等同「这个模型不推理」）', isUnfilled(['off']) === true)
     check('isUnfilled 有其它档位即已填充', isUnfilled(['off', 'low']) === false && isUnfilled(['low']) === false)

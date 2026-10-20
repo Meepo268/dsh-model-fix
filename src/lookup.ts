@@ -148,7 +148,7 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
     return mapped
 }
 
-// ---------- 合成：跨提供方同名条目的保守合并与尽量匹配的加权合成（纯函数，见 docs/decisions.md「参数来源」） ----------
+// ---------- 合成：跨提供方同名条目的保守合并与尽量匹配的候选合成（纯函数，见 docs/decisions.md「参数来源」） ----------
 
 /** 保守合并：档位取交集、容量取小、图片需全支持（宁小勿大，宁缺勿滥） */
 function mergeConservative(entries: readonly IndexEntry[]): IndexEntry | undefined {

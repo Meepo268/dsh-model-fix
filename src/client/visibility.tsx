@@ -1,6 +1,5 @@
 /** 「UI 与行为」组（`behavior`）的执行面：把四个可隐匿部件按开关做**真正的挂载 / 卸载**。
- * 为什么必须是装卸而非组件内显隐：`settings.plugins.tab` 的 tab 头由宿主按**注册账本**画出，组件返回 `null` 只会让内容空掉、tab 头照旧。撤销 `ctx.slots.register` 的 disposer 才是让部件从宿主账本里消失的唯一途径。
- * 为什么注册动作写在 `ctx.slots.inject` 的回调里：向未声明的 slot 直接 `register` 会抛 `slot "..." is not declared`，而声明到达前本席不能注册。`ctx.effect` 会把回调返回的清理函数挂进该次声明的 effect 生命周期，故 fiber 卸载或声明坍缩时最后挂载的条目一并撤销。
+ * 必须是装卸而非组件内显隐：宿主 tab 头按**注册账本**画出，组件返回 `null` 只会让内容空掉、tab 头照旧，撤销注册才是让部件从宿主账本里消失的唯一途径（见 docs/decisions.md「宿主与卡片」）。
  * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），list 席位按 `id` 记账、id 不同可并存 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

@@ -73,7 +73,6 @@ const apiWrites = (ctx: ReturnType<typeof ctxOf>) => ctx.mutateCalls.filter((c) 
 /** 兜底备份的存取（自有段顶层键） */
 const backupWrites = (ctx: ReturnType<typeof ctxOf>) => ctx.mutateCalls.filter((c) => c.ops.some((op) => op.path[0] === 'probeBackup'))
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     // ---------- 计划：逐档七条 + 两个开关的入参校验 ----------
     {

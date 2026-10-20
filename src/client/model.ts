@@ -22,7 +22,7 @@ export const GROUP_KEYS: Record<Group, readonly RowKey[]> = {
     userExperience: USER_EXPERIENCE_KEYS,
 }
 
-/** 全部布尔配置组（脏检测遍历用，遍历顺序无关紧要；瓦片的渲染顺序另见 tile.tsx 的 TILE_ORDER——behavior 排在用户体验之后） */
+/** 全部布尔配置组：仅脏检测遍历用，顺序无关紧要；渲染顺序见 tile.tsx 的 TILE_ORDER */
 const GROUPS: readonly Group[] = ['autoFill', 'allowUpdate', 'compat', 'behavior', 'userExperience']
 
 /** 组内行键全集（词典键映射与各组行表的类型） */
@@ -35,7 +35,7 @@ export type RowKey =
 /** 卡片侧消费的完整当前配置（与 PluginConfig 同形：四组布尔 + excludes + efforts） */
 export type Flags = PluginConfig
 
-/** 解码命名空间整段：只读当前版本快照（键见上方 `VERSION_KEY`；Node 半迁移保证启动后段内必有，见 migrateConfig）；段非法、快照缺失或非法均回退默认。永不返回 undefined（返回 undefined 会让宿主 scope 永挂 loading） */
+/** 解码命名空间整段：只读当前版本快照（键见 `VERSION_KEY`）；段非法、快照缺失或非法均回退默认。永不返回 undefined（返回 undefined 会让宿主 scope 永挂 loading） */
 export function decodeSection(section: unknown): Flags {
     return isPlainObject(section) ? parseSnapshot(section[VERSION_KEY]) ?? DEFAULT_CONFIG : DEFAULT_CONFIG
 }
@@ -50,15 +50,13 @@ export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
     return rowsOf(flags, group)[key] === true
 }
 
-/** 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启。
- * 宿主那段开启时子智能体自会按授权表选模型，跟随反而推翻宿主的合法选择，此时「跟随中」灯应呈灰态。
+/** 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启（宿主那段开启时路由由模型自挑，跟随会推翻其合法选择，此时「跟随中」灯呈灰态）。
  * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启（缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致） */
 export function followingActive(flags: Flags, hostEnabled: boolean | undefined): boolean {
     return groupValue(flags, 'userExperience', 'followParent') && !hostEnabled
 }
 
-/** 组总控的当前显示值：组内全为开才显示开。判据取 every 而非 any——部分选中显示关，点击即整组补全为开；
- *  若取 any，部分选中会显示成开、点击反而把用户已勾的那几行抹掉。口径与验证弹层分组「全选」一致。 */
+/** 组总控的当前显示值：组内全为开才显示开，部分选中显示关，点击即整组补全为开（口径见 docs/decisions.md「宿主与卡片」） */
 export function masterValue(flags: Flags, group: Group): boolean {
     return GROUP_KEYS[group].every((key) => groupValue(flags, group, key))
 }
@@ -178,7 +176,7 @@ export interface VerifyTarget {
     efforts?: string[]
 }
 
-/** 从勾选的候选算出验证的请求计划：每模型一条不带 `reasoningEffort` 的请求。「不带档位」而不是挑一个最低档位：不带参数验的是用户实际会走的那条路径——端点可能有自己的默认推理级别，发 `off` 验出来的结论与默认路径未必一致 */
+/** 从勾选的候选算出验证的请求计划：每模型一条不带 `reasoningEffort` 的请求。不带参数验的是用户实际会走的那条路径——端点可能有自己的默认推理级别，发 `off` 验出来的结论与默认路径未必一致 */
 export function verifyTargets(
     candidates: readonly VerifyCandidate[],
     keys: ReadonlySet<string>,
@@ -188,7 +186,7 @@ export function verifyTargets(
         .map((candidate) => ({ provider: candidate.provider, model: candidate.model }))
 }
 
-/** 该组是否已全选：判据取 `every` 而非 `any`——部分选中时仍显示「全选」，全选中才翻成「取消全选」，与官方 `allVisibleCandidatesPicked` 同语义。按钮文案与点击方向必须共用本函数（两处各写一遍 `every` 一旦不同步，就会出现「文案显示取消全选、点击却是全选」的反直觉行为且不报错） */
+/** 该组是否已全选：部分选中时仍显示「全选」，全选中才翻成「取消全选」，与官方 `allVisibleCandidatesPicked` 同语义。按钮文案与点击方向必须共用本函数（判据不同步即出现「文案显示取消全选、点击却是全选」） */
 export function groupAllPicked(picked: ReadonlySet<string>, models: readonly VerifyCandidate[]): boolean {
     return models.every((candidate) => picked.has(verifyKey(candidate.provider, candidate.model)))
 }

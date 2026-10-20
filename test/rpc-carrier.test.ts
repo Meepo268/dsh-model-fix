@@ -13,7 +13,6 @@ function fakeRpc(signals: (AbortSignal | undefined)[]): ClientConnectionRpc {
     }
 }
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     const signals: (AbortSignal | undefined)[] = []
     const carrier = makeRpcCarrier(fakeRpc(signals))

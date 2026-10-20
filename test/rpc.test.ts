@@ -40,7 +40,6 @@ async function framesOf(response: Response): Promise<VerifyProgressFrame[]> {
     return frames
 }
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     // ---------- 正常路径：执行器发的帧原样转发 ----------
     const okFetch = progressStreamFetch((_payload, options: ProbeRunOptions) => {

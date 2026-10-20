@@ -64,7 +64,7 @@ const endlessStream = (): { llm: Pick<LlmRuntime, 'stream'>; chunks: () => numbe
     return { llm: { stream } as unknown as Pick<LlmRuntime, 'stream'>, chunks: () => chunks, closed: () => closed }
 }
 
-/** 先给一块 `block-start`（命中「已开始产出」的提前返回），此后 `next()` 与迭代器 `return()` 都永不 settle，并按发生顺序记录「中止信号发出」与「迭代器被请求关闭」。用来钉住 #19：命中时 abort 必须立刻发出——不排在被放弃的迭代器关闭之后，更不等它 settle。旧写法（`for await` 的隐式关闭）会一直挂在关闭上，`probeOnce` 永不返回 */
+/** 先给一块 `block-start`（命中「已开始产出」的提前返回），此后 `next()` 与迭代器 `return()` 都永不 settle，并按发生顺序记录「中止信号发出」与「迭代器被请求关闭」。 */
 const hitThenHangStream = (): { llm: Pick<LlmRuntime, 'stream'>; order: string[] } => {
     const order: string[] = []
     let nextCalls = 0
@@ -90,7 +90,6 @@ const hitThenHangStream = (): { llm: Pick<LlmRuntime, 'stream'>; order: string[]
 /** 等待指定毫秒（真定时器，供「块数停止增长」这类时间相关的断言留出余量） */
 const wait = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms) })
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     // ---------- planProbes：验证每模型一条请求（不带档位参数）；探测档位条目按档位逐条展开 ----------
     check(
@@ -637,8 +636,8 @@ export async function run(): Promise<void> {
         )
     }
     {
-        // #19：命中 block-start 的提前返回路径上，中止信号必须立刻发出——不排在迭代器关闭之后，也不等它 settle。
-        // 这条路径正是「命中即中断请求、省额度」最需要中止生效的场景；旧写法下这里会挂死在关闭上。
+        // 命中 block-start 的提前返回路径上，中止信号必须立刻发出——不排在迭代器关闭之后，也不等它 settle。
+        // 这条路径正是「命中即中断请求、省额度」最需要中止生效的场景。
         const hit = hitThenHangStream()
         const startedAt = Date.now()
         const verdict = await probeOnce(hit.llm, probeOf(), new AbortController().signal, 30, 10)

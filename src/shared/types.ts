@@ -33,7 +33,7 @@ export interface CompatRules {
     disableStore: boolean
 }
 
-/** 用户体验规则：体验行为开关，对所有提供方一致、不支持按提供方排除（looseMatch 例外，作用于 Node 半填充） */
+/** 用户体验规则：体验行为开关，对所有提供方一致、不支持按提供方排除 */
 export interface UserExperienceRules {
     /** 记住每模型上次手动选择的推理级别并在切换模型时自动恢复；为 false 时不再保存新记忆，但已记住的仍会自动恢复（关闭时卡片会询问是否清空） */
     rememberEfforts: boolean
@@ -51,7 +51,7 @@ export interface UserExperienceRules {
     localizeEfforts: boolean
     /** 同时显示原档位名：为 true 时，本地化推理级别开启后把中文与英文原档位一起显示（`中文名 · 原档位`，如 `最大 · Max`）；关闭则只显示中文。默认 true */
     showOriginalEfforts: boolean
-    /** 尽量匹配：精确匹配失败（无命中/歧义）时收集候选合成参数填充（官方 ×5 加权、60% 口径，见 docs/decisions.md「尽量匹配」）。默认 false */
+    /** 尽量匹配：精确匹配失败（无命中/歧义）时收集候选合成参数填充（候选等权、60% 口径，作用于 Node 半填充，见 docs/decisions.md「参数来源」）。默认 false */
     looseMatch: boolean
 }
 

@@ -20,7 +20,6 @@ function modelsValueOf(modelOps: SettingsPathOp[], providerPath: string): Record
     return op !== undefined && op.op === 'set' ? (op.value as Record<string, unknown>[]) : undefined
 }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // ---------- planResetModels：推理级别剔除 ----------
     const providers = {

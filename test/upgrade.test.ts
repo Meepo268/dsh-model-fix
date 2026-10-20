@@ -3,7 +3,6 @@ import { upgradeConfig } from '@/upgrade'
 import { DEFAULT_STORED } from '@/migrate'
 import { check, stable } from '@test/helper'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // 当前版本默认值（台阶侧的逐级升级语义已退化为 v7→v8 一级）
     const COMPAT = { disableDeveloper: true, disableStore: true }

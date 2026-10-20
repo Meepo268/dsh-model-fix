@@ -30,7 +30,6 @@ function llmCtx(
     return { ctx, calls }
 }
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     const MEM: EffortMemory = { a: { m1: 'high', m2: 'low' }, b: { ghost: 'max' } }
 

@@ -153,7 +153,7 @@ function indexFromCatalog(catalog: Catalog): IndexedCatalog {
 
 /**
  * 缓存条目结构校验：条目来自磁盘 JSON（用户可编辑、写入可能被截断），填充流程直接迭代 `entry.efforts`，故入库前逐条判定。
- * 档位取值与 buildCatalog 写入口径一致（none ∪ LEVELS，'off' 原值保留）；任一条非法即整份作废走网络重拉（坏盘自愈优先于坏条丢弃）；
+ * 档位键可缺省（模型无推理能力），取值须落在 none ∪ LEVELS（'off' 原值保留）；任一条非法即整份作废走网络重拉（坏盘自愈优先于坏条丢弃）；
  * 未知多余键忽略（向前兼容）；记录本体出现 `provider`/`id` 键即判非法。
  */
 export function isCacheRecord(value: unknown): value is CacheRecord {

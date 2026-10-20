@@ -37,7 +37,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
     // 在途的 AbortController：点停止、关窗与组件卸载都靠它中止——中止经 signal 传导到 Node 半的执行循环
     const abort = useRef<AbortController | null>(null)
     useEffect(() => () => { abort.current?.abort() }, [])
-    // 中止不落宿主那个 error 态的「失败」——用户主动停止不是失败，故改 done 态 + 中性措辞「已停止」
+    // 中止不落宿主那个 error 态的「失败」：用户主动停止不是失败，故改 done 态 + 中性措辞「已停止」
     const terminalLabels = useMemo<TerminalBlockLabels>(
         () => ({ ...terminalLabelsOf(t), done: stopped ? t('verifyStopped') : t('terminalDone') }),
         [t, stopped],
@@ -77,7 +77,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
                     models: summary.models,
                     tested: summary.tested,
                 })
-                // 结论只留在弹层内，不写卡片状态行：弹层跑完不关、结论追加成记录区末行，用户当场就看得见
+                // 结论只留在弹层内，不写卡片状态行（弹层跑完不关，结论追加成记录区末行）
                 setLines((current) => [...current, t('verifyFinished', { result: stats })])
             })
             .catch((error: unknown) => {
@@ -89,7 +89,7 @@ export function useVerifyRun(options: VerifyRunOptions) {
                 options.setBusy(null)
             })
     }
-    // 停止：中止在途验证但不关窗——已验到哪一步值得留在记录里，故按下即在记录区留一行
+    // 停止：中止在途验证但不关窗，按下即在记录区留一行
     const stop = () => {
         if (abort.current === null) return
         abort.current.abort()

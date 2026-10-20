@@ -2,12 +2,10 @@
  * 「返回对话」悬浮按钮：内容区（AppFrame 中心列）左下角的一枚圆形按钮，点击即回到当前会话
  * （宿主 `ctx.layout.selectPanel(null)`）。
  *
- * 按钮要悬浮在中心列左下角（与宿主「回到底部」同一视觉层级），不落在任何渲染席位的树里，
- * 故直插 DOM 而不走 slot。视觉逐条照宿主 `ui-chat` 的 `.toBottom`，图标用宿主 `ui-primitives`
- * 导出的 `IconChevronLeftOutlineRegular`（官方有导出组件就用同一组件，见 docs/ui-fusion.md）。
- *
- * `ctx.layout` 的类型面见 docs/host-api.md「宿主类型导入清单」：宿主 `ui-layout` 包不引，
- * 只按契约复制 `selectPanel` 一个成员（同 `src/subagent.ts` 的做法）。
+ * 按钮要悬浮在中心列左下角，不落在任何渲染席位的树里，故直插 DOM 而不走 slot；视觉逐条照宿主 `ui-chat`
+ * 的 `.toBottom`，图标用宿主 `ui-primitives` 导出的 `IconChevronLeftOutlineRegular`（见 docs/ui-fusion.md）。
+ * 宿主 `ui-layout` 包不引（类型面会顶掉浏览器半 `ctx.sessions` 增补），只按契约复制 `selectPanel` 一个成员
+ * （见 docs/host-api.md）。
  */
 
 import { useSyncExternalStore } from 'react'
@@ -104,8 +102,7 @@ function BackToChat(props: {
  * 装上「返回对话」悬浮按钮，可见性只由 `behavior.backToChat` 一个开关决定：开即挂载，关即销毁
  * （拆 React 根、摘容器节点、还原中心列定位上下文）。子 fiber 卸载即级联撤销。
  *
- * 走子 fiber `inject(['layout'])` 门控：`ctx.layout` 由宿主 ui-layout 提供，缺席则该 fiber
- * 静默 PENDING（同 `src/subagent.ts` 的手法）。
+ * 走子 fiber `inject(['layout'])` 门控：服务缺席则该 fiber 静默 PENDING。
  */
 export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>): void {
     ctx.inject(['layout'], (child) => {

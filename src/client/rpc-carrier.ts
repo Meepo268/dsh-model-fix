@@ -1,5 +1,5 @@
 /** 浏览器半调 Node 半的唯一出口：三个 channel RPC 写回端点、一条语言上报与两条进度流的读流。
- * 收在一处是因为它们同源——channel 字面量、endpoint 名、两条流各自的载荷形状都与 Node 半一一对应。卡片只消费本文件产出的 `RpcCarrier`，自己不发起请求 */
+ * 卡片只消费本文件产出的 `RpcCarrier`，自己不发起请求 */
 
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 // channel RPC 的结果信封

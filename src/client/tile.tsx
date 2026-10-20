@@ -18,14 +18,13 @@ const { Pill, Switch, Tag, StateDot, Tooltip, IconInfoOutlineRegular, IconTrashO
 /** 瓦片文案函数：与卡片 props 的 t 同型，同为 slots.register 的 locale 席位合成注入 */
 type TileTranslate = TranslateNS<'settings.modelFix'>
 
-/** 瓦片渲染顺序：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 / UI 与行为
- * （末位：它管的是前面各处的显隐，放在最后读起来才顺） */
+/** 瓦片渲染顺序：自动填充 / 允许更新 / 兼容性 / 排除提供方 / 用户体验 / UI 与行为 */
 export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience', 'behavior']
 
 /** Pill 组阈值：组内行数（真键 + 恒定展示行）≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
 const PILL_THRESHOLD = 5
 
-/** 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），排在组内真键之前——它是回入口，关掉下面几项后才知道从哪回来。不绑任何配置键，故不进 `GROUP_KEYS`，组总控、草稿、脏检测都看不见它 */
+/** 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），排在组内真键之前——它是回入口。不绑任何配置键，故不进 `GROUP_KEYS`，组总控、草稿、脏检测都看不见它 */
 interface LockedRow {
     /** 行标签文案键 */
     label: CardKey
@@ -159,7 +158,7 @@ export function GroupTile(props: {
 
 /** 「排除提供方」瓦片：动态集合而非布尔矩阵（无整组开关语义）；summary 尾区为「N 命中」徽标，
  * 命中 = 该 id 存在于宿主 llm-pi-ai 的 user 层（0 命中也常驻、不得画成错误色）。
- * 只能手填——正用场景就是先写尚未创建的提供方 id 再新建该提供方。 */
+ * 只能手填——可先写尚未创建的提供方 id，待其创建后即生效。 */
 export function ExcludesTile(props: {
     t: TileTranslate
     flags: Flags
@@ -182,7 +181,7 @@ export function ExcludesTile(props: {
     const inputRef = useRef<HTMLInputElement>(null)
     const commit = () => {
         const value = text.trim()
-        // 空输入静默忽略（与官方新增提供方时的按钮禁用同取向：无事发生即可，不必报错）
+        // 空输入静默忽略（无事发生即可，不必报错）
         if (value === '') {
             setError(undefined)
             return
@@ -253,7 +252,6 @@ export function ExcludesTile(props: {
                         const stateText = t(hit ? 'excludeHit' : 'excludeUnmatched')
                         return (
                             <div key={excluded} className="dsh-mf-tagRow">
-                                {/* 官方结构：trailing 是 [状态点][状态胶囊] 两个兄弟节点，点在胶囊外面不进底色 */}
                                 {hit ? <StateDot state="done" size={7} /> : null}
                                 <Tag tone={hit ? 'success' : 'neutral'} className="dsh-mf-tag">
                                     <span className="dsh-mf-tagText">{excluded}</span>

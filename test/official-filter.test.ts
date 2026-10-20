@@ -2,7 +2,6 @@
 import { apiKeyEnvOf, resolveProfile } from '@/official-filter'
 import { check, stable } from '@test/helper'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // settingsPath 收窄：逐级取键，任一级不是普通对象（含终点非对象）即 undefined
     const segment = { a: { b: { apiKeyEnv: 'X' } }, list: [{ deep: true }] }

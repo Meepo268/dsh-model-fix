@@ -49,7 +49,7 @@ function IconIssue() {
     )
 }
 
-/** 卡片末尾联系行：只吃一个翻译函数，地址、版本与 issue 正文均在本文件内合成。 */
+/** 卡片末尾联系行组件：地址、版本与 issue 正文均在本文件内合成，只吃一个翻译函数。 */
 export function CardMeta(props: { t: TranslateNS<'settings.modelFix'> }) {
     const { t } = props
     // 反馈链接预填版本与 issue 模板

@@ -1,5 +1,5 @@
 /** 宿主词典运行时 patch：开关开时把宿主 model 命名空间 zh 词典里的 `effort.providerDefault` 词条从 'Default' 改成 '默认'（`showOriginalEfforts` 开着则改成 '默认 · Default'）。
- * Default 是宿主 ModelSelect.tsx 自己合成的伪菜单项，取的是浏览器半 locale 服务的词条、不是数据层，Node 半遮蔽 `resolveModelInfo` 碰不到；宿主 LocaleRuntime 的 `register` 禁止同 ns+locale 重复注册，故只能直接 mutate 已注册词典对象里的词条值，再手动调 publish bump revision 让缓存失效、outlet 重渲染。
+ * Default 是宿主 ModelSelect.tsx 自己合成的伪菜单项，取的是浏览器半 locale 服务的词条、不是数据层，Node 半遮蔽 `resolveModelInfo` 碰不到；宿主 LocaleRuntime 的 `register` 禁止同 ns+locale 重复注册，故只能直接 mutate 已注册词典对象里的词条值，再手动调 publish bump revision 让缓存失效、outlet 重渲染（宿主私接面见 docs/host-api.md）。
  * 三态与 Node 半 `localizeEffortNames` 同一形态（见 docs/decisions.md「宿主与卡片」）。卸载时恢复原状、再 publish 一次 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -34,7 +34,7 @@ function valueOf(localized: boolean, showOriginal: boolean): string {
     return showOriginal ? `${LOCALIZED}${EFFORT_NAME_SEP}${ORIGINAL}` : LOCALIZED
 }
 
-/** 设置 zh 词典里目标词条的值；值未变时跳过 publish（词条值没变，已挂载的 outlet 不需要重渲染） */
+/** 设置 zh 词典里目标词条的值；值未变时跳过 publish（值没变，已挂载的 outlet 无需重渲染） */
 function patchZhDict(runtime: LocaleRuntimeHack, localized: boolean, showOriginal: boolean): void {
     const zhDict = runtime.dicts.get(MODEL_NS)?.get(ZH_LOWER)
     // model NS 必然已在宿主 boot 期注册；缺席（理论不可能）静默跳过，不抛错、不 publish

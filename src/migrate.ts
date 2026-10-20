@@ -20,7 +20,7 @@ import { errorText, isSettingsConflict } from '@/shared/errors'
 /** 全新用户的规范默认快照（与升级链对空输入的结果一致，由 test 守护） */
 export const DEFAULT_STORED: PluginConfigSnapshot = toStored(DEFAULT_CONFIG)
 
-/** 当前版本的快照键（当前为 `version-8`，N 取 `CONFIG_VERSION`），全文件的规范化/迁移/自愈写回共用 */
+/** 当前版本的快照键（N 取 `CONFIG_VERSION`），全文件的规范化/迁移/自愈写回共用 */
 const CURRENT_KEY = versionKey(CONFIG_VERSION)
 
 /** 收集段内合法版本号（升序）；不按最低支持过滤，低于最低支持的版本交由 pruneOps Phase A 清理 */

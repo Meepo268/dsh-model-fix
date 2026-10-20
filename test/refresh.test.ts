@@ -26,7 +26,6 @@ function pending(): { reply: () => Promise<Response>; fail: () => void } {
     return { reply: () => gate, fail: () => reject?.(new Error('offline')) }
 }
 
-/** 执行本文件的全部用例 */
 export async function run(): Promise<void> {
     // 前置：refresh 入口会被事件流守卫短路，守卫开着则测不到目标分支
     check('refresh 用例的前置：事件流守卫处于关闭态', isIgnoreAll() === false)

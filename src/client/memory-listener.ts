@@ -1,6 +1,5 @@
 /** 浏览器半的推理级别记忆监听：订阅会话的模型选择投影，把每次切换翻译成两件事——换模型时按记忆恢复级别，换级别时存回记忆（外加 `defaultHigh` 的自动设置）。
- * 这里只管记忆的存取，不管整理：失效清理在 Node 半按宿主的全量模型列表执行（`src/memory.ts`）。存取覆盖面与 UI 选型一致——宿主模型目录里的全部模型都参与。
- * 单独成文件是因为它与卡片不共享任何状态：卡片管的是设置页看见的那份配置，本文件管的是所有活着的会话在后台发生了什么 */
+ * 这里只管记忆的存取，不管整理：失效清理在 Node 半按宿主的全量模型列表执行（`src/memory.ts`）。存取覆盖面与 UI 选型一致——宿主模型目录里的全部模型都参与。 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // ctx.sessions 服务面（ISessions 声明合并）
@@ -147,7 +146,7 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                 }
             }
             const listUnsub = sessions.list.subscribe(syncList)
-            // subscribe 只订阅失效通知、不推首值：立即按当前快照补一遍
+            // 同 trackRetain：subscribe 只订阅失效通知、不推首值，立即按当前快照补一遍
             syncList()
 
             return () => {

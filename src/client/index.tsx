@@ -1,5 +1,5 @@
 /** 浏览器半入口（dsh.client 声明的 web 侧 cordis 插件）。宿主 settings 面为 ctx.configForms，经 makeScope 包装后供卡片与记忆监听消费。
- * 五个席位一律经 `ctx.slots.inject` 注册：对无声明方的席位只挂一个 pending wait（声明到达才跑回调，fiber 卸载即取消），故缺席者静默不发生；向未声明的 slot 直接 register 会抛 `slot "..." is not declared`，且该抛错发生在 fiber 启动期、连累同一 fiber 里后续的全部注册。
+ * 五个席位一律经 `ctx.slots.inject` 注册：向未声明的 slot 直接 register 会抛 `slot "..." is not declared`，且该抛错发生在 fiber 启动期、连累同一 fiber 里后续的全部注册（见 docs/decisions.md「宿主与卡片」）。
  * 其中两席在此直接注册；另三个 slot 承载的四个部件受「UI 与行为」组支配，由 visibility.tsx 编排挂载与卸载 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

@@ -2,7 +2,6 @@
 import { startIgnoreAll, endIgnoreAll, isIgnoreAll } from '@/guard'
 import { check } from '@test/helper'
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     check('守卫初始为 false', isIgnoreAll() === false)
     startIgnoreAll()

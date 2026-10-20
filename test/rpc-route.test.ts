@@ -52,7 +52,7 @@ function fakeResponse(): ServerResponse & { status: number; body: string | undef
 /** 造一个请求信封 JSON 体 */
 const envelope = (rpcId: string, method: string, payload: unknown = {}): string => JSON.stringify({ type: 'client-request', rpcId, method, payload })
 
-/** 执行本文件的全部用例（路由处理器是异步的，故本模块为 async） */
+/** 路由处理器是异步的，故本模块为 async */
 export async function run(): Promise<void> {
     // ---------- endpointOf ----------
     check('endpointOf 命中单段端点', endpointOf(`${CHANNEL}/forceUpdate`, CHANNEL) === 'forceUpdate')

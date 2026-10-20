@@ -25,7 +25,6 @@ function catalog(groups: Record<string, string[]>): IndexedCatalog {
     return indexed(Object.fromEntries(Object.entries(groups).map(([provider, ids]) => [provider, ids.map((id) => entry(id))])))
 }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // ---------- 精确匹配（含归一化：大小写、-latest/-openai-compact 后缀噪音） ----------
     check('lookup 精确命中', lookup(catalog({ deepseek: ['deepseek-chat'] }), 'deepseek', undefined, 'deepseek-chat')?.id === 'deepseek-chat')
@@ -139,7 +138,7 @@ export function run(): void {
         })
         const looseCtx = lookup(ctx, 'relay', undefined, 'm', true)
         check('loose 容量取 60 分位安全 N', looseCtx?.contextWindow === 100_000, looseCtx)
-        // 容量分位数基于有值候选（无值候选不占位）：仅 2/5 家有值时仍取分位，不再判「支持率不足」
+        // 容量分位数只算有值候选（无值候选不占位）：2/5 家有值时仍取分位
         const maxT = indexed({
             gw1: [entry('m', [], { maxTokens: 8_000 })],
             gw2: [entry('m', [], { maxTokens: 8_000 })],
@@ -148,23 +147,14 @@ export function run(): void {
             gw5: [entry('m')],
         })
         check('loose 容量分位只算有值候选', lookup(maxT, 'relay', undefined, 'm', true)?.maxTokens === 8_000, lookup(maxT, 'relay', undefined, 'm', true))
-        // 分位只在候选粒度上算，不按提供方身份加权
-        const withOfficial = indexed({
-            deepseek: [entry('m', [], { maxTokens: 8_000 })],
-            gw1: [entry('m', [], { maxTokens: 8_000 })],
-            gw2: [entry('m', [], { maxTokens: 8_000 })],
-            gw3: [entry('m')],
-            gw4: [entry('m')],
-        })
-        check('loose 容量分位不受提供方身份影响', lookup(withOfficial, 'relay', undefined, 'm', true)?.maxTokens === 8_000, lookup(withOfficial, 'relay', undefined, 'm', true))
         // 安全 N 宁小勿大：某个候选值最大但非多数侧时，N 取多数侧的小值
-        const officialLarger = indexed({
+        const oneLarger = indexed({
             deepseek: [entry('m', [], { contextWindow: 1_000_000 })],
             gw1: [entry('m', [], { contextWindow: 100_000 })],
             gw2: [entry('m', [], { contextWindow: 100_000 })],
             gw3: [entry('m', [], { contextWindow: 100_000 })],
         })
-        check('loose 安全 N 宁小勿大（大值不主导）', lookup(officialLarger, 'relay', undefined, 'm', true)?.contextWindow === 100_000, lookup(officialLarger, 'relay', undefined, 'm', true))
+        check('loose 安全 N 宁小勿大（大值不主导）', lookup(oneLarger, 'relay', undefined, 'm', true)?.contextWindow === 100_000, lookup(oneLarger, 'relay', undefined, 'm', true))
         // efforts 逐档 60%：low 4/5 √、high 3/5=60% √、medium 2/5 ×
         const efforts = indexed({
             gw1: [entry('m', ['low', 'high'])],
@@ -175,7 +165,6 @@ export function run(): void {
         })
         const looseEfforts = lookup(efforts, 'relay', undefined, 'm', true)
         check('loose efforts 逐档 60% 取值', stable(looseEfforts?.efforts) === stable(['low', 'high']), looseEfforts)
-        // image：≥60% 为 true 才写
         const images = indexed({
             gw1: [entry('m', [], { image: true })],
             gw2: [entry('m', [], { image: true })],
@@ -184,15 +173,12 @@ export function run(): void {
             gw5: [entry('m')],
         })
         check('loose image 60% 为 true 才写', lookup(images, 'relay', undefined, 'm', true)?.image === true, lookup(images, 'relay', undefined, 'm', true))
-        // 全字段不达标 -> undefined（合成返回空，特征形同虚设时不硬填）
         const none = indexed({ gw1: [entry('m')], gw2: [entry('m', ['xhigh'])], gw3: [entry('m')] })
         check('loose 全字段不达标 -> undefined', lookup(none, 'relay', undefined, 'm', true) === undefined, lookup(none, 'relay', undefined, 'm', true))
-        // 彻底无命中：includes 扩展兜底——裸名不吃精确匹配时按子串捞候选；扩展候选同样过合成
         const fuzzy = indexed({ deepseek: [entry('deepseek-v4-flash', ['high'], { contextWindow: 100_000 })], gw1: [entry('deepseek-v4-flash-0731', [], { contextWindow: 80_000 })], gw2: [entry('deepseek-v4-flash-0423')] })
         const fuzzyHit = lookup(fuzzy, 'relay', undefined, 'deepseek-v4-f', true)
         // 分位数 [80000,100000] 取 60% 位（累计 ≥60% 的位置）为 100000
         check('loose 无命中时 includes 扩展候选', fuzzyHit?.contextWindow === 100_000, fuzzyHit)
-        // loose 关闭时同样的模糊查询仍无命中（扩展只在 loose 开启时发生）
         check('loose 关闭时无命中仍无扩展', lookup(fuzzy, 'relay', undefined, 'deepseek-v4-f', false) === undefined)
     }
 

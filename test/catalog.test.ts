@@ -10,7 +10,6 @@ function one(model: Record<string, unknown>): CacheRecord | undefined {
     return buildCatalog({ p: { models: { m: model } } })['p']?.models.m
 }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // 图片模态：仅缓存正向信息（支持图片才写 image:true）
     check('仅含图片支持也入库', stable(one({ modalities: { input: ['text', 'image'] } })) === stable({ image: true }), one({ modalities: { input: ['text', 'image'] } }))

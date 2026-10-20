@@ -16,7 +16,6 @@ function nameOf(info: Parameters<typeof localizeEffortNames>[0], index: number):
     return info.reasoning?.efforts[index]?.name ?? ''
 }
 
-/** 执行本文件的全部用例 */
 export function run(): void {
     // 词表与共享层档位表同源：前七键逐项相等（编译期已保证无缺漏），外加 Default（宿主伪菜单项）
     const expectedKeys = [...EFFORT_LEVELS.map(hostForm), 'Default']
