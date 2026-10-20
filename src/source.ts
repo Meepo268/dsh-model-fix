@@ -114,6 +114,7 @@ export function buildSourceSnapshot(
                 provider: candidate.provider,
                 id: candidate.entry.id,
                 fields: fieldsOfEntry(candidate.entry),
+                ...(candidate.also.length === 0 ? {} : { also: candidate.also.length }),
             }))
             // 手工 pin 的条目未必进得了候选（它的 id/名字与本行不同形）：补一行同 key 的选项，
             // 否则下拉会显示成「自动」——那正是用户最需要看见自己指定过什么的地方

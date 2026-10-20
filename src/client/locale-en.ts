@@ -204,6 +204,12 @@ export const en: Record<CardKey, string> = {
     sourceImage: 'image',
     sourceExcluded: ' (provider is excluded; this plugin will not touch it)',
     sourceEmpty: 'No configurable models',
-    sourceFailed: 'Failed to load or save: {message}',    backToChat: 'Back to chat',
+    sourceFailed: 'Failed to load or save: {message}',
+    sourceSearch: 'Search models or sources…',
+    sourceOnlyProvider: 'This provider only',
+    sourceNoMatch: 'No matching models',
+    sourceSeat: 'Parameter source…',
+    sourceSeatHint: 'Choose which data source fills each model',
+    backToChat: 'Back to chat',
 }
 

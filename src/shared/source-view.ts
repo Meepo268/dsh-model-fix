@@ -18,6 +18,8 @@ export interface SourceCandidateView {
     provider: string
     id: string
     fields: SourceFieldsView
+    /** 同 id 形态、同参数的其它来源数（>0 时下拉标 `+N`）：它们填出来的值完全一样，故折叠成一行 */
+    also?: number
 }
 
 /** 一路提供方下的一个模型 */

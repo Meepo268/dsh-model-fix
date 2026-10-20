@@ -1,5 +1,5 @@
-// lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、提供方提示与推理级别转换
-import { lookup, normalizeId, stripNamespace, toReasoningEfforts } from '@/lookup'
+// lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、提供方提示与推理级别转换、参数来源候选枚举
+import { collectCandidates, entryBySourceKey, lookup, normalizeId, sourceKey, stripNamespace, toReasoningEfforts } from '@/lookup'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { check, stable } from '@test/helper'
 
@@ -225,4 +225,34 @@ export function run(): void {
     check('无条目 -> undefined', toReasoningEfforts(undefined) === undefined)
     check('空档位 -> undefined', toReasoningEfforts(entry('m', [])) === undefined)
     check('仅剩 off -> 视为无匹配', toReasoningEfforts(entry('m', ['none'])) === undefined && toReasoningEfforts(entry('m', ['off'])) === undefined)
+
+    // ---------- collectCandidates：下拉候选（三种精确键 + 同族变体），只列不判 ----------
+    const pool = catalog({
+        openrouter: ['z-ai/glm-5.3-flash-free', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3'],
+        zai: ['glm-5.3-flash'],
+    })
+    const keysOf = (providerId: string, modelId: string, name?: string): string[] =>
+        collectCandidates(pool, providerId, modelId, name).map((candidate) => candidate.key)
+    // 基准：本提供方的精确命中排第一（其余按目录顺序跟在后面）
+    check('候选：精确命中并本提供方优先', keysOf('zai', 'cn:glm-5.3-flash')[0] === 'zai/glm-5.3-flash', keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 目录 id 带 `<厂商>/` 前缀时不算精确命中，但仍是同族，必须列出（且不重复）
+    check('候选：带斜杠前缀的同名条目也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 变体：免费渠道那条 id 更长，包含关键字，必须出现在下拉里（用户点名的 glm-5.3-flash-free 场景）
+    check('候选：同族变体（-free）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash-free'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    check('候选：更短的父版本（glm-5.3）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 变体不得混进自动匹配：lookup 仍然只认精确/词干/前缀
+    check('变体不参与自动匹配', lookup(pool, 'zai', 'glm-5.3-flash-free') === undefined, lookup(pool, 'zai', 'glm-5.3-flash-free')?.id)
+    // 太短的键（hy3）不做包含扫描：否则整片目录都会被收进来
+    check('候选：短键不做变体扫描', keysOf('custom', 'cn:hy3').length === 0, keysOf('custom', 'cn:hy3').join('|'))
+    check('候选：目录里根本没有时为空', keysOf('zai', 'cn:totally-unknown').length === 0)
+    // 截断与折叠：同 id 形态 + 同参数的 30 家镜像折叠成一行（`also` 记账），不占满名额
+    const many = catalog(Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`p${index}`, ['glm-5.3-flash']] as const)))
+    const manyRows = collectCandidates(many, 'p0', 'glm-5.3-flash')
+    check('候选：同值镜像折叠成一行', manyRows.length === 1 && manyRows[0]?.also.length === 29, `${manyRows.length}/${manyRows[0]?.also.length}`)
+    check('候选：折叠后仍保留本提供方为代表', manyRows[0]?.key === 'p0/glm-5.3-flash', manyRows[0]?.key)
+    // 来源键回取：目录刷新后条目消失即回落到自动匹配
+    check('来源键取条目', entryBySourceKey(pool, sourceKey('openrouter', 'z-ai/glm-5.3-flash-free'))?.id === 'z-ai/glm-5.3-flash-free')
+    check('来源键形状不对 -> undefined', entryBySourceKey(pool, 'noslash') === undefined && entryBySourceKey(pool, 'a/') === undefined && entryBySourceKey(pool, '/x') === undefined)
+    check('来源键指向已消失的条目 -> undefined', entryBySourceKey(pool, 'openrouter/gone') === undefined)
+    check('来源键提供方不存在 -> undefined', entryBySourceKey(pool, 'nobody/glm-5.3') === undefined)
 }

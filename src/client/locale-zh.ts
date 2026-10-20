@@ -203,6 +203,12 @@ export const zh: Record<CardKey, string> = {
     sourceImage: '图片',
     sourceExcluded: '（该提供方已在排除列表，本插件不会动它）',
     sourceEmpty: '没有可配置的模型',
-    sourceFailed: '取数或保存失败：{message}',    backToChat: '返回对话',
+    sourceFailed: '取数或保存失败：{message}',
+    sourceSearch: '搜索模型或来源…',
+    sourceOnlyProvider: '只看本提供方',
+    sourceNoMatch: '没有匹配的模型',
+    sourceSeat: '参数来源…',
+    sourceSeatHint: '按模型指定用哪一路数据填参数',
+    backToChat: '返回对话',
 }
 

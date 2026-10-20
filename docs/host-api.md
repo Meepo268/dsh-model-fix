@@ -103,7 +103,7 @@
 - 引用身份稳定、就地更新（`_commitVolatile` 逐个 `updateVolatile` 并 emit `loader/volatile-update`，仅发给 owning fiber）⇒ volatile 变更**不重启 fiber**。
 - volatile 位置约束：根 volatile 受支持，`.volatile()` 不能叠加；volatile 字段要求固定对象路径（无外裹 volatile）。
 
-### slots：五席注册
+### slots：六席注册
 
 - `ctx.slots`（`DSH/packages/client/ui-renderer/src/client/registry.ts`，`SlotRegistry`）。
 - `register` 是原型赋值、内部包 `ctx.effect` ⇒ **register 必须能挂 effect 生命周期**（实际都经 effect）；向未声明 slot 注册直接抛 `slot "…" is not declared`。
@@ -111,17 +111,19 @@
 - 带 inject 的 register 重载（`DSH/packages/client/ui-slots/src/index.ts`）：`BaseOptions{ name; children?; store?; locale?; registrant? }`；工厂参数给严格 session 席位 `sessionId`、session-maybe 席位 `sessionId | undefined`，声明 store 时追加 `actions`；**没有 binding 对象参数**。
 - props 合成：`InjectFace<I>` 里 `hooks` 被渲染器绑成 `use<Name>` 选择器 hook（组件看不到裸 observable）；`PropsStore<H> = { useStore; actions }`；**只有 `register({ locale: NS })` 声明了命名空间，props 上才出现 `t`**。
 - 条目字段（`KindOptions`）：list `{ id; order?; label?; priority? }`、keyed `{ key; priority? }`、chain `{ select; priority? }`；`SlotLabel = string | (() => string)`（每次渲染求值）。
-- 本插件五席：
+- 本插件六席：
 
 | slot key | SlotMap 定义 | kind | 条目字段 |
 | --- | --- | --- | --- |
 | `settings.models.footer` | `DSH/packages/client/ui-settings-models/src/client/slot-contract.ts`，渲染点该包 `src/client/ModelsSection.tsx` | list | `id` / `order?` / `label?` / `priority?` |
+| `settings.models.provider-card` | 同上（`.../slot-contract.ts`；声明在 `settings.section` 的 models 条目下 `{ kind: "keyed", scope: "root" }`）。owner props `{ provider: row.entry; configured; keyConfigured }`，分发票 `renderSlot(..., { entryKey: row.entry.settingsNs })` | keyed | `key`（= 提供方 `settingsNs`）/ `priority?` |
 | `plugins.bundle.config` | `DSH/packages/client/ui-plugin-manager/src/client/slot-contract.ts`（owner props `PluginConfigViewProps`） | keyed | `key`（包名）/ `priority?` |
 | `plugins.row.config` | 同上（JSDoc：keyed by `<package>#<row id>`） | keyed | 同上 |
 | `settings.plugins.tab` | `DSH/packages/client/ui-settings/src/client/contract/slots.ts` | list | `id` / `order?` / `label?` / `priority?` |
 | `conversation.input.left` | `DSH/packages/client/ui-conversation/src/client/contract/slots.ts`（无 owner props），渲染点该包 `src/client/skeleton/InputBar.tsx` | list | `id` / `order?` / `label?` / `priority?` |
 
 - keyed 拼接（`DSH/packages/client/ui-plugin-manager/src/client/config-ledger.ts`）：`rowConfigKey(bundle, rowId) = \`${bundle}#${rowId}\`` ⇒ 本仓 `${PLUGIN_NAME}#${PLUGIN_NS}` 逐字成立。
+- **`provider-card` 的键是 `settingsNs` 而不是提供方 id**（`ui-settings-models` 目录行的字段：`provider` = 提供方 id、`settingsNs` = 声明它的设置文档、`settingsPath` = 文档内路径）。用户在「模型」页添加的自定义提供方全部挂在同一文档 `llm-pi-ai` 下（`settingsPath: ['providers', <id>]`），故注册键取 `API_NS`、提供方 id 从 owner props 的 `provider.provider` 现取；再按提供方 id 各注册一份兜底（个别适配器以提供方 id 作 `settingsNs`，多注册的键不命中、无副作用）。运行时注册（`registered`）的行 `settingsNs` 为空串，无法定向。
 
 ### locale：词典与 `t`
 

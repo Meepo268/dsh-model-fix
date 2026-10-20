@@ -201,6 +201,12 @@ export type CardKey =
     | 'sourceExcluded'
     | 'sourceEmpty'
     | 'sourceFailed'
+    // 「参数来源」的入口与列表工具行：提供方卡片里的按钮、搜索框、只看本提供方
+    | 'sourceSearch'
+    | 'sourceOnlyProvider'
+    | 'sourceNoMatch'
+    | 'sourceSeat'
+    | 'sourceSeatHint'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
