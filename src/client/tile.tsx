@@ -22,10 +22,10 @@ type TileTranslate = TranslateNS<'settings.modelFix'>
  * （末位：它管的是前面各处的显隐，放在最后读起来才顺） */
 export const TILE_ORDER: readonly (Group | 'excludes')[] = ['autoFill', 'allowUpdate', 'compat', 'excludes', 'userExperience', 'behavior']
 
-/** Pill 组阈值：组内行键数 ≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
+/** Pill 组阈值：组内行数（真键 + 恒定展示行）≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
 const PILL_THRESHOLD = 5
 
-/** 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），渲染在组内真键之前。它不绑任何配置键，故不进 `GROUP_KEYS`——组总控、草稿、脏检测都看不见它 */
+/** 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），排在组内真键之前——它是回入口，关掉下面几项后才知道从哪回来。不绑任何配置键，故不进 `GROUP_KEYS`，组总控、草稿、脏检测都看不见它 */
 interface LockedRow {
     /** 行标签文案键 */
     label: CardKey
@@ -35,7 +35,7 @@ interface LockedRow {
 
 /** 配置组瓦片：summary 为组名 + 整组开关 + 折叠箭头，展开体为组释义 + 子开关行；
  * 整行可点由 .dsh-mf-itemToggle 覆盖层承担（无 button 嵌套），可访问名用 aria-labelledby 指向可见标题。
- * 组内行数 ≥ PILL_THRESHOLD 时，子开关改渲染为 Pill 胶囊组。 */
+ * 组内行数（真键 + 恒定展示行）≥ PILL_THRESHOLD 时，子开关改渲染为 Pill 胶囊组。 */
 export function GroupTile(props: {
     group: Group
     t: TileTranslate
@@ -45,14 +45,15 @@ export function GroupTile(props: {
     onToggle: () => void
     onMaster: () => void
     onCell: (key: RowKey) => void
-    /** 追加在组内真键之后的恒定展示行（不绑配置、不受总控与脏检测影响）；缺省即无 */
-    lockedRow?: LockedRow
+    /** 恒定展示行（不绑配置、不受总控与脏检测影响），渲染在组内真键之前；缺省即无 */
+    lockedRows?: readonly LockedRow[]
 }) {
-    const { group, t, open } = props
+    const { group, t, open, lockedRows = [] } = props
     const uid = useId()
     const id = `${uid}-${group}`
     const title = t(COLUMN_KEYS[group])
-    const usePills = GROUP_KEYS[group].length >= PILL_THRESHOLD
+    // 恒定展示行占着组内位置，须一并计入阈值
+    const usePills = lockedRows.length + GROUP_KEYS[group].length >= PILL_THRESHOLD
     return (
         <div className="dsh-mf-item" role="group" data-open={open ? 'true' : undefined} aria-labelledby={`${id}-title`}>
             <div className="dsh-mf-itemHead">
@@ -81,14 +82,21 @@ export function GroupTile(props: {
                     <p className="dsh-mf-itemHint">{t(HINT_KEYS[group])}</p>
                     {usePills ? (
                         <div className="dsh-mf-pillGroup" role="group" aria-label={`${title} ${t('masterAll')}`}>
+                            {/* 宿主 Pill 不 forwardRef，Tooltip.cloneElement 注入的 ref 到不了 Pill 内部，
+                                故每颗 pill 都用 span 承接 ref 锚点（两种行共用此写法） */}
+                            {lockedRows.map((row) => (
+                                <Tooltip key={row.label} label={t(row.tip)} side="top" maxWidth={TIP_MAX_WIDTH} portal>
+                                    <span>
+                                        <Pill active className="dsh-mf-pillLocked">{t(row.label)}</Pill>
+                                    </span>
+                                </Tooltip>
+                            ))}
                             {GROUP_KEYS[group].map((key) => {
                                 const tip = t(TIP_KEYS[key])
                                 const rowLabel = t(ROW_KEYS[key])
                                 const active = groupValue(props.flags, group, key)
                                 return (
                                     <Tooltip key={key} label={tip} side="top" maxWidth={TIP_MAX_WIDTH} portal>
-                                        {/* 宿主 Pill 不 forwardRef，Tooltip.cloneElement 注入的 ref 无法到达其内部 button；
-                                            故用 span 承接 ref 锚点 */}
                                         <span>
                                             <Pill
                                                 active={active}
@@ -105,20 +113,19 @@ export function GroupTile(props: {
                         </div>
                     ) : (
                         <>
-                            {/* 恒定展示行排在组内真键之前：它是回入口，先看到它才知道下面几行关掉后从哪回来 */}
-                            {props.lockedRow === undefined ? null : (
-                                <div className="dsh-mf-itemRow">
+                            {lockedRows.map((row) => (
+                                <div key={row.label} className="dsh-mf-itemRow">
                                     <span className="dsh-mf-itemLabelGroup">
-                                        <span className="dsh-mf-itemLabel">{t(props.lockedRow.label)}</span>
-                                        <Tooltip label={t(props.lockedRow.tip)} side="top" maxWidth={TIP_MAX_WIDTH} portal>
-                                            <button type="button" className="dsh-mf-help" aria-label={t(props.lockedRow.tip)}>
+                                        <span className="dsh-mf-itemLabel">{t(row.label)}</span>
+                                        <Tooltip label={t(row.tip)} side="top" maxWidth={TIP_MAX_WIDTH} portal>
+                                            <button type="button" className="dsh-mf-help" aria-label={t(row.tip)}>
                                                 <IconInfoOutlineRegular size={12} />
                                             </button>
                                         </Tooltip>
                                     </span>
-                                    <Switch checked disabled label={`${t(props.lockedRow.label)} ${title}`} onChange={() => { /* 恒定展示行，无配置可写 */ }} />
+                                    <Switch checked disabled label={`${t(row.label)} ${title}`} onChange={() => { /* 恒定展示行，无配置可写 */ }} />
                                 </div>
-                            )}
+                            ))}
                             {GROUP_KEYS[group].map((key) => {
                                 const tip = t(TIP_KEYS[key])
                                 return (

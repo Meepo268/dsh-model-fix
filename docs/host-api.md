@@ -272,6 +272,7 @@
 - **pi-ai `stream()` 删除了空闲超时抛出**（alpha.3 去掉 `LLM_STREAM_IDLE_TIMEOUT` 两行）：本仓无回归——`probe-engine.ts` 自带两级超时且与每次 `next()` 赛跑，不依赖宿主空闲看门狗与适配器配合中止。
 - **非 loopback 连接的 settings 卡不再固定 `unavailable`**（alpha.3 把 `status` 收窄为 `idle | loading | ready`）：本仓 `card.tsx` 的 `status === 'unavailable'` 分支来自 `ConfigForm.derive()`（查无 NS），与连接性质无关，插件未被宿主登记时仍会命中，保留。
 - **宿主自 `0.2.1-alpha.2` 起原生隐藏「未配密钥的官方 API 组」**（`llm-deepseek-api-key` 的 `discoverModels` 在 `MISSING_CREDENTIAL` 时返回 `[]`，与 rc.2 本仓功能同效）：本仓功能保留作老宿主兜底。`deepseek-account` 自 `0.1.7-rc.2` 起自带登录门，宿主自己的凭据判定显式跳过它（`hasProviderApiKey` 的 `continue`）⇒ **不得加进 `HIDDEN_OFFICIAL_PROVIDERS`**（account 段无 `apiKeyEnv` 键，判定会回退 `DEEPSEEK_API_KEY` 误隐藏可用账号组）。
+- **`Pill` 的形态由 `onClick` 是否存在决定**（无 `onClick` 渲染静态 `span`，有则渲染 `button` 并加 `.interactive`；`Pill.module.css` 无 `:disabled` 规则）⇒ 卡片「恒定展示行」的不可操作态用「不传 `onClick`」表达，`disabled` 只落在 button 路径上、对静态 span 无效；置灰线索改由本地 `.dsh-mf-pillLocked{opacity:.5}` 提供，值取宿主 Switch 的 `.switch:disabled` 同值。升级宿主时复核该形态。
 
 ## 升级宿主时的检查清单
 
