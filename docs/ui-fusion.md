@@ -11,3 +11,4 @@
 - 宿主 Modal 的初始焦点控件标 `data-modal-autofocus`，不用 React `autoFocus`（模态层先存触发控件再移焦点，`autoFocus` 抢在前面会毁掉关闭后的回焦）。
 - 卡片外壳不写 `max-width`（宽度由所在 section 约束，官方同样不写）。
 - UI 称谓跟随官方：provider-id 叫「提供方 / Provider ID」，功能名「排除提供方」（en: Excluded providers）。「取消」全卡片只留一个 `cancel` 键；`close` 只作宿主 Modal × 的 `closeLabel`；确认键保持动作化。状态文案句号收尾的口径见 [decisions.md](decisions.md)「宿主与卡片」。
+- 「返回对话」悬浮按钮（`src/client/back-to-chat.tsx`）：唯一不走宿主 slot 的 UI。它要贴在**宿主 React 树之外的容器**（AppFrame 中心列）的角落，无席位可挂，故直插 DOM + 独立 React 根（宿主图标是 React 组件，渲染需根）；元素 id/class 一律以 `tikaflow-model-fix` 起头。定位上下文是宿主中心列，逐字照宿主 `ui-chat` 的 `.toBottom`；层级 `z-index: 999`（低于宿主 Modal 的 1000）。

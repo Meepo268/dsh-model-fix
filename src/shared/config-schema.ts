@@ -40,7 +40,7 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
 }
 
 /**
- * behavior 组默认值（整组缺失或字段缺失落此）：四项全开。
+ * behavior 组默认值（整组缺失或字段缺失落此）
  * 全开是唯一与「装本插件但看不见任何 UI」相容的缺省；缺段的老快照落此即保持既有观感（见 docs/versioning.md）。
  */
 const BEHAVIOR_DEFAULTS: BehaviorRules = {
@@ -48,6 +48,7 @@ const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showInBuiltinPlugins: true,
     showInComposer: true,
     showFollowStatus: true,
+    backToChat: true,
 }
 
 /** 默认配置：全新用户的配置基线（存储形态经 `toStored` 物化；取值改动须同步 src/upgrade.ts 的台阶字面量） */
@@ -86,6 +87,7 @@ export const BEHAVIOR_KEYS = [
     'showInBuiltinPlugins',
     'showInComposer',
     'showFollowStatus',
+    'backToChat',
 ] as const
 
 /** 解析版本快照键 version-N；非法返回 undefined。严格匹配规范键（禁宽泛归一） */

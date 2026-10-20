@@ -10,7 +10,7 @@ export function run(): void {
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
     const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false }
-    const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true }
+    const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true }
 
     // ---------- v7 → v8：原样沿用各组字段，补 compat.disableStore 与 userExperience 的 followParent / selfTune / hideOfficial / localizeEfforts / showOriginalEfforts 默认，并补 v8 形态内新增的 behavior 段 ----------
     const v7Stored = {

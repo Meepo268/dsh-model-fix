@@ -164,6 +164,14 @@
 - **`sessionController.selectModel`**（`@deepseek-ai/dsh-api-session-controller` 的 `src/types/commands.ts`）：会话级模型选择生效——与 UI 选择器同一链路（落 `model/selection` 成投影 `pending`），返回值带 `{ selected }`；失败**抛 `RemoteError`**（子智能体持有会话 `session/agent-busy`、模型不支持所选档位 `session/model-unavailable`），本仓文案原样透传。
 - **`llm.resolveModelInfo(provider, model, signal?)`**：解析任一活路由的模型信息（档位来自适配器元数据，不限于本插件填充的模型）；本仓查询工具用它取可用档位（出参不含 `defaultEffort`），失败 catch 兜成 `resolve-failed` 不外抛。
 
+### layout：中心面板选择（返回对话按钮）
+
+- 契约（`DSH/packages/client/ui-layout/src/client/service.ts`，宿主 `@deepseek-ai/dsh-client-ui-layout` 提供）：`selectPanel(panelId: string | null): void`。`null` 即选中会话界面、不改当前会话；非 `null` 选已注册的全局面板，未注册的 key 抛错并保留当前选择。本插件只用 `selectPanel(null)`。
+- 类型面按契约复制、不引宿主包：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决），故 `src/client/back-to-chat.tsx` 本地声明 `HostLayout` 并 `declare module` 合并 `ctx.layout`。
+- 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位才跑回调，缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
+- DOM 锚点：`[data-slot="main"]` 锚点的父元素即 AppFrame 中心列（`ui-layout/src/client/AppFrame.tsx` 的 `.centerCol`）。宿主 CSS Module 类名随构建 hash 变化，不可按类名找。
+- 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮要贴中心列左下角 ⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮取 999 低于它（模态框打开时被盖住）。
+
 ### credentials：凭据状态面（隐藏官方API的判定依据）
 
 - `ctx.credentials` 在 `src/index.ts` 的 `inject` 里作顶级依赖（与 `settings` / `llm` 并列），不用 `ctx.get`：宿主基础配置无条件挂载它（`DSH/packages/bundle/base/cordis.patch.yml` 无 `disabled` 条件）⇒ 缺失即异常部署，PENDING 暴露好过静默降级。
@@ -172,7 +180,6 @@
 - 官方适配器默认引用名：`llm-deepseek-api-key` 的 `Config.apiKeyEnv` 默认 `"DEEPSEEK_API_KEY"`（volatile，`config.apiKeyEnv ?? 默认`）⇒ 段缺该字段时本仓判定回退同名常量 `DEFAULT_OFFICIAL_API_KEY_ENV`。
 
 ### llm：`resolveModelInfo` 是档位显示名的唯一出口
-
 - `reasoning.efforts[].name` 只在它返回里出现（`buildModelCatalog` 先 `listModels` 拿模型、再 `resolveModelInfo` 拿档位元数据，原样搬进目录载荷；UI 菜单 / 触发器标题 / subagent 工具全取它）⇒ 遮这一处全链覆盖（与 `official-filter` 遮 `listModels` 同一 `LlmRuntime` 实例、同一形态）。
 - 消费者影响面已逐一核实：session-reference / compaction-basic / ACP / MCP-client 只取 `context` 与 `inputModalities`，零影响；**例外：`tool-subagent` 的 list-models 把 `effort.name` 拼进给 AI 的文本——开关开时 AI 看到的档位名也是中文（已知取舍）**。
 - `defaultEffort` 不可翻译：它是档位 id，`LlmRuntime` 校验它落在 `efforts[].id` 内（不合法抛 `INVALID_MODEL_REASONING`）。
@@ -219,7 +226,8 @@
 | `@deepseek-ai/dsh-client-ui-conversation/client` | 合并（slot key `conversation.input.left`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-llm` | `LlmCallConfig` / `LlmCallConfigAdapterDefaults` / `ReasoningEffortId`（**必须包根**：`/types` 子路径不含 `LlmCallConfig`） | type-only | `src/subagent.ts` |
 
-- 浏览器半运行期宿主依赖只有 `react`、`react/jsx-runtime` 与 `@deepseek-ai/dsh-client-ui-primitives`（其余擦除后不留痕）；ui-primitives 属平台模块（宿主冻结模块表提供），卡片用宿主运行期对象而非打包副本（符号漂移由 typecheck 拦，风险是宿主改名后运行期 `undefined`，React #130 打空该 slot 条目）。
+- 浏览器半运行期宿主依赖只有 `react`、`react/jsx-runtime`、`react-dom/client` 与 `@deepseek-ai/dsh-client-ui-primitives`（其余擦除后不留痕）；ui-primitives 属平台模块（宿主冻结模块表提供），卡片用宿主运行期对象而非打包副本（符号漂移由 typecheck 拦，风险是宿主改名后运行期 `undefined`，React #130 打空该 slot 条目）。
+- `react-dom/client` 同属宿主平台模块表（`PLATFORM_MODULES`）：本仓列 peer + devDep 只为类型与打包外置，运行期 `createRoot` 由宿主兑现。宿主若改名该导出，typecheck 不报错（类型来自本仓 devDep 而非宿主）——升宿主时须复核。
 - `ctx.llm` 只做 type-only 引用：验证请求必须经宿主 `LlmRuntime.stream` 发出，`dependencies` 不长新条目；档位 id 用 `as ReasoningEffortId` 断言不引运行期构造器。
 - 浏览器侧 `connection` 的 rpc 面经 `unknown` 桥接：宿主 `connection` 服务声明合并只有服务端面，client 面（`ClientConnectionRpc`）不合并进 `Context`。
 - **`ConfigForm.mutate` 入参形态**：宿主签名写的 `SettingsPathOpView` 来自未装的 `@deepseek-ai/dsh-api-remotes/client`（`skipLibCheck` 下退化成 `any`），故不能用 `Parameters<>` 取形态；`src/client/scope.ts` 直接标成 `dsh-settings` 的 `/types` 子路径同名导出（两包各持一份同形声明）。唯一残留收敛是 `unknown → JsonValue` 断言（写回值恒为配置段 JSON 值；浏览器半门禁不允许引同包 `isJsonValue`）。

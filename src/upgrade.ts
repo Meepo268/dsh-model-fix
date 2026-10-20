@@ -62,8 +62,6 @@ const V8_LOCALIZE_EFFORTS_DEFAULT = true
 const V8_SHOW_ORIGINAL_EFFORTS_DEFAULT = true
 const V8_DISABLE_STORE_DEFAULT = true
 const V8_LOOSE_MATCH_DEFAULT = false
-
-/** v8 新增顶级组 `behavior` 的台阶默认值（四项全开；口径与当前版本缺段解析一致） */
 const V8_BEHAVIOR_DEFAULT = true
 
 // ---------- 最低一级台阶（持守卫） ----------
@@ -110,6 +108,7 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
             showInBuiltinPlugins: V8_BEHAVIOR_DEFAULT,
             showInComposer: V8_BEHAVIOR_DEFAULT,
             showFollowStatus: V8_BEHAVIOR_DEFAULT,
+            backToChat: V8_BEHAVIOR_DEFAULT,
         },
         userExperience: {
             ...parsed.userExperience,

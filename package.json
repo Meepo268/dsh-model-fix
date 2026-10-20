@@ -58,11 +58,13 @@
     "@pyyupsk/nit": "^0.3.0",
     "@types/node": "^26.2.0",
     "@types/react": "~18.3.0",
+    "@types/react-dom": "^18.3.7",
     "@typescript/native": "npm:typescript@7.0.2",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "jiti": "^2.7.0",
+    "react-dom": "^18.3.1",
     "tsdown": "^0.22.2",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.71.0"
@@ -89,7 +91,8 @@
     "@deepseek-ai/dsh-settings": ">=0.1.7-rc.2",
     "@deepseek-ai/dsh-util-values": ">=0.1.7-rc.2",
     "@deepseek-ai/schemastery": ">=3.18.4",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
@@ -156,6 +159,9 @@
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     }
   },

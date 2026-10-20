@@ -177,11 +177,15 @@ export type CardKey =
     | 'rowShowInComposer'
     | 'rowShowFollowStatus'
     | 'rowShowInPluginManager'
+    | 'rowBackToChat'
     | 'tipShowInModels'
     | 'tipShowInBuiltinPlugins'
     | 'tipShowInComposer'
     | 'tipShowFollowStatus'
     | 'tipShowInPluginManager'
+    | 'tipBackToChat'
+    // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM，不经插槽 t 注入）
+    | 'backToChat'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
@@ -204,6 +208,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     showInBuiltinPlugins: 'rowShowInBuiltinPlugins',
     showInComposer: 'rowShowInComposer',
     showFollowStatus: 'rowShowFollowStatus',
+    backToChat: 'rowBackToChat',
     selfTune: 'rowSelfTuneEffort',
     hideOfficial: 'rowHideOfficial',
     localizeEfforts: 'rowLocalizeEfforts',
@@ -244,6 +249,7 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     showInBuiltinPlugins: 'tipShowInBuiltinPlugins',
     showInComposer: 'tipShowInComposer',
     showFollowStatus: 'tipShowFollowStatus',
+    backToChat: 'tipBackToChat',
     selfTune: 'tipSelfTuneEffort',
     hideOfficial: 'tipHideOfficial',
     localizeEfforts: 'tipLocalizeEfforts',

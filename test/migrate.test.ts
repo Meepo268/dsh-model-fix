@@ -11,7 +11,7 @@ export function run(): void {
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
     const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false }
-    const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true }
+    const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true }
 
     // toStored：运行时配置 -> 当前版本快照（自愈重写与全新用户直写的唯一构造口）
     check('toStored 补 configVersion 且含各组布尔与排除列表与 efforts 与 behavior 与 userExperience', stable(toStored({
@@ -20,7 +20,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-        behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true },
+        behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
     })) === stable({
         configVersion: 8,
@@ -29,16 +29,16 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-        behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true },
+        behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
-    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }))
+    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }))
     check('DEFAULT_STORED 即 toStored(默认配置)', stable(DEFAULT_STORED) === stable(toStored({
         autoFill: { reasoning: true, context: true, image: true },
         allowUpdate: { reasoning: false, context: false, image: false },
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
+        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     })), DEFAULT_STORED)
     check('DEFAULT_STORED 的 configVersion 为当前版本', DEFAULT_STORED.configVersion === CONFIG_VERSION, DEFAULT_STORED)
@@ -47,7 +47,7 @@ export function run(): void {
     // 行为必须一致；有可用旧快照（>= MIN_SUPPORTED_VERSION）时沿用其语义，绝不把段内仍可用的快照静默抹成默认
     const brokenV8WithV7 = {
         'version-8': { autoFill: 'garbage' },
-        'version-7': { autoFill: { reasoning: false, context: false, image: true }, allowUpdate: { reasoning: true, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true } },
+        'version-7': { autoFill: { reasoning: false, context: false, image: true }, allowUpdate: { reasoning: true, context: true, image: false }, compat: { disableDeveloper: false }, excludes: ['x'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true } },
     }
     const healed = { 'version-8': toStored(resolveConfig(brokenV8WithV7)) }
     check('自愈后生效配置不变', stable(resolveConfig(healed)) === stable(resolveConfig(brokenV8WithV7)), { healed, before: resolveConfig(brokenV8WithV7) })
@@ -57,7 +57,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true },
+        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), resolveConfig(healed))
     // 无任何可用快照时自愈为默认（回退语义：不静默保留坏值；更高版本垃圾快照同样不计）

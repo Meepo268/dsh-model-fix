@@ -30,6 +30,7 @@ import { decodeSection } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { makeScope, type DecodedScope } from '@/client/scope'
 import { applySlotVisibility } from '@/client/visibility'
+import { applyBackToChat } from '@/client/back-to-chat'
 import { decodeHostModelSelection, HOST_MODEL_SELECTION_NS, type HostModelSelectionView } from '@/client/composer'
 
 /** 提供方 scope 的解码占位值：本卡只消费 snapshot.user（原始用户层），value 无用途；decode 必须永不返回 undefined */
@@ -102,4 +103,6 @@ function boot(
     applyLocaleReporter(ctx)
     // 宿主 Default 词条 patch：Scope 订阅挂进本 fiber，随卸载自动恢复原状，见 locale-patch.ts
     applyLocalePatch(ctx, scope)
+    // 「返回对话」悬浮按钮：内容区左下角，点击回到当前会话（宿主 ctx.layout 提供该能力）
+    applyBackToChat(ctx, scope)
 }

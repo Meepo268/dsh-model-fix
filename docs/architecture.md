@@ -61,6 +61,7 @@
 | `src/client/locale-keys.ts` | 卡片文案键契约（键并入宿主 `LocaleNamespaceMap`） |
 | `src/client/locale-zh.ts` `locale-en.ts` | 卡片词典（中 / 英） |
 | `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
+| `src/client/back-to-chat.tsx` | 「返回对话」悬浮按钮：中心列左下角直插 DOM + 独立 React 根（宿主 `ctx.layout.selectPanel(null)`） |
 | `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用） |
 | `icon.svg` `cordis.patch.yml` `locale/*.json` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |
 

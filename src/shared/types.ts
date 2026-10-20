@@ -65,6 +65,8 @@ export interface BehaviorRules {
     showInComposer: boolean
     /** 在对话框工具栏显示「跟随」状态灯；关闭即卸载该条目 */
     showFollowStatus: boolean
+    /** 在内容区左下角显示「返回对话」悬浮按钮；关闭即销毁该按钮 */
+    backToChat: boolean
 }
 
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */

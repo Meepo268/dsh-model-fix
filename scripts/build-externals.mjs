@@ -9,9 +9,10 @@ export const NODE_EXTERNALS = [
     '@deepseek-ai/dsh-credentials',
 ]
 
-/** 浏览器半实际值导入的宿主包（client 包基座提供）。未用：react-dom ×2、cordis、zod、@tanstack/react-virtual、client-store/ui-slots/ui-dockkit。 @type {readonly string[]} */
+/** 浏览器半实际值导入的宿主包（client 包基座提供）。未用：react-dom（本体）、cordis、zod、@tanstack/react-virtual、client-store/ui-slots/ui-dockkit。 @type {readonly string[]} */
 export const CLIENT_EXTERNALS = [
     'react',
     'react/jsx-runtime',
+    'react-dom/client',
     '@deepseek-ai/dsh-client-ui-primitives',
 ]
