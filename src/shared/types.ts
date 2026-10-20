@@ -72,6 +72,10 @@ export interface BehaviorRules {
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */
 export type EffortMemory = Record<string, Record<string, string>>
 
+/** 上次由插件写入的参数指纹：provider id → model id → 四字段（档位/上下文/输出/模态）指纹。
+ * 用来把「插件自己写的值」与「用户手改的值」分开：指纹对不上即视为手改，`allowUpdate` 不再覆盖（见 docs/decisions.md「参数来源」） */
+export type WrittenMap = Record<string, Record<string, string>>
+
 /** 当前运行时配置（仅对象写法） */
 export interface PluginConfig {
     /** 开启后以 models.dev 最新数据为准更新已有配置 */
@@ -84,6 +88,8 @@ export interface PluginConfig {
     excludes: string[]
     /** 每模型推理级别记忆：provider → model → 级别。运行时记忆而非用户配置，结构非法时解析侧宽松回落 {}（不让记忆坏值连累配置自愈重写丢配置） */
     efforts: EffortMemory
+    /** 上次插件写入的参数指纹：provider → model → 指纹串。与 `efforts` 同性质（运行时状态、宽松解析），用来区分「插件写的」与「手改的」，见 `src/stamp.ts` */
+    written: WrittenMap
     /** UI 可见性规则（只管各 UI 部件挂不挂载，不改插件行为） */
     behavior: BehaviorRules
     /** 用户体验规则（前端行为开关，不支持按提供方排除） */
@@ -98,6 +104,7 @@ export interface PluginConfigSnapshot {
     compat: CompatRules
     excludes: string[]
     efforts: EffortMemory
+    written: WrittenMap
     behavior: BehaviorRules
     userExperience: UserExperienceRules
 }

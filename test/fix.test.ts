@@ -12,6 +12,7 @@ import { setCatalog } from '@/catalog'
 import { API_NS, PLUGIN_NS } from '@/shared/constants'
 import { CONFIG_VERSION, DEFAULT_CONFIG, versionKey } from '@/shared/config-schema'
 import { check, stable } from '@test/helper'
+import { fieldStampsOf, serializeStamps } from '@/stamp'
 import { makeStubCtx, resetModules, type StubCtx } from '@test/ctx'
 
 /** 插件命名空间里当前版本快照的键（fix 的落盘口随版本变，故不写字面量） */
@@ -41,6 +42,7 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         compat: { ...DEFAULT_CONFIG.compat, ...overrides.compat },
         excludes: overrides.excludes ?? [],
         efforts: overrides.efforts ?? {},
+        written: overrides.written ?? {},
         behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
@@ -108,7 +110,7 @@ export async function run(): Promise<void> {
         check('autoFill.reasoning 关：变更计数为 1', changes === 1)
     }
 
-    // ---------- 3. allowUpdate 开启：覆盖已有错误值 ----------
+    // ---------- 3. allowUpdate 开启：覆盖插件自己写过的值 ----------
     {
         resetModules()
         const ctx = makeStubCtx({
@@ -117,12 +119,33 @@ export async function run(): Promise<void> {
         setConfig(cfg({
             autoFill: { reasoning: true, context: false, image: false },
             allowUpdate: { reasoning: true, context: false, image: false },
+            // 指纹与现有行一致 = 这行是插件上次写的，故允许更新（手改行见下一条用例）
+            written: { testprovider: { 'model-a': serializeStamps(fieldStampsOf({ reasoningEfforts: { low: 'low' } })) } },
         }))
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]
-        check('allowUpdate：覆盖已有推理级别', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }))
+        check('allowUpdate：覆盖插件写入的推理级别', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }))
         check('allowUpdate：变更计数为 1', changes === 1)
+    }
+
+    // ---------- 3b. allowUpdate 开启但该字段被手改（指纹不符）：不覆盖 ----------
+    {
+        resetModules()
+        const ctx = makeStubCtx({
+            api: { providers: { testprovider: { models: [{ id: 'model-a', reasoningEfforts: { low: 'low' } }] } } },
+        })
+        setConfig(cfg({
+            autoFill: { reasoning: true, context: false, image: false },
+            allowUpdate: { reasoning: true, context: false, image: false },
+            // 记的是旧值（medium），行上已是 low -> 判定被手改，冻结
+            written: { testprovider: { 'model-a': serializeStamps(fieldStampsOf({ reasoningEfforts: { medium: 'medium' } })) } },
+        }))
+        setCatalog(CAT)
+        const changes = await fix(ctx as unknown as Context)
+        const model = modelsOf(ctx, 'testprovider')[0]
+        check('allowUpdate：手改过的推理级别不被覆盖', stable(model?.reasoningEfforts) === stable({ low: 'low' }), model?.reasoningEfforts)
+        check('allowUpdate：手改行无变更', changes === 0, changes)
     }
 
     // ---------- 4. force 单次绕过：allowUpdate 关但 force 开 ----------
@@ -195,8 +218,9 @@ export async function run(): Promise<void> {
         const efforts = (ctx.userOf(PLUGIN_NS)[KEY] as Record<string, unknown> | undefined)?.efforts
         check('记忆不由 fix 重建：已删模型与外部提供方的记忆逐字保留', stable(efforts) === stable(memories), efforts)
         check(
-            '记忆不由 fix 重建：写回只发生一次且落在 llm-pi-ai 段',
-            changes === 1 && ctx.mutateCalls.length === 1 && ctx.mutateCalls[0]?.ns === API_NS,
+            '记忆不由 fix 重建：先写 llm-pi-ai 再落指纹，efforts 键不被重写',
+            changes === 1 && ctx.mutateCalls.length === 2
+                && ctx.mutateCalls[0]?.ns === API_NS && ctx.mutateCalls[1]?.ns === PLUGIN_NS,
             ctx.mutateCalls,
         )
         // 计划口径：efforts 记忆已整体移出 Node 半，填充计划里不应再有该字段
@@ -388,7 +412,7 @@ export async function run(): Promise<void> {
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context)
         check('冲突重试：重试后成功返回变更数', changes === 1)
-        check('冲突重试：共两次 mutate 调用（首次被拒）', ctx.mutateCalls.length === 2)
+        check('冲突重试：API 写回两次（首次被拒）+ 指纹一次', ctx.mutateCalls.length === 3)
         check('冲突重试：最终文档已填充', modelsOf(ctx, 'testprovider')[0]?.contextWindow === 128000)
     }
 

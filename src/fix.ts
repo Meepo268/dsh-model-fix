@@ -5,15 +5,25 @@ import { getCatalog } from '@/catalog'
 import { planProviderCompat } from '@/compat'
 import { lookup, toReasoningEfforts, toReasoningEffortsFromList } from '@/lookup'
 import { COMPAT_APIS, MAX_ATTEMPTS } from '@/constants'
-import { API_NS, PLUGIN_NAME } from '@/shared/constants'
+import { API_NS, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
+import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
 import { getConfig } from '@/config'
 import { stripEmptyFields } from '@/empty'
 import { queueTask } from '@/host'
 import { isCapacity, type IndexedCatalog } from '@/types'
-import { isPlainObject, providersOf, type CompatRules, type PluginConfig } from '@/shared/types'
+import { fieldStampsOf, isPluginWritten, withStamps, type FieldStamps } from '@/stamp'
+import { isPlainObject, providersOf, type CompatRules, type PluginConfig, type WrittenMap } from '@/shared/types'
 import { descriptorOf } from '@/section'
 import { fetchDeclarations, type DeclarationMap } from '@/upstream'
 import { errorText, isSettingsConflict } from '@/shared/errors'
+
+/** 指纹字段 -> 配置里的字段开关（上下文窗口与输出上限同受 context 开关管） */
+const RULE_OF = {
+    r: 'reasoning',
+    c: 'context',
+    m: 'context',
+    i: 'image',
+} as const
 
 /** 缓存图片信息转换为写回的 input 模态数组：仅支持图片时填 ['text','image']，无数据或纯文本不填（未声明即按纯文本处理） */
 function toInputValue(image: boolean | undefined): string[] | undefined {
@@ -26,6 +36,10 @@ interface FillPlan {
     readonly changes: number
     readonly compatChanges: number
     readonly excluded: number
+    /** 本轮写入后的参数指纹表（写进插件自有段的 `written` 键，用来区分插件写的与手改的） */
+    readonly written: WrittenMap
+    /** 本轮需要落盘的指纹条数（0 = 不必写插件段） */
+    readonly stamps: number
 }
 
 /** 纯计划函数（零 ctx、可单测）：遍历提供方算出模型参数 op 与路由 compat op；`excludes` 命中者在入口整条跳过；`efforts` 记忆不在本文件处理。
@@ -47,6 +61,8 @@ export function planFill(
     let changes = 0
     let compatChanges = 0
     let excluded = 0
+    let written = cfg.written
+    let stamps = 0
     for (const [providerId, provider] of Object.entries(providers)) {
         if (excludes.has(providerId)) {
             excluded++
@@ -76,10 +92,17 @@ export function planFill(
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input
                 const imageValue = toInputValue(declared?.image ?? entry?.image)
+                // 指纹口径：逐字段判断「这行还是插件上次写的那一版」，手改过的字段不再被自动来源覆盖（见 src/stamp.ts）
+                const stampsNow = fieldStampsOf(cleaned)
+                const pluginWrote = (field: keyof FieldStamps): boolean =>
+                    isPluginWritten(cfg.written, providerId, modelId, field, stampsNow)
+                /** 已有值可被自动来源覆盖的条件：强制更新单次全放开；否则该字段的「允许更新」开着、且该字段仍是插件写的 */
+                const editable = (field: keyof FieldStamps): boolean =>
+                    force || (allowRules[RULE_OF[field]] && pluginWrote(field))
                 // 推理级别
                 const reasoningFillable = autoRules.reasoning
                     && reasoningEfforts === undefined && !!efforts
-                const reasoningUpdatable = (force || allowRules.reasoning)
+                const reasoningUpdatable = editable('r')
                     && isPlainObject(efforts)
                     && !deepEqualJson(reasoningEfforts, efforts)
                 // 容量新值须为正整数且非哨兵（写 0 会被宿主 schema 拒绝并连累整批写入）
@@ -87,17 +110,17 @@ export function planFill(
                 const maxT = declared?.maxTokens ?? entry?.maxTokens
                 const contextFillable = autoRules.context
                     && contextWindow === undefined && isCapacity(ctxW)
-                const contextUpdatable = (force || allowRules.context)
+                const contextUpdatable = editable('c')
                     && ctxW !== contextWindow
                     && isCapacity(ctxW)
                 const maxTokensFillable = autoRules.context
                     && maxTokens === undefined && isCapacity(maxT)
-                const maxTokensUpdatable = (force || allowRules.context)
+                const maxTokensUpdatable = editable('m')
                     && maxT !== maxTokens
                     && isCapacity(maxT)
                 const imageFillable = autoRules.image
                     && input === undefined && !!imageValue
-                const imageUpdatable = (force || allowRules.image)
+                const imageUpdatable = editable('i')
                     && !!imageValue
                     && !deepEqualJson(input, imageValue)
                 if (cleaned === model && !reasoningFillable && !reasoningUpdatable
@@ -111,6 +134,12 @@ export function planFill(
                 if (maxTokensFillable || maxTokensUpdatable) patched.maxTokens = maxT
                 if (imageFillable || imageUpdatable) patched.input = imageValue
                 next[i] = patched
+                // 记下「这行现在是插件写的样子」：不给这条指纹，下一轮就认不出这行是自动写入还是手改
+                const stamped = withStamps(written, providerId, modelId, fieldStampsOf(patched))
+                if (stamped !== written) {
+                    written = stamped
+                    stamps++
+                }
             }
             if (next) {
                 ops.push({ op: 'set', path: ['providers', providerId, 'models'], value: next })
@@ -129,7 +158,22 @@ export function planFill(
             }
         }
     }
-    return { ops, changes, compatChanges, excluded }
+    return { ops, changes, compatChanges, excluded, written, stamps }
+}
+
+/** 把本轮写入的参数指纹落到插件自有段的 `written` 键（与 `efforts` 记忆同级）；失败只告警，不影响本次填充 */
+async function persistStamps(ctx: Context, written: WrittenMap): Promise<void> {
+    const descriptor = descriptorOf(ctx, PLUGIN_NS)
+    if (!descriptor) return
+    try {
+        await queueTask(() => ctx.settings.mutate(
+            PLUGIN_NS,
+            [{ op: 'set', path: [versionKey(CONFIG_VERSION), 'written'], value: written }],
+            descriptor.revision,
+        ))
+    } catch (error) {
+        ctx.logger.warn(`${PLUGIN_NAME}: 参数指纹落盘失败（下一轮将按手改保守处理）：${errorText(error)}`)
+    }
 }
 
 /** 填充与写回：读最新段 → `planFill` 出计划 → 写 `llm-pi-ai` → 返回变更模型数（不含 compat 计数，保持 RPC 契约）
@@ -151,6 +195,8 @@ export async function fix(ctx: Context, force = false): Promise<number> {
         try {
             await queueTask(() => ctx.settings.mutate(API_NS, plan.ops, descriptor.revision))
             ctx.logger.info(`${PLUGIN_NAME}: 已变更 ${plan.changes} 个模型（补充/同步推理级别、容量字段、图片模态、清理空字段）、${plan.compatChanges} 个提供方的兼容性优化，跳过 ${plan.excluded} 个已排除提供方`)
+            // 指纹落盘失败不算填充失败：下一轮只会把这些行当手改（更保守），不会乱写
+            if (plan.stamps > 0) await persistStamps(ctx, plan.written)
             return plan.changes
         } catch (error) {
             if (isSettingsConflict(error) && attempt < MAX_ATTEMPTS) continue

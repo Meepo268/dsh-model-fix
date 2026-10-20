@@ -58,6 +58,7 @@ export const DEFAULT_CONFIG: PluginConfig = {
     compat: { ...COMPAT_DEFAULTS },
     excludes: [],
     efforts: {},
+    written: {},
     behavior: { ...BEHAVIOR_DEFAULTS },
     userExperience: { ...USER_EXPERIENCE_DEFAULTS },
 }
@@ -212,7 +213,9 @@ export function parseSnapshot(value: unknown): PluginConfig | undefined {
     const userExperience = parseUserExperience(value.userExperience)
     if (!userExperience) return
     const efforts = parseEfforts(value.efforts)
-    return { allowUpdate, autoFill, compat, excludes, efforts, behavior, userExperience }
+    // written 与 efforts 同形同宽松口径：运行时状态，坏值回落 {} 而不判整段快照非法
+    const written = parseEfforts(value.written)
+    return { allowUpdate, autoFill, compat, excludes, efforts, written, behavior, userExperience }
 }
 
 /** 运行时配置 -> 规范 v8 存储快照。字段一律拷贝，防 DEFAULT_CONFIG 被就地改写 */
@@ -224,6 +227,7 @@ export function toStored(config: PluginConfig): PluginConfigSnapshot {
         compat: { ...config.compat },
         excludes: [...config.excludes],
         efforts: { ...config.efforts },
+        written: { ...config.written },
         behavior: { ...config.behavior },
         userExperience: { ...config.userExperience },
     }
