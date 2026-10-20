@@ -47,6 +47,10 @@ export const ENDPOINT_RESET_MODELS = 'resetModels'
 export const ENDPOINT_RESTORE_MODELS = 'restoreModels'
 /** 浏览器半启动时上报探测语言的 endpoint 名（Node 侧没有 locale 服务，见 effort-name.ts 的语言解析） */
 export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
+/** 「参数来源」弹层取数：每个模型当前的 pin、实际取胜来源与目录候选 */
+export const ENDPOINT_SOURCES = 'sources'
+/** 写一个模型的参数来源 pin（空串 = 回到自动） */
+export const ENDPOINT_SET_SOURCE = 'setSource'
 
 /** settings 写回冲突与语言上报共用的重试次数（纯数值，跨半共享）。值变更须同步两端——差异直接造成写入行为不一致 */
 export const MAX_ATTEMPTS = 3

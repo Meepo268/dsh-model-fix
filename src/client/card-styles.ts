@@ -169,6 +169,30 @@ const STYLE_TEXT = [
     '.dsh-mf-composerChip[data-state="fail"]{background:var(--dsw-alias-state-warn-tertiary,#fff1d6);color:var(--dsw-alias-state-warn-label,#dd8629)}',
     // 状态点（只在 on/fail 态画）：6px 圆点，background:currentColor，随 chip 色变化
     '.dsh-mf-composerChip[data-state="on"]::before,.dsh-mf-composerChip[data-state="fail"]::before{content:"";display:block;flex:none;width:6px;height:6px;border-radius:50%;background:currentColor}',
+    // 「参数来源」弹层：提供方分组 + 每行名称/ID/下拉/三行提示；行间用 0.5px 分隔线，与卡片瓦片同一描边令牌
+    '.dsh-mf-sourceGroup{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}',
+    '.dsh-mf-sourceGroupName{margin:0;font-size:13px;font-weight:600;color:var(--dsw-alias-label-secondary,#505865)}',
+    '.dsh-mf-sourceRow{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:10px}',
+    '.dsh-mf-sourceHead{display:flex;align-items:baseline;gap:8px;min-width:0}',
+    '.dsh-mf-sourceName{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary,#0f1115);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.dsh-mf-sourceId{font-size:11px;color:var(--dsw-alias-label-caption,#adb2b8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.dsh-mf-sourceSelect{box-sizing:border-box;width:100%;height:30px;padding:0 8px;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:8px;background:var(--dsw-alias-bg-layer-3,#fff);color:var(--dsw-alias-label-primary,#0f1115);font:inherit;font-size:12px}',
+    '.dsh-mf-sourceHint{margin:0;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-caption,#adb2b8)}',
+    '.dsh-mf-sourceError{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-label,#dd8629)}',
+    '.dsh-mf-sourceEmpty{margin:8px 0;font-size:12px;color:var(--dsw-alias-label-caption,#adb2b8)}',
+    // 弹层顶部工具行（搜索框 + 「只看本提供方」）：搜索框与下拉同形，但占满整行宽度
+    '.dsh-mf-sourceTools{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}',
+    '.dsh-mf-sourceSearch{box-sizing:border-box;width:100%;height:32px;padding:0 10px;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:8px;background:var(--dsw-alias-bg-layer-3,#fff);color:var(--dsw-alias-label-primary,#0f1115);font:inherit;font-size:12px}',
+    '.dsh-mf-sourceSearch:focus-visible{outline:2px solid var(--dsw-alias-border-l2,rgba(0,0,0,.32));outline-offset:-1px}',
+    '.dsh-mf-sourceOnly{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary,#505865)}',
+    // 列表体：模型多时必须能滚。最大高度取视口与固定值的较小者，滚动条用宿主的 --dsh-scrollbar-* 令牌
+    '.dsh-mf-sourceBody{display:flex;flex-direction:column;max-height:min(62vh,560px);overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--dsh-scrollbar-thumb,var(--dsw-alias-scrollbar-bg-l2)) transparent}',
+    '.dsh-mf-sourceBody::-webkit-scrollbar{width:8px}',
+    '.dsh-mf-sourceBody::-webkit-scrollbar-thumb{border-radius:4px;background:var(--dsh-scrollbar-thumb,var(--dsw-alias-scrollbar-bg-l2))}',
+    '.dsh-mf-sourceBody::-webkit-scrollbar-track{background:transparent}',
+    // 提供方卡片里的入口行
+    '.dsh-mf-sourceSeat{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+    '.dsh-mf-sourceSeatHint{font-size:11px;color:var(--dsw-alias-label-caption,#adb2b8)}',
 ].join('\n')
 
 /** 幂等注入样式：每次渲染校验 DOM 实况——宿主 HMR 会按 data-plugin 摘走旧节点，节点在则同步内容 */

@@ -9,9 +9,12 @@
 | `src/migrate.ts` | 启动迁移、旧快照清理与自愈（排除列表去重） |
 | `src/upgrade.ts` | 冻结的升级台阶链（v7 → 当前版） |
 | `src/catalog.ts` | models.dev 目录拉取、缓存读写与拍平索引 |
-| `src/lookup.ts` | 模型 id 匹配（三级归一）与档位转换 |
+| `src/lookup.ts` | 模型 id 匹配（三级归一 + 命名空间前缀剥离 + 显示名兜底）、档位转换、参数来源候选枚举（精确 + 同族变体，按指纹折叠） |
+| `src/upstream.ts` | 上游能力声明：`GET {baseURL}/models` 自报的档位/容量/模态解析与带缓存的 best-effort 抓取 |
+| `src/source.ts` | 参数来源解析（pin → 目录条目/上游声明）与「参数来源」弹层的纯快照构造 |
 | `src/compat.ts` | 路由 compat 纯写入计划 |
-| `src/fix.ts` | 填充与写回：纯计划函数 `planFill` 出 op，`fix` 只做编排 |
+| `src/fix.ts` | 填充与写回：纯计划函数 `planFill` 出 op，`fix` 只做编排（写回后同步指纹表） |
+| `src/stamp.ts` | 参数指纹：`written` 表的序列化/解析与逐字段「插件写的 vs 手改」判定（纯函数，无 ctx） |
 | `src/memory.ts` | 推理级别记忆的失效清理：存活清单 → 纯 `planPruneMemory` → 只写 `efforts` 键 |
 | `src/empty.ts` | 空壳字段判据 `stripEmptyFields`，所有写回路径共用 |
 | `src/reset.ts` | 重置推理级别（仅剔除 `reasoningEfforts`） |
@@ -28,7 +31,7 @@
 | `src/probe.ts` | 「探测档位」执行器：兜底备份 → 预声明 → 逐档探测 → 收敛写回 |
 | `src/fill.ts` | 探测档位的两次写回（预声明 / 收敛） |
 | `src/probe-backup.ts` | 探测的崩溃兜底：备份与启动回退 |
-| `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点（channel 自注册） |
+| `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点 + 两个「参数来源」端点（channel 自注册） |
 | `src/rpc-route.ts` | RPC 信封解码与路由分发 |
 | `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
 | `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单 |
@@ -39,13 +42,15 @@
 | `src/constants.ts` | Node 半常量 |
 | `src/shared/` | 跨半共享层（零 Node 依赖）：常量、`errorText`、探测/验证契约、当前版本配置 schema 与行键表 |
 | `src/client/index.tsx` | 浏览器半入口：席位注册、卡片、词典、调用面接线、scope 释放，全挂 `configForms` 子 fiber |
-| `src/client/card.tsx` | 五席共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
+| `src/client/card.tsx` | 各席共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
 | `src/client/tile.tsx` | 瓦片层：布尔矩阵组 / 动态排除集合两种形态 |
 | `src/client/card-meta.tsx` | 卡片联系行（仓库 / 版本 / 反馈） |
 | `src/client/card-styles.ts` | 卡片样式层：全部样式数值的唯一出处 |
 | `src/client/confirm.tsx` | 四层二次确认的共用外壳 |
 | `src/client/diagnose-dialog.tsx` | 验证 / 探测弹层的共用外壳（双选项卡 + 记录区） |
 | `src/client/probe-dialog.tsx` | 探测弹层组装层 |
+| `src/client/sources-dialog.tsx` | 「参数来源」弹层：逐模型来源下拉 + 两路现值对读 + 搜索/只看本提供方（列表体自带滚动） |
+| `src/client/source-seat.tsx` | 提供方卡片里的「参数来源」入口（`settings.models.provider-card` 席位，按 `settingsNs` 定向） |
 | `src/client/card-verify.ts` | 验证的整轮编排 hook |
 | `src/client/card-probe.ts` | 探测的整轮编排 hook |
 | `src/client/card-records.ts` | 两条诊断记录区的纯文案层 |
@@ -60,7 +65,7 @@
 | `src/client/locale-patch.ts` | 宿主 model NS 词典的 Default 词条本地化 |
 | `src/client/locale-keys.ts` | 卡片文案键契约（键并入宿主 `LocaleNamespaceMap`） |
 | `src/client/locale-zh.ts` `locale-en.ts` | 卡片词典（中 / 英） |
-| `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
+| `src/client/visibility.tsx` | 「UI 与行为」组：四个 slot 上五个部件的挂载 / 卸载（含提供方卡片里的参数来源入口，键集随提供方列表变化） |
 | `src/client/back-to-chat.tsx` | 「返回对话」悬浮按钮：中心列左下角直插 DOM + 独立 React 根（宿主 `ctx.layout.selectPanel(null)`） |
 | `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用） |
 | `icon.svg` `cordis.patch.yml` `locale/*.json` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |

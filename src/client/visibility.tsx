@@ -8,9 +8,11 @@ import { groupValue } from '@/client/model'
 import type { Flags } from '@/client/model'
 import type { DecodedScope } from '@/client/scope'
 import { CARD_NS } from '@/client/locale-keys'
-import { PLUGIN_NS as MODEL_FIX_NS } from '@/shared/constants'
+import { API_NS, PLUGIN_NS as MODEL_FIX_NS } from '@/shared/constants'
 import { ComposerEntry, FollowLamp, type ComposerProps } from '@/client/composer'
 import { Card, type CardProps } from '@/client/card'
+import { SourceSeat } from '@/client/source-seat'
+import { providerIdsOf } from '@/client/model'
 
 /** 三个宿主 slot（`conversation.input.left` 贡献两条，故此处去重） */
 type ManagedSlot = 'settings.models.footer' | 'settings.plugins.tab' | 'conversation.input.left'
@@ -129,4 +131,40 @@ export function applySlotVisibility(
             }
         })
     }
+
+    // 提供方卡片里的「参数来源」入口：席位按提供方 settingsNs 定向分发（`renderSlot(..., { entryKey: row.entry.settingsNs })`），
+    // 而自定义提供方全都挂在同一个设置文档 `llm-pi-ai` 下（`settingsPath: ['providers', <id>]`），故真正的键是
+    // `API_NS` 而不是提供方 id；提供方 id 由席位的 owner props（`provider.provider`）当场取。
+    // 另外把每个提供方 id 也注册一遍：个别适配器以提供方 id 作 settingsNs，多注册的键不会命中，无副作用。
+    ctx.slots.inject('settings.models.provider-card', () => {
+        const live = new Map<string, () => void>()
+        const sync = (): void => {
+            const on = groupValue(scope.getSnapshot().value, 'behavior', 'showInModels')
+            const wanted = on
+                ? [API_NS, ...providerIdsOf(composerProps.providersScope.getSnapshot().user)]
+                : []
+            for (const key of wanted) {
+                if (live.has(key)) continue
+                live.set(key, ctx.slots.register({
+                    name: 'settings.models.provider-card',
+                    key,
+                    locale: CARD_NS,
+                }, (props) => <SourceSeat {...props} fallbackProvider={key} sources={card.sources} setSource={card.setSource} />))
+            }
+            for (const [key, dispose] of [...live]) {
+                if (wanted.includes(key)) continue
+                dispose()
+                live.delete(key)
+            }
+        }
+        sync()
+        const offProviders = composerProps.providersScope.subscribe(sync)
+        const offFlags = scope.subscribe(sync)
+        return () => {
+            offProviders()
+            offFlags()
+            for (const dispose of live.values()) dispose()
+            live.clear()
+        }
+    })
 }

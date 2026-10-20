@@ -3,6 +3,7 @@
  * 路由自注册而非宿主 `connection.rpc.handle`（后者在 connection 服务 ctx 上求值 `owner.webServer`，而 connection 不再注入它必抛，详见 docs/decisions.md「写回端点」） */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import type { ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 // ctx.llm 服务面声明合并（仅 type-only，不引运行期依赖；LLM 服务是插件 inject 依赖，装载即在）
 import type {} from '@deepseek-ai/dsh-llm'
@@ -10,13 +11,23 @@ import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import {
     ENDPOINT_FORCE_UPDATE, ENDPOINT_REPORT_LOCALE,
     ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
+    ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
     PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE,
 } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
+import { getCatalog } from '@/catalog'
+import { resolveConfig } from '@/config'
 import { fix } from '@/fix'
+import { queueTask } from '@/host'
+import { descriptorOf } from '@/section'
+import { buildSourceSnapshot } from '@/source'
+import { fetchDeclarations } from '@/upstream'
+import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
+import { providersOf } from '@/shared/types'
+import { API_NS } from '@/shared/constants'
 import { reportLocale } from '@/effort-name'
 import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
 import { probeAndFill } from '@/probe'
@@ -74,6 +85,53 @@ function handleReportLocale(payload: unknown): ConnectionRpcResult<unknown> {
     return { ok: true, value: {} }
 }
 
+/** 「参数来源」载荷：模型定位 + 来源值（空串 = 回到自动） */
+interface SetSourcePayload {
+    provider: string
+    model: string
+    source: string
+}
+
+/** 校验「参数来源」载荷：provider / model 必须是非空字符串，source 允许空串（= 自动） */
+function parseSetSource(payload: unknown): SetSourcePayload | undefined {
+    if (typeof payload !== 'object' || payload === null) return
+    const { provider, model, source } = payload as Record<string, unknown>
+    if (typeof provider !== 'string' || provider === '') return
+    if (typeof model !== 'string' || model === '') return
+    if (typeof source !== 'string') return
+    return { provider, model, source }
+}
+
+/** 参数来源快照（只读）：读 `llm-pi-ai` 的提供方与模型，装配上游声明后交给纯函数出视图 */
+async function handleSources(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    try {
+        const providers = providersOf(descriptorOf(ctx, API_NS)?.user) ?? {}
+        const declarations = await fetchDeclarations(ctx, providers)
+        const config = resolveConfig(descriptorOf(ctx, PLUGIN_NS)?.user)
+        return { ok: true, value: buildSourceSnapshot(config, providers, getCatalog(), declarations) }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/sources-failed', message: errorText(error), details: {} } }
+    }
+}
+
+/** 写一个模型的参数来源 pin（空串 = 回到自动）：只动自有段的 `sources` 键，
+ * 随后的填充由 `settings/document-updated` 的既有接线自动触发，故本端点不自己再跑一轮 */
+async function handleSetSource(ctx: Context, payload: unknown): Promise<ConnectionRpcResult<unknown>> {
+    const parsed = parseSetSource(payload)
+    if (!parsed) return { ok: false, error: { code: 'model-fix/set-source-invalid', message: '参数来源载荷非法', details: {} } }
+    const descriptor = descriptorOf(ctx, PLUGIN_NS)
+    if (!descriptor) return { ok: false, error: { code: 'model-fix/config-unreadable', message: `${PLUGIN_NAME}: 自有配置段 ${PLUGIN_NS} 不可读`, details: {} } }
+    const path = [versionKey(CONFIG_VERSION), 'sources', parsed.provider, parsed.model]
+    const source = parsed.source.trim()
+    const op: SettingsPathOp = source === '' ? { op: 'unset', path } : { op: 'set', path, value: source }
+    try {
+        await queueTask(() => ctx.settings.mutate(PLUGIN_NS, [op], descriptor.revision))
+        return { ok: true, value: {} }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/set-source-failed', message: errorText(error), details: {} } }
+    }
+}
+
 /** 注册一个 channel（三个写回端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer；无 webServer 的 profile（如 headless）下子 fiber 不启动，其余功能不受影响
@@ -89,6 +147,8 @@ export function installRpc(ctx: Context): void {
                     case ENDPOINT_RESET_MODELS: return handleResetModels(ctx)
                     case ENDPOINT_RESTORE_MODELS: return handleRestoreModels(ctx)
                     case ENDPOINT_REPORT_LOCALE: return handleReportLocale(payload)
+                    case ENDPOINT_SOURCES: return handleSources(ctx)
+                    case ENDPOINT_SET_SOURCE: return handleSetSource(ctx, payload)
                     default:
                         return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }
                 }
@@ -164,3 +224,4 @@ export function progressStreamFetch(
         return new Response(stream, { headers: { 'content-type': 'text/event-stream' } })
     }
 }
+

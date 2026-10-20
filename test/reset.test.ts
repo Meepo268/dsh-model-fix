@@ -10,6 +10,7 @@ const base: PluginConfig = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: ['acme-gateway'],
     efforts: {},
+    written: {}, sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
     userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
 }
@@ -92,3 +93,4 @@ export function run(): void {
     const emptyPlan = planResetModels(base, {})
     check('空 providers 无模型 op、changed 为 0', emptyPlan.modelOps.length === 0 && emptyPlan.changed === 0)
 }
+

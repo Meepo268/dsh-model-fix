@@ -12,6 +12,7 @@ import { run as runLookup } from '@test/lookup.test'
 import { run as runMemory } from '@test/memory.test'
 import { run as runMigrate } from '@test/migrate.test'
 import { run as runOfficialFilter } from '@test/official-filter.test'
+import { run as runUpstream } from '@test/upstream.test'
 import { run as runUpgrade } from '@test/upgrade.test'
 import { run as runProbe } from '@test/probe.test'
 import { run as runProbeBackup } from '@test/probe-backup.test'
@@ -21,6 +22,8 @@ import { run as runRestore } from '@test/restore.test'
 import { run as runRpcCarrier } from '@test/rpc-carrier.test'
 import { run as runRpcRoute } from '@test/rpc-route.test'
 import { run as runRpc } from '@test/rpc.test'
+import { run as runStamp } from '@test/stamp.test'
+import { run as runSource } from '@test/source.test'
 import { run as runSelfTune } from '@test/self-tune.test'
 import { run as runSubagent } from '@test/subagent.test'
 import { run as runVerify } from '@test/verify.test'
@@ -48,6 +51,8 @@ section('memory.test.ts')
 await runMemory()
 section('migrate.test.ts')
 runMigrate()
+section('upstream.test.ts')
+await runUpstream()
 section('upgrade.test.ts')
 runUpgrade()
 section('official-filter.test.ts')
@@ -70,6 +75,10 @@ section('rpc-route.test.ts')
 await runRpcRoute()
 section('rpc.test.ts')
 await runRpc()
+section('stamp.test.ts')
+runStamp()
+section('source.test.ts')
+runSource()
 section('self-tune.test.ts')
 await runSelfTune()
 section('fix.test.ts')

@@ -8,7 +8,7 @@
  * 产物只含当前 schema 的已知键，缺省容器均为新对象/新数组。
  */
 
-import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, PluginConfig, PluginConfigSnapshot, UserExperienceRules } from '@/shared/types'
+import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, PluginConfig, PluginConfigSnapshot, SourceMap, UserExperienceRules } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 
 /** 当前配置快照版本号（段内键 `version-N` 的 N）；只有不兼容才递增（见 docs/versioning.md） */
@@ -58,6 +58,8 @@ export const DEFAULT_CONFIG: PluginConfig = {
     compat: { ...COMPAT_DEFAULTS },
     excludes: [],
     efforts: {},
+    written: {},
+    sources: {},
     behavior: { ...BEHAVIOR_DEFAULTS },
     userExperience: { ...USER_EXPERIENCE_DEFAULTS },
 }
@@ -179,6 +181,21 @@ export function parseEfforts(value: unknown): EffortMemory {
     return result
 }
 
+/** 参数来源 pin 的宽松解析：与 `efforts` 同形同口径，另把空串（= 自动）当未指定丢弃 */
+export function parseSources(value: unknown): SourceMap {
+    const parsed = parseEfforts(value)
+    const result: SourceMap = {}
+    for (const [provider, models] of Object.entries(parsed)) {
+        const entry: Record<string, string> = {}
+        for (const [model, source] of Object.entries(models)) {
+            const trimmed = source.trim()
+            if (trimmed !== '') entry[model] = trimmed
+        }
+        if (Object.keys(entry).length > 0) result[provider] = entry
+    }
+    return result
+}
+
 /** 解析 userExperience 组：整体缺失落默认；非对象、字段非布尔 => undefined */
 function parseUserExperience(value: unknown): UserExperienceRules | undefined {
     if (value === undefined) return { ...USER_EXPERIENCE_DEFAULTS }
@@ -212,7 +229,11 @@ export function parseSnapshot(value: unknown): PluginConfig | undefined {
     const userExperience = parseUserExperience(value.userExperience)
     if (!userExperience) return
     const efforts = parseEfforts(value.efforts)
-    return { allowUpdate, autoFill, compat, excludes, efforts, behavior, userExperience }
+    // written 与 efforts 同形同宽松口径：运行时状态，坏值回落 {} 而不判整段快照非法
+    const written = parseEfforts(value.written)
+    // sources 是用户意图（哪家提供方的参数），宽松解析但保留 trim 后的非空值
+    const sources = parseSources(value.sources)
+    return { allowUpdate, autoFill, compat, excludes, efforts, written, sources, behavior, userExperience }
 }
 
 /** 运行时配置 -> 规范 v8 存储快照。字段一律拷贝，防 DEFAULT_CONFIG 被就地改写 */
@@ -224,6 +245,8 @@ export function toStored(config: PluginConfig): PluginConfigSnapshot {
         compat: { ...config.compat },
         excludes: [...config.excludes],
         efforts: { ...config.efforts },
+        written: { ...config.written },
+        sources: { ...config.sources },
         behavior: { ...config.behavior },
         userExperience: { ...config.userExperience },
     }

@@ -103,6 +103,10 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
         compat: { ...parsed.compat, disableStore: V8_DISABLE_STORE_DEFAULT },
         excludes: [...parsed.excludes],
         efforts,
+        // 指纹表从空开始：迁移来的配置分不清哪行是插件写的，一律当手填（首轮填充只补缺失字段，不覆盖）
+        written: {},
+        // 来源 pin 从空开始：迁移来的配置一律按「自动」处理（上游声明 > 目录）
+        sources: {},
         behavior: {
             showInModels: V8_BEHAVIOR_DEFAULT,
             showInBuiltinPlugins: V8_BEHAVIOR_DEFAULT,

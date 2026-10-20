@@ -20,6 +20,7 @@ export function run(): void {
         compat: { disableDeveloper: false },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {}, sources: {},
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false },
     }
     check('v7 快照升到 v8 保留全部现值与 efforts 记忆', stable(upgradeConfig(v7Stored, 7)) === stable({
@@ -29,6 +30,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {}, sources: {},
         behavior: BEHAVIOR,
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), upgradeConfig(v7Stored, 7))
@@ -40,6 +42,7 @@ export function run(): void {
         compat: COMPAT,
         excludes: EXCLUDES,
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {}, sources: {},
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), upgradeConfig({ ...v7Stored, compat: 'x' }, 7))
@@ -51,11 +54,12 @@ export function run(): void {
         compat: COMPAT,
         excludes: EXCLUDES,
         efforts: EFFORTS,
+        written: {}, sources: {},
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), upgradeConfig('garbage', 7))
     // 升级产物只含当前 schema 的已知键（configVersion + 六组），剥离多余键（schema 未声明的键被忽略）
-    check('升级产物剥离多余键', Object.keys(upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7)).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,configVersion,efforts,excludes,userExperience', upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7))
+    check('升级产物剥离多余键', Object.keys(upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7)).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,configVersion,efforts,excludes,sources,userExperience,written', upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7))
 
     // efforts 宽松保留：坏结构回落 {}，不拖垮整段配置
     check('v7 efforts 坏结构回落空但保留其余字段', stable(upgradeConfig({ ...v7Stored, efforts: 'bad' }, 7)) === stable({
@@ -65,6 +69,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
+        written: {}, sources: {},
         behavior: BEHAVIOR,
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), upgradeConfig({ ...v7Stored, efforts: 'bad' }, 7))
@@ -81,3 +86,4 @@ export function run(): void {
     // 默认快照与升级链的一致性（全新用户直写默认 vs 空配置走升级链，结果必须相同）
     check('DEFAULT_STORED 与升级链空输入一致', stable(DEFAULT_STORED) === stable(upgradeConfig({}, 7)), { DEFAULT_STORED, chain: upgradeConfig({}, 7) })
 }
+

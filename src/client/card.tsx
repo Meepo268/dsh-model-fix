@@ -39,6 +39,7 @@ import type { CardBusy, Notice } from '@/client/card-notice'
 import { isWritebackTimeout, truncateMessage } from '@/client/card-notice'
 import { useVerifyRun } from '@/client/card-verify'
 import { useProbeRun } from '@/client/card-probe'
+import { SourcesDialog } from '@/client/sources-dialog'
 
 /** 瓦片 chevron：宿主 ui-primitives 导出的描边 chevron 图标 */
 const CHEVRON_DOWN = primitives.IconChevronDownOutlineRegular
@@ -131,7 +132,9 @@ export function Card(props: CardProps) {
         onNotice: setNotice,
     })
     // 五个动作键共用一个占用态：任一处在途或任一弹层开着，其余四个一并禁用
-    const configLocked = busy !== null || verify.open || probe.open
+    // 「参数来源」弹层亦占用同一互斥（它会写自有段并触发填充）
+    const [sourceOpen, setSourceOpen] = useState(false)
+    const configLocked = busy !== null || verify.open || probe.open || sourceOpen
 
     // 配置服务不可用：保留静态外壳（无展开语义）便于发现与排查
     if (snap.status === 'unavailable') {
@@ -362,7 +365,7 @@ export function Card(props: CardProps) {
             </div>
             <div className="dsh-mf-bar">
                 <span className="dsh-mf-actions">
-                    {/* 五个动作键共用一个占用态：在途或任一弹层开着，其余四个一并禁用 */}
+                    {/* 六个动作键共用一个占用态：在途或任一弹层开着，其余一并禁用 */}
                     <button
                         type="button"
                         className="dsh-mf-force"
@@ -404,6 +407,15 @@ export function Card(props: CardProps) {
                         onClick={probe.onOpen}
                     >
                         {t('probe')}
+                    </button>
+                    {/* 纯读改自有段的键：不花额度，不加 warn 语义；在探测之后——它解释「参数到底取自谁」 */}
+                    <button
+                        type="button"
+                        className="dsh-mf-force"
+                        disabled={!ready || (busy !== null)}
+                        onClick={() => { setSourceOpen(true) }}
+                    >
+                        {t('sourceAction')}
                     </button>
                 </span>
             </div>
@@ -490,6 +502,13 @@ export function Card(props: CardProps) {
                 onRun={verify.run}
                 onStop={verify.stop}
             />
+            <SourcesDialog
+                t={t}
+                open={sourceOpen}
+                onClose={() => { setSourceOpen(false) }}
+                sources={props.sources}
+                setSource={props.setSource}
+            />
             <ProbeDialog
                 t={t}
                 open={probe.open}
@@ -559,3 +578,4 @@ export function Card(props: CardProps) {
         </div>
     )
 }
+

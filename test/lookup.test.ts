@@ -1,5 +1,5 @@
-// lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、提供方提示与推理级别转换
-import { lookup, normalizeId, toReasoningEfforts } from '@/lookup'
+// lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、提供方提示与推理级别转换、参数来源候选枚举
+import { collectCandidates, entryBySourceKey, lookup, normalizeId, sourceKey, stripNamespace, toReasoningEfforts } from '@/lookup'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { check, stable } from '@test/helper'
 
@@ -120,8 +120,9 @@ export function run(): void {
     check('中缀日期变体凭 digits 区分', lookup(catalog({ openai: ['gpt-5-preview', 'gpt-5-20241120-preview'] }), 'openai', 'gpt-5-20240831-preview')?.id === 'gpt-5-preview')
     check('中缀日期多变体无裸名 -> 无匹配', lookup(catalog({ openai: ['gpt-5-20240831-preview', 'gpt-5-20241120-preview'] }), 'openai', 'gpt-5-preview') === undefined)
 
-    // ---------- 前缀匹配：目录 id 以本地 id 加分隔符扩展时唯一命中 ----------
-    check('前缀匹配唯一命中', lookup(catalog({ openai: ['gpt-5-mini'] }), 'openai', 'gpt-5')?.id === 'gpt-5-mini')
+    // ---------- 前缀匹配：目录 id 只多一个数字快照后缀时唯一命中 ----------
+    check('前缀匹配唯一命中（数字快照）', lookup(catalog({ openai: ['gpt-5-20250807'] }), 'openai', 'gpt-5')?.id === 'gpt-5-20250807')
+    check('前缀不吃子型号（gpt-5 ↛ gpt-5-mini）', lookup(catalog({ openai: ['gpt-5-mini'] }), 'openai', 'gpt-5') === undefined)
 
     // ---------- 歧义不猜：词干/前缀命中多个或零个 -> 无匹配 ----------
     check('词干命中多个 -> 无匹配', lookup(catalog({ openai: ['gpt-5-mini', 'gpt-5-turbo'] }), 'openai', 'gpt-5') === undefined)
@@ -199,10 +200,64 @@ export function run(): void {
         check('loose 关闭时无命中仍无扩展', lookup(fuzzy, 'relay', 'deepseek-v4-f', false) === undefined)
     }
 
+    // ---------- 命名空间前缀：聚合网关给 id 加自建命名空间（cn:deepseek-v4-pro），目录里只有裸名 ----------
+    check('stripNamespace 剥前导命名空间', stripNamespace('cn:deepseek-v4-pro') === 'deepseek-v4-pro', stripNamespace('cn:deepseek-v4-pro'))
+    check('stripNamespace 无前缀原样返回', stripNamespace('deepseek-chat') === 'deepseek-chat')
+    // 后缀冒号是模型自带 tag（`kenari/hy3:free`），不得当命名空间剥
+    check('stripNamespace 不碰后缀冒号', stripNamespace('kenari/hy3:free') === 'kenari/hy3:free', stripNamespace('kenari/hy3:free'))
+    check('剥前缀后命中', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'cn:deepseek-v4-pro')?.id === 'deepseek-v4-pro')
+    check('剥前缀后走官方提示组（不被别家镜像抢）', lookup(
+        catalog({ deepseek: ['deepseek-v4-pro'], aihubmix: ['deepseek-v4-pro'] }), 'custom-ai', 'cn:deepseek-v4-pro',
+    )?.id === 'deepseek-v4-pro')
+    // 目录 id 自身带前缀时，剥前缀不得破坏其完整 id 匹配
+    check('目录 id 带前缀不受剥前缀影响', lookup(catalog({ deepinfra: ['tencent/Hy3'] }), 'deepinfra', 'tencent/Hy3')?.id === 'tencent/Hy3')
+
+    // ---------- 显示名兜底：id 全线失配时用「设置→模型」里的显示名（Deepseek-V4-Pro）再试一次 ----------
+    check('id 失配 -> 显示名兜底命中', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'cn:unknown-pro', false, 'Deepseek-V4-Pro')?.id === 'deepseek-v4-pro')
+    check('显示名空格与大小写归一', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'nope', false, 'DeepSeek V4 Pro')?.id === 'deepseek-v4-pro', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'nope', false, 'DeepSeek V4 Pro'))
+    check('显示名兜底要求唯一命中', lookup(catalog({ a: ['hy4-preview'], b: ['hy4-preview'] }), 'custom-router', 'zzz', false, 'Hy4 Preview') === undefined)
+    check('id 命中优先于显示名', lookup(catalog({ deepseek: ['deepseek-v4-pro'], openai: ['gpt-5'] }), 'deepseek', 'deepseek-v4-pro', false, 'GPT-5')?.id === 'deepseek-v4-pro')
+    check('显示名兜底优先本提供方组', lookup(catalog({ venice: ['kimi-k3'], moonshotai: ['kimi-k3-turbo'] }), 'venice', 'zzz', false, 'Kimi K3')?.id === 'kimi-k3')
+    check('空显示名不影响 id 匹配', lookup(catalog({ deepseek: ['deepseek-chat'] }), 'deepseek', 'deepseek-chat', false, '')?.id === 'deepseek-chat')
+
     // ---------- toReasoningEfforts：none/off 映射到 off 键，保留目录原值而非 null ----------
     check('efforts 映射与 none 转 off（保留原值 none）', stable(toReasoningEfforts(entry('m', ['none', 'low', 'high']))) === stable({ off: 'none', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['none', 'low', 'high'])))
     check('efforts 映射与 off 保留原值', stable(toReasoningEfforts(entry('m', ['off', 'low', 'high']))) === stable({ off: 'off', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['off', 'low', 'high'])))
     check('无条目 -> undefined', toReasoningEfforts(undefined) === undefined)
     check('空档位 -> undefined', toReasoningEfforts(entry('m', [])) === undefined)
     check('仅剩 off -> 视为无匹配', toReasoningEfforts(entry('m', ['none'])) === undefined && toReasoningEfforts(entry('m', ['off'])) === undefined)
+
+    // ---------- collectCandidates：下拉候选（三种精确键 + 同族变体），只列不判 ----------
+    const pool = catalog({
+        openrouter: ['z-ai/glm-5.3-flash-free', 'z-ai/glm-5.3-flash-thinking', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3', 'z-ai/glm-5'],
+        zai: ['glm-5.3-flash'],
+    })
+    const keysOf = (providerId: string, modelId: string, name?: string): string[] =>
+        collectCandidates(pool, providerId, modelId, name).map((candidate) => candidate.key)
+    // 基准：本提供方的精确命中排第一（其余按目录顺序跟在后面）
+    check('候选：精确命中并本提供方优先', keysOf('zai', 'cn:glm-5.3-flash')[0] === 'zai/glm-5.3-flash', keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 目录 id 带 `<厂商>/` 前缀时不算精确命中，但仍是同族，必须列出（且不重复）
+    check('候选：带斜杠前缀的同名条目也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 变体：免费渠道那条 id 更长，包含关键字，必须出现在下拉里（用户点名的 glm-5.3-flash-free 场景）
+    check('候选：同族变体（-free）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash-free'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    check('候选：同族变体（-thinking）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash-thinking'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 上一代版本是另一个模型，不是同模型的另一渠道：glm-5.3-flash 不得收 glm-5.3，glm-5.3 更不得收 glm-5
+    check('候选：不收上一代父版本（glm-5.3-flash ↛ glm-5.3）', !keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    check('候选：不收上一代父版本（glm-5.3 ↛ glm-5）', !keysOf('zai', 'cn:glm-5.3').includes('openrouter/z-ai/glm-5'), keysOf('zai', 'cn:glm-5.3').join('|'))
+    check('候选：同族变体只差限定词时保留（glm-5.3-flash 自身可被 glm-5.3 选中）', keysOf('zai', 'cn:glm-5.3-flash-free').includes('zai/glm-5.3-flash'), keysOf('zai', 'cn:glm-5.3-flash-free').join('|'))
+    // 变体不得混进自动匹配：lookup 仍然只认精确/词干/前缀
+    check('变体不参与自动匹配', lookup(pool, 'zai', 'glm-5.3-flash-free') === undefined, lookup(pool, 'zai', 'glm-5.3-flash-free')?.id)
+    // 太短的键（hy3）不做包含扫描：否则整片目录都会被收进来
+    check('候选：短键不做变体扫描', keysOf('custom', 'cn:hy3').length === 0, keysOf('custom', 'cn:hy3').join('|'))
+    check('候选：目录里根本没有时为空', keysOf('zai', 'cn:totally-unknown').length === 0)
+    // 截断与折叠：同 id 形态 + 同参数的 30 家镜像折叠成一行（`also` 记账），不占满名额
+    const many = catalog(Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`p${index}`, ['glm-5.3-flash']] as const)))
+    const manyRows = collectCandidates(many, 'p0', 'glm-5.3-flash')
+    check('候选：同值镜像折叠成一行', manyRows.length === 1 && manyRows[0]?.also.length === 29, `${manyRows.length}/${manyRows[0]?.also.length}`)
+    check('候选：折叠后仍保留本提供方为代表', manyRows[0]?.key === 'p0/glm-5.3-flash', manyRows[0]?.key)
+    // 来源键回取：目录刷新后条目消失即回落到自动匹配
+    check('来源键取条目', entryBySourceKey(pool, sourceKey('openrouter', 'z-ai/glm-5.3-flash-free'))?.id === 'z-ai/glm-5.3-flash-free')
+    check('来源键形状不对 -> undefined', entryBySourceKey(pool, 'noslash') === undefined && entryBySourceKey(pool, 'a/') === undefined && entryBySourceKey(pool, '/x') === undefined)
+    check('来源键指向已消失的条目 -> undefined', entryBySourceKey(pool, 'openrouter/gone') === undefined)
+    check('来源键提供方不存在 -> undefined', entryBySourceKey(pool, 'nobody/glm-5.3') === undefined)
 }

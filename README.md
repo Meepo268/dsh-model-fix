@@ -24,6 +24,8 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 本插件根据实际需求，提供以下功能：
 
 - 添加了第三方模型，但是不知道推理级别、上下文窗口等参数？【自动填充】按 models.dev 数据补全模型参数（推理级别、上下文窗口、最大输出、图片模态），已有配置不受影响
+- 你的聚合网关给模型 id 加了命名空间前缀（如 `cn:deepseek-v4-pro`），插件认不出？【前缀与显示名兜底】先剥前导命名空间前缀再匹配；仍匹配不上时，用「设置→模型」里的显示名再试一次，让这类模型也能补上参数
+- 网关自己就公告了档位和容量，为什么还要按 models.dev 的第三方数据填？【以网关声明为准】供应商端点 `GET {baseURL}/models` 自报的推理档位、上下文窗口、输出上限、输入模态优先于 models.dev；端点没声明的维度才回落目录
 - 第三方模型参数更新了，却不知道怎么填？【允许更新】：自动更新模型参数（已有配置也会更新）
 - 手动给模型添加推理级别后，发现请求报错？【禁用`developer`角色】系统提示词改用旧版兼容的`system`角色
 - 请求体带 `store` 参数导致报错？【禁用`store`参数】请求体里不再带 `store` 键，兼容不认该参数的端点（如 LiteLLM 代理）
@@ -38,6 +40,8 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 - 推理级别的名字看着别扭？【本地化推理级别】模型选择器里的推理级别按界面语言显示名称
 - 推理级别翻译后对不上原名称？【显示原档位名】在本地化推理级别时，还显示原档位名（如「最大 · Max」），方便对照。
 - 自动填充效果不理想，总是填充不上？【尽量匹配】尽量给出一组合适的参数填充，**但无法保证准确**。
+- 上游声明的参数不想要、想改用 models.dev 的？或者某个模型压根不该被自动填？【参数来源】逐模型指定用哪一路数据：「自动」（上游声明 > models.dev）、「只用上游声明」，或从目录里挑定某一家提供方的该模型；下拉里同时列出每一路当前的值，指定过来源的模型整体按该来源落一遍。入口在每张提供方卡片里（就在「添加模型」旁边），弹层可搜索、模型再多也能滚；目录里的同族变体（如免费渠道的 `-free` 后缀）也在候选里，只是不参与自动匹配
+- 手改过的参数被自动来源冲掉了？【手改优先】插件给每个字段记指纹：只有「上次是插件写的」且你开着【允许更新】的字段才会被自动刷新，手改过的字段一律保留（「强制更新」可一次性覆盖）
 
 UI界面还提供了一些额外功能：
 
@@ -79,13 +83,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.33.5/dsh-model-fix.tgz
+https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.36.3/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.33.5/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.36.3/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
@@ -123,7 +127,7 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         reasoning: true
         context: true
         image: true
-      allowUpdate:        # 允许更新已有模型的字段；默认 false
+      allowUpdate:        # 刷新「插件上次写过的」字段（手改过的字段始终冻结）；默认 false
         reasoning: false
         context: false
         image: false
@@ -132,6 +136,7 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         disableStore: true
       excludes: []        # 排除的提供方 id 列表
       efforts: {}         # 每模型推理级别记忆
+      written: {}         # 插件写过的字段指纹（自动维护，用于识别手改；一般不用手填）
       userExperience:     # 用户体验，对所有提供方生效，不支持排除
         rememberEfforts: true
         defaultHigh: true
