@@ -15,6 +15,7 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         excludes: overrides.excludes ?? [],
         efforts: overrides.efforts ?? {},
         written: overrides.written ?? {},
+        sources: overrides.sources ?? {},
         behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
@@ -105,3 +106,4 @@ export async function run(): Promise<void> {
     const existing = planFill(cfg(), { gw: { baseURL: 'http://x/v1', models: [{ id: 'm1', reasoningEfforts: { low: 'low' }, contextWindow: 1_000_000, maxTokens: 128_000, input: ['text', 'image'] }] } }, catalog, false, declarations)
     check('手填值不被上游覆盖', existing.ops.length === 0 && existing.changes === 0, existing)
 }
+

@@ -186,6 +186,21 @@ export type CardKey =
     | 'tipBackToChat'
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM，不经插槽 t 注入）
     | 'backToChat'
+    // 「参数来源」弹层：动作键、弹层说明、下拉选项与逐行提示
+    | 'sourceAction'
+    | 'sourceTitle'
+    | 'sourceDesc'
+    | 'sourceAuto'
+    | 'sourceUpstreamOnly'
+    | 'sourceUpstreamLabel'
+    | 'sourceCatalogLabel'
+    | 'sourceNone'
+    | 'sourceNow'
+    | 'sourceCurrent'
+    | 'sourceImage'
+    | 'sourceExcluded'
+    | 'sourceEmpty'
+    | 'sourceFailed'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {

@@ -3,7 +3,8 @@ import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { getCatalog } from '@/catalog'
 import { planProviderCompat } from '@/compat'
-import { lookup, toReasoningEfforts, toReasoningEffortsFromList } from '@/lookup'
+import { toReasoningEfforts, toReasoningEffortsFromList } from '@/lookup'
+import { resolveSource } from '@/source'
 import { COMPAT_APIS, MAX_ATTEMPTS } from '@/constants'
 import { API_NS, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
 import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
@@ -54,7 +55,6 @@ export function planFill(
     const allowRules = cfg.allowUpdate
     const autoRules = cfg.autoFill
     const compatRules = cfg.compat
-    const looseMatch = cfg.userExperience.looseMatch
     // 提供方级排除：命中的 id 整条跳过（模型写回与路由 compat 都不作用其上）
     const excludes = new Set(cfg.excludes)
     const ops: SettingsPathOp[] = []
@@ -85,9 +85,10 @@ export function planFill(
                     contextWindow?: unknown
                     maxTokens?: unknown
                 }
-                const entry = lookup(indexed, providerId, modelId, looseMatch, modelName)
-                // 参数来源优先级：上游端点声明的维度 > models.dev 目录条目；两侧都缺才留空
-                const declared = declarations?.get(providerId)?.get(modelId)
+                // 参数来源（见 src/source.ts 与 docs/decisions.md「参数来源」）：pin 决定认哪一侧，缺省走「上游声明 > 目录」
+                const { entry, declared, pin } = resolveSource(cfg, indexed, declarations, providerId, modelId, modelName)
+                // 人工指定过来源的模型按用户意图整体生效：不再受指纹冻结（选来源就是要它落下来），但仍记新指纹
+                const pinned = pin !== ''
                 const efforts = toReasoningEffortsFromList(declared?.efforts) ?? toReasoningEfforts(entry)
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input
@@ -96,9 +97,9 @@ export function planFill(
                 const stampsNow = fieldStampsOf(cleaned)
                 const pluginWrote = (field: keyof FieldStamps): boolean =>
                     isPluginWritten(cfg.written, providerId, modelId, field, stampsNow)
-                /** 已有值可被自动来源覆盖的条件：强制更新单次全放开；否则该字段的「允许更新」开着、且该字段仍是插件写的 */
+                /** 已有值可被自动来源覆盖的条件：强制更新单次全放开；人工指定过来源的模型整体放开；否则该字段的「允许更新」开着、且该字段仍是插件写的 */
                 const editable = (field: keyof FieldStamps): boolean =>
-                    force || (allowRules[RULE_OF[field]] && pluginWrote(field))
+                    force || pinned || (allowRules[RULE_OF[field]] && pluginWrote(field))
                 // 推理级别
                 const reasoningFillable = autoRules.reasoning
                     && reasoningEfforts === undefined && !!efforts

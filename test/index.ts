@@ -23,6 +23,7 @@ import { run as runRpcCarrier } from '@test/rpc-carrier.test'
 import { run as runRpcRoute } from '@test/rpc-route.test'
 import { run as runRpc } from '@test/rpc.test'
 import { run as runStamp } from '@test/stamp.test'
+import { run as runSource } from '@test/source.test'
 import { run as runSelfTune } from '@test/self-tune.test'
 import { run as runSubagent } from '@test/subagent.test'
 import { run as runVerify } from '@test/verify.test'
@@ -76,6 +77,8 @@ section('rpc.test.ts')
 await runRpc()
 section('stamp.test.ts')
 runStamp()
+section('source.test.ts')
+runSource()
 section('self-tune.test.ts')
 await runSelfTune()
 section('fix.test.ts')

@@ -68,7 +68,7 @@ function boot(
     // scope 的 form 订阅释放挂入本 fiber
     ctx.effect(() => () => { scope.dispose(); providersScope.dispose(); hostModelScope.dispose() }, `${name}: scope disposal`)
     // 浏览器半调 Node 半的全部出口（三个写回端点 + 两条诊断链的读流）见 rpc-carrier.ts
-    const { forceUpdate, resetModels, restoreModels, verifyModels, probeEfforts } =
+    const { forceUpdate, resetModels, restoreModels, sources, setSource, verifyModels, probeEfforts } =
         makeRpcCarrier(rpc)
     // 五席共用的卡片入参：载体与 scope 逐席相同
     const cardProps = {
@@ -77,6 +77,8 @@ function boot(
         forceUpdate,
         resetModels,
         restoreModels,
+        sources,
+        setSource,
         verifyModels,
         probeEfforts,
     }
@@ -106,3 +108,4 @@ function boot(
     // 「返回对话」悬浮按钮：内容区左下角，点击回到当前会话（宿主 ctx.layout 提供该能力）
     applyBackToChat(ctx, scope)
 }
+

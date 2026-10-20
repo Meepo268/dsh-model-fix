@@ -169,6 +169,17 @@ const STYLE_TEXT = [
     '.dsh-mf-composerChip[data-state="fail"]{background:var(--dsw-alias-state-warn-tertiary,#fff1d6);color:var(--dsw-alias-state-warn-label,#dd8629)}',
     // 状态点（只在 on/fail 态画）：6px 圆点，background:currentColor，随 chip 色变化
     '.dsh-mf-composerChip[data-state="on"]::before,.dsh-mf-composerChip[data-state="fail"]::before{content:"";display:block;flex:none;width:6px;height:6px;border-radius:50%;background:currentColor}',
+    // 「参数来源」弹层：提供方分组 + 每行名称/ID/下拉/三行提示；行间用 0.5px 分隔线，与卡片瓦片同一描边令牌
+    '.dsh-mf-sourceGroup{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}',
+    '.dsh-mf-sourceGroupName{margin:0;font-size:13px;font-weight:600;color:var(--dsw-alias-label-secondary,#505865)}',
+    '.dsh-mf-sourceRow{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:10px}',
+    '.dsh-mf-sourceHead{display:flex;align-items:baseline;gap:8px;min-width:0}',
+    '.dsh-mf-sourceName{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary,#0f1115);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.dsh-mf-sourceId{font-size:11px;color:var(--dsw-alias-label-caption,#adb2b8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.dsh-mf-sourceSelect{box-sizing:border-box;width:100%;height:30px;padding:0 8px;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:8px;background:var(--dsw-alias-bg-layer-3,#fff);color:var(--dsw-alias-label-primary,#0f1115);font:inherit;font-size:12px}',
+    '.dsh-mf-sourceHint{margin:0;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-caption,#adb2b8)}',
+    '.dsh-mf-sourceError{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-label,#dd8629)}',
+    '.dsh-mf-sourceEmpty{margin:8px 0;font-size:12px;color:var(--dsw-alias-label-caption,#adb2b8)}',
 ].join('\n')
 
 /** 幂等注入样式：每次渲染校验 DOM 实况——宿主 HMR 会按 data-plugin 摘走旧节点，节点在则同步内容 */

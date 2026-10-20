@@ -249,3 +249,65 @@ function synthesize(candidates: readonly LooseCandidate[]): IndexEntry | undefin
         ...(image ? { image: true } : {}),
     }
 }
+
+// ---------- 参数来源：候选枚举与按来源键取条目（「参数来源」下拉用，纯函数） ----------
+
+/** 参数来源候选键的拼法：`<provider>/<modelId>`；写进配置的 pin 值与下拉回传值共用这一个拼法 */
+export function sourceKey(provider: string, id: string): string {
+    return `${provider}/${id}`
+}
+
+/** 目录候选（下拉里的一行）：来源键 + 提供方 + 条目本身 */
+export interface CatalogCandidate {
+    key: string
+    provider: string
+    entry: IndexEntry
+}
+
+/** 单模型候选上限：目录里同一模型最多挂在几十家提供方下，全列会把下拉撑爆（截断前优先本组，其余按目录顺序） */
+const SOURCE_CANDIDATE_LIMIT = 24
+
+/** 收集某模型在目录里的全部候选条目（供人工指定来源）：以三种匹配键（原 id / 剥命名空间前缀后的 id / 归一显示名）
+ * 逐提供方扫一遍，同一提供方内按此顺序取首个命中；按来源键去重，截到 `SOURCE_CANDIDATE_LIMIT` 条。
+ * 与 `lookup` 的区别：不判歧义也不合成——下拉就是把选择权交还用户 */
+export function collectCandidates(
+    indexed: IndexedCatalog,
+    providerId: string,
+    modelId: string,
+    name?: string,
+    limit = SOURCE_CANDIDATE_LIMIT,
+): CatalogCandidate[] {
+    const keys = [normalizeId(modelId)]
+    const bare = stripNamespace(modelId)
+    if (bare !== modelId) keys.push(normalizeId(bare))
+    const named = name === undefined ? '' : normalizeName(name)
+    if (named !== '' && !keys.includes(named)) keys.push(named)
+    const found = new Map<string, CatalogCandidate>()
+    // 本配置的提供方优先（目录里真有同名组时它的条目最可能是用户想要的）
+    const order = [providerId, ...[...indexed.groups.keys()].filter((provider) => provider !== providerId)]
+    for (const provider of order) {
+        const group = indexed.groups.get(provider)
+        if (!group) continue
+        for (const key of keys) {
+            const hit = matchId(key, group.ids)
+            if (hit === undefined) continue
+            const entry = group.byId.get(hit)
+            if (!entry) continue
+            const candidate = { key: sourceKey(provider, entry.id), provider, entry }
+            if (!found.has(candidate.key)) found.set(candidate.key, candidate)
+            break
+        }
+        if (found.size >= limit) break
+    }
+    return [...found.values()]
+}
+
+/** 按来源键取目录条目（`<provider>/<id>`）；键形不符或条目已不在目录（目录刷新后消失）时返回 undefined，
+ * 由调用方回落到自动匹配 */
+export function entryBySourceKey(indexed: IndexedCatalog, key: string): IndexEntry | undefined {
+    const cut = key.indexOf('/')
+    if (cut <= 0 || cut === key.length - 1) return
+    const group = indexed.groups.get(key.slice(0, cut))
+    if (!group) return
+    return group.byId.get(normalizeId(key.slice(cut + 1)))
+}

@@ -40,6 +40,8 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 - 推理级别的名字看着别扭？【本地化推理级别】模型选择器里的推理级别按界面语言显示名称
 - 推理级别翻译后对不上原名称？【显示原档位名】在本地化推理级别时，还显示原档位名（如「最大 · Max」），方便对照。
 - 自动填充效果不理想，总是填充不上？【尽量匹配】尽量给出一组合适的参数填充，**但无法保证准确**。
+- 上游声明的参数不想要、想改用 models.dev 的？或者某个模型压根不该被自动填？【参数来源】逐模型指定用哪一路数据：「自动」（上游声明 > models.dev）、「只用上游声明」，或从目录里挑定某一家提供方的该模型；下拉里同时列出每一路当前的值，指定过来源的模型整体按该来源落一遍
+- 手改过的参数被自动来源冲掉了？【手改优先】插件给每个字段记指纹：只有「上次是插件写的」且你开着【允许更新】的字段才会被自动刷新，手改过的字段一律保留（「强制更新」可一次性覆盖）
 
 UI界面还提供了一些额外功能：
 
@@ -81,13 +83,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.33.5/dsh-model-fix.tgz
+https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.35.0/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.33.5/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.35.0/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）

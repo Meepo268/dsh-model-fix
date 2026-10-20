@@ -15,6 +15,7 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         excludes: overrides.excludes ?? [],
         efforts: overrides.efforts ?? {},
         written: overrides.written ?? {},
+        sources: overrides.sources ?? {},
         behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
@@ -98,3 +99,4 @@ export function run(): void {
     const stampOfM2 = parseStamps(plan.written.gw?.m2)
     check('指纹按写入后的行计算', stampOfM2?.c === 1_000_000 && stampOfM2?.r === 'medium=medium', stampOfM2)
 }
+

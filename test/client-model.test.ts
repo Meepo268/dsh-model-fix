@@ -36,7 +36,7 @@ const ALL_ON: Flags = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
-    written: {},
+    written: {}, sources: {},
     behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
     userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
 }
@@ -60,7 +60,7 @@ export function run(): void {
             compat: { disableDeveloper: false, disableStore: false },
             excludes: ['acme-gateway'],
             efforts: {},
-            written: {},
+            written: {}, sources: {},
             behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
@@ -74,7 +74,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            written: {},
+            written: {}, sources: {},
             behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
@@ -88,7 +88,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: ['acme-gateway'],
             efforts: {},
-            written: {},
+            written: {}, sources: {},
             behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
@@ -104,7 +104,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-            written: {},
+            written: {}, sources: {},
             behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
@@ -170,7 +170,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            written: {},
+            written: {}, sources: {},
             behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
@@ -224,7 +224,7 @@ export function run(): void {
             compat: DEFAULT_FLAGS.compat,
             excludes: DEFAULT_FLAGS.excludes,
             efforts: DEFAULT_FLAGS.efforts,
-            written: {},
+            written: {}, sources: {},
             behavior: DEFAULT_FLAGS.behavior,
             userExperience: DEFAULT_FLAGS.userExperience,
         }),
@@ -431,3 +431,4 @@ export function run(): void {
     ))
     check('isDirty 不受 behavior 之外的组影响（behavior 相同时不脏）', !isDirty(ALL_ON, ALL_ON))
 }
+

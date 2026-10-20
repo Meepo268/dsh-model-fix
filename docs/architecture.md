@@ -11,6 +11,7 @@
 | `src/catalog.ts` | models.dev 目录拉取、缓存读写与拍平索引 |
 | `src/lookup.ts` | 模型 id 匹配（三级归一 + 命名空间前缀剥离 + 显示名兜底）与档位转换 |
 | `src/upstream.ts` | 上游能力声明：`GET {baseURL}/models` 自报的档位/容量/模态解析与带缓存的 best-effort 抓取 |
+| `src/source.ts` | 参数来源解析（pin → 目录条目/上游声明）与「参数来源」弹层的纯快照构造 |
 | `src/compat.ts` | 路由 compat 纯写入计划 |
 | `src/fix.ts` | 填充与写回：纯计划函数 `planFill` 出 op，`fix` 只做编排（写回后同步指纹表） |
 | `src/stamp.ts` | 参数指纹：`written` 表的序列化/解析与逐字段「插件写的 vs 手改」判定（纯函数，无 ctx） |
@@ -30,7 +31,7 @@
 | `src/probe.ts` | 「探测档位」执行器：兜底备份 → 预声明 → 逐档探测 → 收敛写回 |
 | `src/fill.ts` | 探测档位的两次写回（预声明 / 收敛） |
 | `src/probe-backup.ts` | 探测的崩溃兜底：备份与启动回退 |
-| `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点（channel 自注册） |
+| `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点 + 两个「参数来源」端点（channel 自注册） |
 | `src/rpc-route.ts` | RPC 信封解码与路由分发 |
 | `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
 | `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单 |
@@ -48,6 +49,7 @@
 | `src/client/confirm.tsx` | 四层二次确认的共用外壳 |
 | `src/client/diagnose-dialog.tsx` | 验证 / 探测弹层的共用外壳（双选项卡 + 记录区） |
 | `src/client/probe-dialog.tsx` | 探测弹层组装层 |
+| `src/client/sources-dialog.tsx` | 「参数来源」弹层：逐模型来源下拉 + 两路现值对读 |
 | `src/client/card-verify.ts` | 验证的整轮编排 hook |
 | `src/client/card-probe.ts` | 探测的整轮编排 hook |
 | `src/client/card-records.ts` | 两条诊断记录区的纯文案层 |

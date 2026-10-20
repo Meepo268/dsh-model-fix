@@ -76,6 +76,14 @@ export type EffortMemory = Record<string, Record<string, string>>
  * 用来把「插件自己写的值」与「用户手改的值」分开：指纹对不上即视为手改，`allowUpdate` 不再覆盖（见 docs/decisions.md「参数来源」） */
 export type WrittenMap = Record<string, Record<string, string>>
 
+/** 每模型参数来源 pin：provider id → model id → 来源值。
+ * 来源值：`''` / 缺省 = 自动（上游声明 > models.dev 目录）；`upstream` = 只认上游声明；`<provider>/<modelId>` = 只认该目录条目。
+ * 与 `efforts` / `written` 同性质（运行时状态、宽松解析），但**是用户意图**，故随配置一起保存（见 docs/decisions.md「参数来源」） */
+export type SourceMap = Record<string, Record<string, string>>
+
+/** 「参数来源」下拉里的「只认上游声明」取值；其余取值一律是 `<provider>/<modelId>` 候选键 */
+export const SOURCE_UPSTREAM = 'upstream'
+
 /** 当前运行时配置（仅对象写法） */
 export interface PluginConfig {
     /** 开启后以 models.dev 最新数据为准更新已有配置 */
@@ -90,6 +98,8 @@ export interface PluginConfig {
     efforts: EffortMemory
     /** 上次插件写入的参数指纹：provider → model → 指纹串。与 `efforts` 同性质（运行时状态、宽松解析），用来区分「插件写的」与「手改的」，见 `src/stamp.ts` */
     written: WrittenMap
+    /** 每模型参数来源 pin：provider → model → 来源值（缺省 = 自动）。人工纠正「用哪家提供方的参数」的落点，见 `SourceMap` */
+    sources: SourceMap
     /** UI 可见性规则（只管各 UI 部件挂不挂载，不改插件行为） */
     behavior: BehaviorRules
     /** 用户体验规则（前端行为开关，不支持按提供方排除） */
@@ -105,6 +115,7 @@ export interface PluginConfigSnapshot {
     excludes: string[]
     efforts: EffortMemory
     written: WrittenMap
+    sources: SourceMap
     behavior: BehaviorRules
     userExperience: UserExperienceRules
 }

@@ -18,7 +18,7 @@ export function run(): void {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        written: {},
+        written: {}, sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     })
@@ -49,7 +49,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        written: {},
+        written: {}, sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), resolveConfig({ 'version-7': v7Entry }))
@@ -69,7 +69,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway', 'lab-7'],
         efforts: {},
-        written: {},
+        written: {}, sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), resolveConfig({ 'version-7': v7WithUE }))
@@ -80,7 +80,7 @@ export function run(): void {
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
-        written: {},
+        written: {}, sources: {},
         behavior: BEHAVIOR_DEFAULT,
         userExperience: UE_DEFAULT,
     }), resolveConfig({ 'version-7': { configVersion: 7, autoFill: { context: false } } }))
@@ -115,12 +115,12 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: {},
-        written: {},
+        written: {}, sources: {},
         behavior: BEHAVIOR_DEFAULT,
         userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), resolveConfig({ 'version-9': v8Entry }))
-    check('更高版本快照含未知键时 parseSnapshot 剥离未知键', Object.keys(resolveConfig({ 'version-9': { ...v8Entry, unknownTop: 1 } })).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,userExperience,written')
-    check('更高版本快照含额外组键时 parseSnapshot 剥离', Object.keys(resolveConfig({ 'version-9': { ...v8Entry, extraGroup: { a: 1 } } })).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,userExperience,written')
+    check('更高版本快照含未知键时 parseSnapshot 剥离未知键', Object.keys(resolveConfig({ 'version-9': { ...v8Entry, unknownTop: 1 } })).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,sources,userExperience,written')
+    check('更高版本快照含额外组键时 parseSnapshot 剥离', Object.keys(resolveConfig({ 'version-9': { ...v8Entry, extraGroup: { a: 1 } } })).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,sources,userExperience,written')
     // 解析错误传播到 resolveConfig：快照整体非法时整段回默认
     check('更高版本快照结构非法整段回退默认', stable(resolveConfig({ 'version-9': { ...v8Entry, autoFill: 'bad' } })) === DEFAULT_STABLE, resolveConfig({ 'version-9': { ...v8Entry, autoFill: 'bad' } }))
     check('快照组内类型非法整段回退默认', stable(resolveConfig({ 'version-8': { ...v8Entry, allowUpdate: 'bad' } })) === DEFAULT_STABLE, resolveConfig({ 'version-8': { ...v8Entry, allowUpdate: 'bad' } }))
@@ -132,7 +132,7 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: false },
         excludes: ['foo'],
         efforts: { 'some-provider': { 'some-model': 'high' } },
-        written: {},
+        written: {}, sources: {},
         behavior: BEHAVIOR_DEFAULT,
         userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: false, followParent: true, selfTune: true, hideOfficial: false, localizeEfforts: false, showOriginalEfforts: false, looseMatch: false },
     })) === stable({
@@ -141,16 +141,17 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: false },
         excludes: ['foo'],
         efforts: { 'some-provider': { 'some-model': 'high' } },
-        written: {},
+        written: {}, sources: {},
         behavior: BEHAVIOR_DEFAULT,
         userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: false, followParent: true, selfTune: true, hideOfficial: false, localizeEfforts: false, showOriginalEfforts: false, looseMatch: false },
     }), parseSnapshot({ configVersion: 8, allowUpdate: { reasoning: true, context: true, image: true }, autoFill: { reasoning: false, context: false, image: false }, compat: { disableDeveloper: false, disableStore: false }, excludes: ['foo'], efforts: { 'some-provider': { 'some-model': 'high' } }, behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true }, userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: false, followParent: true, selfTune: true, hideOfficial: false, localizeEfforts: false, showOriginalEfforts: false } }))
     check('parseSnapshot 允许 v8 快照 userExperience 缺 followParent（整项回默认）', stable(parseSnapshot({ configVersion: 8, userExperience: {} })) === stable({ ...DEFAULT_CONFIG, userExperience: UE_DEFAULT }), parseSnapshot({ configVersion: 8, userExperience: {} }))
     check('parseSnapshot v8 userExperience 非法字段触发整段非法（不是单个键）', parseSnapshot({ configVersion: 8, userExperience: { rememberEfforts: 'bad' } }) === undefined, parseSnapshot({ configVersion: 8, userExperience: { rememberEfforts: 'bad' } }))
     check('v8 快照里的 followParent 经 resolveConfig 原样生效', stable(resolveConfig({ 'version-8': v8Entry }).userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false }), resolveConfig({ 'version-8': v8Entry }).userExperience)
-    check('parseSnapshot 剥离 configVersion 等运行时不消费的键', Object.keys(parseSnapshot(v7Entry) ?? {}).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,userExperience,written', parseSnapshot(v7Entry))
+    check('parseSnapshot 剥离 configVersion 等运行时不消费的键', Object.keys(parseSnapshot(v7Entry) ?? {}).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,sources,userExperience,written', parseSnapshot(v7Entry))
     // 缺省 excludes 落的是新建数组：解析结果被调用方改动不得污染 DEFAULT_CONFIG
     const materialized = parseSnapshot({ configVersion: 7 })
     materialized?.excludes.push('mutated')
     check('parseSnapshot 缺省 excludes 不与默认常量共享引用', DEFAULT_CONFIG.excludes.length === 0, { DEFAULT_CONFIG, materialized })
 }
+

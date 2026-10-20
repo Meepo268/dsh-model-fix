@@ -43,6 +43,7 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         excludes: overrides.excludes ?? [],
         efforts: overrides.efforts ?? {},
         written: overrides.written ?? {},
+        sources: overrides.sources ?? {},
         behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
@@ -512,3 +513,4 @@ export async function run(): Promise<void> {
         check('尽量匹配开：变更计数为 1', changes === 1)
     }
 }
+

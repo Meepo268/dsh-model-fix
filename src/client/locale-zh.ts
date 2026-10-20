@@ -189,5 +189,20 @@ export const zh: Record<CardKey, string> = {
     tipShowInPluginManager: '本插件始终显示在「插件管理」里，且不可关闭——它是你重新打开上述任何界面的唯一入口。',
     tipBackToChat: '在内容区左下角显示一枚「返回对话」悬浮按钮，点击即回到当前正在进行的对话。',
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
-    backToChat: '返回对话',
+    // 「参数来源」弹层
+    sourceAction: '参数来源',
+    sourceTitle: '参数来源',
+    sourceDesc: '逐模型指定用哪一路数据来填参数。「自动」按「上游声明 > models.dev 目录」取；下拉里的其它项强制只认那一路。手改过的字段仍优先保留，但在这里选了来源就会按该来源整体覆盖一次。',
+    sourceAuto: '自动（上游声明优先）',
+    sourceUpstreamOnly: '只用上游声明',
+    sourceUpstreamLabel: '上游声明',
+    sourceCatalogLabel: 'models.dev 目录',
+    sourceNone: '无可用来源',
+    sourceNow: '当前生效：{label}',
+    sourceCurrent: '现值',
+    sourceImage: '图片',
+    sourceExcluded: '（该提供方已在排除列表，本插件不会动它）',
+    sourceEmpty: '没有可配置的模型',
+    sourceFailed: '取数或保存失败：{message}',    backToChat: '返回对话',
 }
+

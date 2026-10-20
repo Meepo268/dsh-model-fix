@@ -190,5 +190,20 @@ export const en: Record<CardKey, string> = {
     tipShowInPluginManager: 'This plugin always shows in the plugin manager and cannot be hidden — it is the only way back into any of the surfaces above.',
     tipBackToChat: 'Shows a floating "Back to chat" button at the bottom-left of the content area; clicking it returns to the conversation in progress.',
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
-    backToChat: 'Back to chat',
+    // 「参数来源」弹层
+    sourceAction: 'Parameter source',
+    sourceTitle: 'Parameter source',
+    sourceDesc: 'Pick which data source fills each model. "Auto" follows upstream declaration, then the models.dev catalog; any other choice pins that source. Values you edited by hand are kept, except that picking a source here applies it once for the whole model.',
+    sourceAuto: 'Auto (upstream first)',
+    sourceUpstreamOnly: 'Upstream declaration only',
+    sourceUpstreamLabel: 'Upstream declaration',
+    sourceCatalogLabel: 'models.dev catalog',
+    sourceNone: 'No source',
+    sourceNow: 'Effective: {label}',
+    sourceCurrent: 'Current',
+    sourceImage: 'image',
+    sourceExcluded: ' (provider is excluded; this plugin will not touch it)',
+    sourceEmpty: 'No configurable models',
+    sourceFailed: 'Failed to load or save: {message}',    backToChat: 'Back to chat',
 }
+
