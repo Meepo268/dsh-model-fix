@@ -58,6 +58,8 @@ export function planFill(
                 const model = models[i]
                 if (!isPlainObject(model) || model.id === undefined || model.id === null) continue
                 const modelId = String(model.id)
+                // 显示名兜底：网关 id 带命名空间前缀、或与目录 id 不同形时，用「设置→模型」右侧那个名字再试一次
+                const modelName = typeof model.name === 'string' ? model.name : undefined
                 // 缺失补写按剔除空壳后的值认（空壳等同未声明，否则既不被填又被清、要等下一轮才补上）
                 const cleaned = stripEmptyFields(model)
                 const { reasoningEfforts, contextWindow, maxTokens } = cleaned as {
@@ -65,7 +67,7 @@ export function planFill(
                     contextWindow?: unknown
                     maxTokens?: unknown
                 }
-                const entry = lookup(indexed, providerId, modelId, looseMatch)
+                const entry = lookup(indexed, providerId, modelId, looseMatch, modelName)
                 const efforts = toReasoningEfforts(entry)
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input

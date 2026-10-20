@@ -7,6 +7,21 @@ export function normalizeId(id: string): string {
     return id.toLowerCase().replace(/-openai-compact$/, '').replace(/-latest$/, '')
 }
 
+/** 命名空间前缀：`ns:`（小写标识符 + 冒号），只在**前导**位置剥。聚合网关常给模型 id 加自己的命名空间（`cn:deepseek-v4-pro`），
+ * 而目录里存的是裸名；`kenari/hy3:free` 这类**后缀**冒号是模型自带 tag，不得误剥（故不用 lastIndexOf） */
+const NAMESPACE_PREFIX = /^[a-z0-9][a-z0-9_-]*:/
+
+/** 剥掉前导命名空间前缀（`cn:deepseek-v4-pro` → `deepseek-v4-pro`）；无前缀原样返回 */
+export function stripNamespace(id: string): string {
+    return id.replace(NAMESPACE_PREFIX, '')
+}
+
+/** 显示名归一：小写、空白与下划线折算连字符、压缩重复连字符（`DeepSeek V4 Pro` → `deepseek-v4-pro`）；
+ * 只作兜底匹配键，不替代 id（显示名可重复，故只在 id 全线失配时使用且要求唯一命中） */
+export function normalizeName(name: string): string {
+    return normalizeId(name.trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/-{2,}/g, '-'))
+}
+
 /** 日期式数字组（2/4 位数字、总计 4/6/8 位，长形优先）；不锚定末尾，中缀亦提取；-? 连带消费相邻连字符避免 base 残留 -- */
 const DATE_GROUP_WITH_HYPHEN = /-?(?:\d{8}|\d{4}-\d{4}|\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}|\d{6}|\d{2}-\d{4}|\d{4}-\d{2}|\d{4}|\d{2}-\d{2})/g
 
@@ -51,7 +66,7 @@ function hintedProviders(id: string): readonly string[] {
 
 /** 在目录中查找模型条目：组内依次 完整 id → 裸名 → 末段唯一匹配；全局官方提示依序试、兜底仅跨提供方唯一命中才认。多命中判歧义放弃（宁可漏不错配，见 decisions.md「参数来源」）。
  * `loose`（尽量匹配）时歧义不再放弃：兜底命中 ≥2 进加权合成、=1 直接返回；仍无命中则用归一裸名全局 includes 扩展候选，同样单命中直接返回、多命中合成 */
-export function lookup(indexed: IndexedCatalog, providerId: string, modelId: string, loose = false): IndexEntry | undefined {
+function lookupCore(indexed: IndexedCatalog, providerId: string, modelId: string, loose = false): IndexEntry | undefined {
     const { groups } = indexed
     const bare = modelId.slice(modelId.lastIndexOf('/') + 1)
     /** 组内匹配；`tailMatch` 只在 provider 严格匹配（已定域）时开启，避免裸名撞别家末段造成跨提供方错配 */
@@ -116,6 +131,30 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
     // 和collected同逻辑
     if (fuzzy.length === 1) return fuzzy[0].entry
     if (fuzzy.length > 1) return synthesize(fuzzy)
+}
+
+/** 在目录中查找模型条目：先按 id 走三级匹配与提供方定位；id 全线失配时依次尝试
+ * ① 剥掉前导命名空间前缀后的 id（`cn:deepseek-v4-pro`）② 归一后的**显示名**（`DeepSeek-V4-Pro`）。
+ * 两级兜底都只认唯一命中（宁可漏不错配，见 decisions.md「参数来源」）：网关 id 前缀与显示名都可能撞名，
+ * 放宽成歧义合成会把别家参数写进本模型配置。 */
+export function lookup(
+    indexed: IndexedCatalog,
+    providerId: string,
+    modelId: string,
+    loose = false,
+    name?: string,
+): IndexEntry | undefined {
+    const direct = lookupCore(indexed, providerId, modelId, loose)
+    if (direct) return direct
+    const bare = stripNamespace(modelId)
+    if (bare !== modelId) {
+        const stripped = lookupCore(indexed, providerId, bare, loose)
+        if (stripped) return stripped
+    }
+    // 显示名兜底不走 loose：显示名可比 id 模糊得多（`DeepSeek V4` 对 `deepseek-v4-pro`），合成必错配
+    const named = name === undefined ? '' : normalizeName(name)
+    if (named === '' || named === normalizeId(bare) || named === normalizeId(modelId)) return
+    return lookupCore(indexed, providerId, named, false)
 }
 
 /** 尽量匹配的 60% 判据：efforts / image 支持门槛，容量分位位置 */

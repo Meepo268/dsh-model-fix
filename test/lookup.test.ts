@@ -1,5 +1,5 @@
 // lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、提供方提示与推理级别转换
-import { lookup, normalizeId, toReasoningEfforts } from '@/lookup'
+import { lookup, normalizeId, stripNamespace, toReasoningEfforts } from '@/lookup'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { check, stable } from '@test/helper'
 
@@ -198,6 +198,26 @@ export function run(): void {
         // loose 关闭时同样的模糊查询仍无命中（扩展只在 loose 开启时发生）
         check('loose 关闭时无命中仍无扩展', lookup(fuzzy, 'relay', 'deepseek-v4-f', false) === undefined)
     }
+
+    // ---------- 命名空间前缀：聚合网关给 id 加自建命名空间（cn:deepseek-v4-pro），目录里只有裸名 ----------
+    check('stripNamespace 剥前导命名空间', stripNamespace('cn:deepseek-v4-pro') === 'deepseek-v4-pro', stripNamespace('cn:deepseek-v4-pro'))
+    check('stripNamespace 无前缀原样返回', stripNamespace('deepseek-chat') === 'deepseek-chat')
+    // 后缀冒号是模型自带 tag（`kenari/hy3:free`），不得当命名空间剥
+    check('stripNamespace 不碰后缀冒号', stripNamespace('kenari/hy3:free') === 'kenari/hy3:free', stripNamespace('kenari/hy3:free'))
+    check('剥前缀后命中', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'cn:deepseek-v4-pro')?.id === 'deepseek-v4-pro')
+    check('剥前缀后走官方提示组（不被别家镜像抢）', lookup(
+        catalog({ deepseek: ['deepseek-v4-pro'], aihubmix: ['deepseek-v4-pro'] }), 'custom-ai', 'cn:deepseek-v4-pro',
+    )?.id === 'deepseek-v4-pro')
+    // 目录 id 自身带前缀时，剥前缀不得破坏其完整 id 匹配
+    check('目录 id 带前缀不受剥前缀影响', lookup(catalog({ deepinfra: ['tencent/Hy3'] }), 'deepinfra', 'tencent/Hy3')?.id === 'tencent/Hy3')
+
+    // ---------- 显示名兜底：id 全线失配时用「设置→模型」里的显示名（Deepseek-V4-Pro）再试一次 ----------
+    check('id 失配 -> 显示名兜底命中', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'cn:unknown-pro', false, 'Deepseek-V4-Pro')?.id === 'deepseek-v4-pro')
+    check('显示名空格与大小写归一', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'nope', false, 'DeepSeek V4 Pro')?.id === 'deepseek-v4-pro', lookup(catalog({ deepseek: ['deepseek-v4-pro'] }), 'custom-router', 'nope', false, 'DeepSeek V4 Pro'))
+    check('显示名兜底要求唯一命中', lookup(catalog({ a: ['hy4-preview'], b: ['hy4-preview'] }), 'custom-router', 'zzz', false, 'Hy4 Preview') === undefined)
+    check('id 命中优先于显示名', lookup(catalog({ deepseek: ['deepseek-v4-pro'], openai: ['gpt-5'] }), 'deepseek', 'deepseek-v4-pro', false, 'GPT-5')?.id === 'deepseek-v4-pro')
+    check('显示名兜底优先本提供方组', lookup(catalog({ venice: ['kimi-k3'], moonshotai: ['kimi-k3-turbo'] }), 'venice', 'zzz', false, 'Kimi K3')?.id === 'kimi-k3')
+    check('空显示名不影响 id 匹配', lookup(catalog({ deepseek: ['deepseek-chat'] }), 'deepseek', 'deepseek-chat', false, '')?.id === 'deepseek-chat')
 
     // ---------- toReasoningEfforts：none/off 映射到 off 键，保留目录原值而非 null ----------
     check('efforts 映射与 none 转 off（保留原值 none）', stable(toReasoningEfforts(entry('m', ['none', 'low', 'high']))) === stable({ off: 'none', low: 'low', high: 'high' }), toReasoningEfforts(entry('m', ['none', 'low', 'high'])))
