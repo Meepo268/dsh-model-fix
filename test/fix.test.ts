@@ -31,6 +31,7 @@ const CAT: IndexedCatalog = {
         'testprovider',
         { ids: ENTRIES.map((item) => item.id), byId: new Map(ENTRIES.map((item) => [item.id, item])) },
     ]]),
+    endpoints: new Map(),
 }
 
 /** 以 DEFAULT_CONFIG 为基线合并覆盖项（各组深合并，容器不与默认共享引用） */
@@ -370,7 +371,7 @@ export async function run(): Promise<void> {
             api: { providers: { testprovider: { models: [{ id: 'model-unknown' }] } } },
         })
         setConfig(cfg())
-        setCatalog({ catalog: {}, groups: new Map() })
+        setCatalog({ catalog: {}, groups: new Map(), endpoints: new Map() })
         const changes = await fix(ctx as unknown as Context)
         check('无目录数据：变更计数为 0', changes === 0)
         check('无目录数据：零 mutate', ctx.mutateCalls.length === 0)
@@ -458,6 +459,7 @@ export async function run(): Promise<void> {
             ['gw-one', { ids: ['model-x'], byId: new Map([['model-x', { id: 'model-x', efforts: ['low', 'high'], contextWindow: 100_000, maxTokens: 8_000 }]]) }],
             ['gw-two', { ids: ['model-x'], byId: new Map([['model-x', { id: 'model-x', efforts: ['low', 'high'], contextWindow: 100_000, maxTokens: 8_000 }]]) }],
         ]),
+        endpoints: new Map(),
     }
     {
         resetModules()
@@ -486,5 +488,37 @@ export async function run(): Promise<void> {
             maxTokens: 8_000,
         }), model)
         check('尽量匹配开：变更计数为 1', changes === 1)
+    }
+
+    // ---------- 19. 端点优先：路由 baseURL 命中端点即按该端点的提供方取参数（路由 id 不符也认） ----------
+    {
+        resetModules()
+        const ctx = makeStubCtx({
+            api: { providers: { 'my-route': { baseURL: 'https://api.example.com', models: [{ id: 'model-a' }] } } },
+        })
+        setConfig(cfg())
+        setCatalog({
+            catalog: {},
+            groups: new Map([[
+                'testprovider',
+                { ids: ENTRIES.map((item) => item.id), byId: new Map(ENTRIES.map((item) => [item.id, item])) },
+            ]]),
+            endpoints: new Map([['https://api.example.com', ['testprovider']]]),
+        })
+        const changes = await fix(ctx as unknown as Context)
+        const model = modelsOf(ctx, 'my-route')[0]
+        check('端点优先：路由 id 不符也按端点命中并填充', changes === 1 && model?.contextWindow === 128000, { changes, model })
+    }
+
+    // ---------- 20. 端点未命中：回落到路由 id 的提供方 ----------
+    {
+        resetModules()
+        const ctx = makeStubCtx({
+            api: { providers: { 'testprovider': { baseURL: 'https://other.example', models: [{ id: 'model-a' }] } } },
+        })
+        setConfig(cfg())
+        setCatalog(CAT)
+        const changes = await fix(ctx as unknown as Context)
+        check('端点未命中：回落到路由 id 的提供方', changes === 1 && modelsOf(ctx, 'testprovider')[0]?.contextWindow === 128000)
     }
 }

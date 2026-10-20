@@ -1,15 +1,15 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
-import { API_URL, CACHE_FILE, FETCH_MS, LEVELS, MAX_ATTEMPTS, RETRY_DELAY_MS } from '@/constants'
+import { API_URL, CACHE_FILE, FETCH_MS, LEVELS, MAX_ATTEMPTS, PROVIDER_API_FALLBACKS, RETRY_DELAY_MS } from '@/constants'
 import { PLUGIN_NAME } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
-import type { CacheRecord, Catalog, IndexedCatalog, ModelEntry, ProviderGroup, IndexEntry } from '@/types'
+import type { CacheGroup, CacheRecord, Catalog, IndexedCatalog, ModelEntry, ProviderGroup, IndexEntry } from '@/types'
 import { isCapacity } from '@/types'
 import { normalizeId } from '@/lookup'
 import { isPlainObject } from '@/shared/types'
 
 /** 目录尚未可用时的空兜底 */
-const EMPTY_INDEX: IndexedCatalog = { catalog: {}, groups: new Map() }
+const EMPTY_INDEX: IndexedCatalog = { catalog: {}, groups: new Map(), endpoints: new Map() }
 
 let indexedCache: IndexedCatalog | undefined
 
@@ -60,18 +60,42 @@ function fromApiEntry(entry: unknown): ModelEntry | undefined {
     return { reasoning: hasReasoning, toggle, efforts, contextWindow, maxTokens, image }
 }
 
+/** 端点串：只认 http 开头（模板串与非 http 端点不作匹配依据） */
+function isEndpoint(value: unknown): value is string {
+    return typeof value === 'string' && value.startsWith('http')
+}
+
+/** 提供方端点：models.dev 的 api 优先，否则查静态补全表 */
+function providerApiOf(raw: unknown, providerId: string): string | undefined {
+    if (isEndpoint(raw)) return raw
+    return PROVIDER_API_FALLBACKS[providerId]
+}
+
+/** 模型级端点：models.dev 的 models.<id>.provider.api（对象形态） */
+function modelApiOf(entry: unknown): string | undefined {
+    if (!isPlainObject(entry)) return
+    const provider = (entry as { provider?: unknown }).provider
+    if (!isPlainObject(provider)) return
+    const api = (provider as { api?: unknown }).api
+    if (isEndpoint(api)) return api
+}
+
 /**
- * 将 models.dev 原始 JSON 构建为分组缓存：{ provider: { model-id: 条目 } }，
+ * 将 models.dev 原始 JSON 构建为分组缓存：{ provider-id: { api?, models: { model-id: 条目 } } }，
  * 仅保留有可用推理级别、容量或支持图片的模型。
+ * 组级 api 取 models.dev 的 provider.api（缺失时由静态补全表补），模型级 api 取该模型的 provider.api。
  * efforts 过滤为 harness 支持的取值，'off'/'none' 按目录原值保留；目录未列关闭档时不写入（"能通"不等于"能关"）。
  */
 export function buildCatalog(api: Record<string, unknown> | undefined): Catalog {
     const catalog: Catalog = {}
-    for (const [provider, block] of Object.entries(api ?? {})) {
+    for (const [key, block] of Object.entries(api ?? {})) {
         if (!isPlainObject(block)) continue
         const models = (block as { models?: unknown }).models
         if (!isPlainObject(models)) continue
-        const group: Record<string, CacheRecord> = {}
+        const providerId = typeof (block as { id?: unknown }).id === 'string' ? (block as { id: string }).id : key
+        const group: CacheGroup = { models: {} }
+        const groupApi = providerApiOf((block as { api?: unknown }).api, providerId)
+        if (groupApi !== undefined) group.api = groupApi
         for (const [id, entry] of Object.entries(models as Record<string, unknown>)) {
             const parsed = fromApiEntry(entry)
             if (!parsed) continue
@@ -79,26 +103,35 @@ export function buildCatalog(api: Record<string, unknown> | undefined): Catalog 
             const hasUsableReasoning = parsed.reasoning && efforts.some((effort) => effort !== 'none' && effort !== 'off')
             // 仅 none 的推理能力（无可选档位）不入库；容量或图片仍可
             if (!hasUsableReasoning && parsed.contextWindow === undefined && parsed.maxTokens === undefined && !parsed.image) continue
-            const result: CacheRecord = { efforts: hasUsableReasoning ? efforts : [] }
+            const result: CacheRecord = {}
+            if (hasUsableReasoning) result.efforts = efforts
             if (parsed.contextWindow !== undefined) result.contextWindow = parsed.contextWindow
             if (parsed.maxTokens !== undefined) result.maxTokens = parsed.maxTokens
             if (parsed.image) result.image = parsed.image
-            group[id] = result
+            const modelApi = modelApiOf(entry)
+            if (modelApi !== undefined) result.api = modelApi
+            group.models[id] = result
         }
-        if (Object.keys(group).length > 0) catalog[provider] = group
+        if (Object.keys(group.models).length > 0) catalog[providerId] = group
     }
     return catalog
 }
 
-/** 构建带 provider 分组索引的目录；catalog 保留原引用（供 fetchLatest 序列化对比），索引条目另建 */
+/** 构建带 provider 分组索引与端点索引的目录；catalog 保留原引用（供 fetchLatest 序列化对比），索引条目另建 */
 function indexFromCatalog(catalog: Catalog): IndexedCatalog {
     const groups = new Map<string, ProviderGroup>()
-    for (const [provider, models] of Object.entries(catalog)) {
+    const endpoints = new Map<string, string[]>()
+    const register = (endpoint: string, provider: string): void => {
+        const list = endpoints.get(endpoint)
+        if (!list) endpoints.set(endpoint, [provider])
+        else if (!list.includes(provider)) list.push(provider)
+    }
+    for (const [provider, group] of Object.entries(catalog)) {
         const ids: string[] = []
         const byId = new Map<string, IndexEntry>()
-        for (const [id, record] of Object.entries(models)) {
+        for (const [id, record] of Object.entries(group.models)) {
             if (!isCacheRecord(record)) continue
-            const entry: IndexEntry = { id, efforts: record.efforts.slice() }
+            const entry: IndexEntry = { id, efforts: record.efforts ? record.efforts.slice() : [] }
             if (record.contextWindow !== undefined) entry.contextWindow = record.contextWindow
             if (record.maxTokens !== undefined) entry.maxTokens = record.maxTokens
             if (record.image) entry.image = true
@@ -109,8 +142,13 @@ function indexFromCatalog(catalog: Catalog): IndexedCatalog {
         }
         if (ids.length === 0) continue
         groups.set(provider, { ids, byId })
+        // 端点索引：组级 api 与模型级 api 都登记（模型级 api 是该模型的真实端点，组级 api 是该提供方的默认端点）
+        if (group.api) register(group.api, provider)
+        for (const record of Object.values(group.models)) {
+            if (record.api) register(record.api, provider)
+        }
     }
-    return { catalog, groups }
+    return { catalog, groups, endpoints }
 }
 
 /**
@@ -120,22 +158,27 @@ function indexFromCatalog(catalog: Catalog): IndexedCatalog {
  */
 export function isCacheRecord(value: unknown): value is CacheRecord {
     if (!isPlainObject(value)) return false
-    const { efforts, contextWindow, maxTokens, image } = value as Partial<CacheRecord> & Record<string, unknown>
-    if (!Array.isArray(efforts) || !efforts.every((effort) => typeof effort === 'string' && (effort === 'none' || LEVELS.has(effort)))) return false
+    const { efforts, contextWindow, maxTokens, image, api } = value as Partial<CacheRecord> & Record<string, unknown>
+    if (efforts !== undefined && (!Array.isArray(efforts) || !efforts.every((effort) => typeof effort === 'string' && (effort === 'none' || LEVELS.has(effort))))) return false
     if (contextWindow !== undefined && !isCapacity(contextWindow)) return false
     if (maxTokens !== undefined && !isCapacity(maxTokens)) return false
     if (image !== undefined && image !== true) return false
+    if (api !== undefined && !isEndpoint(api)) return false
     if ('provider' in value || 'id' in value) return false
     return true
 }
 
-/** 判断缓存文件顶层条目（model -> 记录映射）是否全部合法；任一不合法返回 undefined */
-export function parseCacheGroup(value: unknown): Record<string, CacheRecord> | undefined {
+/** 判断缓存文件的一个分组条目是否合法（{ api?, models }）；不合法返回 undefined */
+export function parseCacheGroup(value: unknown): CacheGroup | undefined {
     if (!isPlainObject(value)) return
-    const group: Record<string, CacheRecord> = {}
-    for (const [model, record] of Object.entries(value)) {
+    const { api, models } = value as { api?: unknown; models?: unknown }
+    if (api !== undefined && !isEndpoint(api)) return
+    if (!isPlainObject(models)) return
+    const group: CacheGroup = { models: {} }
+    if (api !== undefined) group.api = api
+    for (const [model, record] of Object.entries(models)) {
         if (!isCacheRecord(record)) return
-        group[model] = record
+        group.models[model] = record
     }
     return group
 }
@@ -152,7 +195,7 @@ export async function readCache(): Promise<IndexedCatalog | undefined> {
         for (const [provider, group] of Object.entries(parsed)) {
             const records = parseCacheGroup(group)
             if (records === undefined) return
-            if (Object.keys(records).length === 0) continue
+            if (Object.keys(records.models).length === 0) continue
             catalog[provider] = records
             usable += 1
         }

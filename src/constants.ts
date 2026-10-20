@@ -29,35 +29,21 @@ export const DEVELOPER_COMPAT_FIELD = 'supportsDeveloperRole'
 /** disableStore 对应的 provider 路由 compat 字段名（开启写 false，关闭删键） */
 export const STORE_COMPAT_FIELD = 'supportsStore'
 
-/** 模型名前缀 -> 官方提供方候选（依序尝试），用于跨提供方匹配同源模型；前缀须全小写（匹配前已对裸名 lowercase），取舍依据见 docs/decisions.md「参数来源」 */
-export const HINTS: ReadonlyArray<readonly [string, readonly string[]]> = [
-    ['deepseek', ['deepseek']],
-    ['claude', ['anthropic']],
-    ['kimi', ['moonshotai', 'moonshotai-cn']],
-    ['grok', ['xai']],
-    ['gpt', ['openai']],
-    ['chatgpt', ['openai']],
-    ['o1', ['openai']],
-    ['o3', ['openai']],
-    ['o4', ['openai']],
-    ['gemini', ['google']],
-    ['gemma', ['google']],
-    ['qwen', ['alibaba', 'alibaba-cn']],
-    ['qwen3', ['alibaba', 'alibaba-cn']],
-    ['glm', ['zai', 'zhipuai']],
-    ['mistral', ['mistral']],
-    ['magistral', ['mistral']],
-    ['codestral', ['mistral']],
-    ['ministral', ['mistral']],
-    ['pixtral', ['mistral']],
-    ['mixtral', ['mistral']],
-    ['voxtral', ['mistral']],
-    ['devstral', ['mistral']],
-    ['minimax', ['minimax', 'minimax-cn']],
-    ['mimo', ['xiaomi']],
-    ['llama', ['llama']],
-    ['sonar', ['perplexity']],
-    ['longcat', ['longcat']],
-    ['doubao', ['volcengine', 'volcengine-coding-plan']],
-    ['step', ['stepfun', 'stepfun-ai', 'stepfun-step-plan']],
-]
+/**
+ * models.dev 缺失 api 字段时的端点补全表：provider id → 端点。
+ * 只收端点固定稳定的主流提供方（账号级/环境变量决定的端点不入表，那类端点本就静态不可知）。
+ * 仅在构建缓存时使用；models.dev 自带 api 时以其为准。
+ */
+export const PROVIDER_API_FALLBACKS: Readonly<Record<string, string | undefined>> = {
+    openai: 'https://api.openai.com/v1',
+    anthropic: 'https://api.anthropic.com',
+    google: 'https://generativelanguage.googleapis.com/v1beta',
+    xai: 'https://api.x.ai/v1',
+    groq: 'https://api.groq.com/openai/v1',
+    mistral: 'https://api.mistral.ai',
+    cerebras: 'https://api.cerebras.ai/v1',
+    togetherai: 'https://api.together.ai/v1',
+    perplexity: 'https://api.perplexity.ai',
+    cohere: 'https://api.cohere.ai/compatibility/v1',
+    vercel: 'https://ai-gateway.vercel.sh/v1',
+}

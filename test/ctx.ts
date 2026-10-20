@@ -106,5 +106,5 @@ export function makeStubCtx(opts: StubCtxOpts = {}): StubCtx {
 /** 重置模块级单例（目录 + 配置源），每个用例前调用 */
 export function resetModules(): void {
     setConfigSource(() => DEFAULT_CONFIG)
-    setCatalog({ catalog: {}, groups: new Map() })
+    setCatalog({ catalog: {}, groups: new Map(), endpoints: new Map() })
 }

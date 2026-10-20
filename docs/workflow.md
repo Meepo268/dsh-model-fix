@@ -4,6 +4,8 @@
 
 `pnpm typecheck` / `lint` / `test` / `build`；提交前必跑。只认这些已定义脚本，不得裸跑 bin（`tsdown --config`、`eslint` 的 TS 配置读取都挂在脚本上，裸跑漏开关就与提交前验证不等价）。
 
+`pnpm build:cache` 是维护命令（重建随包目录缓存 `public/models-cache.json`），不在提交前验证序列内；它经 jiti 直跑 TS 构建器，与运行期同一份逻辑，不复制。
+
 ## 工具链陷阱
 
 - pnpm 脚本必须在 shell 里直接跑，不得经 Node 子进程包裹（沙箱下 `child_process` 启 pnpm 报 `spawn EPERM`）。
@@ -24,6 +26,6 @@
 
 ## 测试规范
 
-`test/` 只收不依赖 DSH 运行时的纯函数与零 ctx 编排：配置解析与迁移、目录拍平与缓存条目校验、id 匹配与档位转换、compat 计划、`planResetModels` / `planRestore`、probe 四层（`planProbes` / `groupProbesByProvider` / `classifyFailure` / `reportProvider` / `summarizeProviders` / `planEffortApply` / `declaredEffortsOf`）、两个执行器带桩全链路（进度帧序列、`skipped`、`done ≤ total` 不变量、早停不发终帧、中止不入账也不短路、未开跑的组不进汇报、探测预声明→收敛写回与终帧统计）、`probeOnce` 超时兜底（`timeoutMs` / `graceMs` 可选参数传小值毫秒级验证）、守卫、`rpc-route` 纯信封 + node:http 桩、`rpc` 进度流（标准 `Request`/`Response` 驱动）、`refresh` 卸载清理（替换全局 `fetch` 桩）、`fix` / `probeAndFill` 编排 + `test/ctx.ts` 常驻内存 settings 桩（`noPlugin` 模拟自有段未登记、`mutateCalls` 逐次记守卫状态）、浏览器半纯映射层（含 `isUnfilled` 与至多七档展开）。浏览器组件与真实 fs / 网络不进 `test/`（两个执行器只依赖注入的 `llm.stream`）。
+`test/` 只收不依赖 DSH 运行时的纯函数与零 ctx 编排：配置解析与迁移、目录构建与缓存条目校验、id 匹配与档位转换、compat 计划、`planResetModels` / `planRestore`、probe 四层（`planProbes` / `groupProbesByProvider` / `classifyFailure` / `reportProvider` / `summarizeProviders` / `planEffortApply` / `declaredEffortsOf`）、两个执行器带桩全链路（进度帧序列、`skipped`、`done ≤ total` 不变量、早停不发终帧、中止不入账也不短路、未开跑的组不进汇报、探测预声明→收敛写回与终帧统计）、`probeOnce` 超时兜底（`timeoutMs` / `graceMs` 可选参数传小值毫秒级验证）、守卫、`rpc-route` 纯信封 + node:http 桩、`rpc` 进度流（标准 `Request`/`Response` 驱动）、`refresh` 卸载清理（替换全局 `fetch` 桩）、`fix` / `probeAndFill` 编排 + `test/ctx.ts` 常驻内存 settings 桩（`noPlugin` 模拟自有段未登记、`mutateCalls` 逐次记守卫状态）、浏览器半纯映射层（含 `isUnfilled` 与至多七档展开）。浏览器组件与真实 fs / 网络不进 `test/`（两个执行器只依赖注入的 `llm.stream`）。
 
 模块级单例的复位纪律：`indexedCache` 与 `configSource` 每用例前调 `resetModules()`；`refresh.ts` 的 `refreshing` / `retryTimer` 用例收尾调 `cancelRefreshRetry()`；`probeOnce` 超时兜底用例挂了 `process.on('unhandledRejection')`，用例收尾必须 `off` 还原。

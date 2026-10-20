@@ -19,6 +19,7 @@
   - `unset` 只删本键、不折叠空父对象 ⇒ 删空壳必须整段 `unset`（`src/compat.ts` 整段 unset、`src/empty.ts` 空壳判据都建立在这条上）。
   - 只允许写 volatile 字段（`isVolatilePath`，`DSH/packages/settings/settings/src/schema.ts`）。本插件两处写入都在 volatile 子树：自有段 `Config = z.any().volatile()`（根 volatile ⇒ 整段可写）；`llm-pi-ai` 段 `providers: z.dict(profile).default({}).volatile()`（`DSH/packages/llm/llm-pi-ai/src/config.ts`）⇒ `providers.<id>.models` 与 `compat` 可写。
   - `fix` 按 provider 整段 `set` 覆盖 `models`、不写数组下标中间段，是两侧读法（下标支持与否）的安全子集。
+- `providers.<id>.baseURL` 是该路由的端点（宿主 `llm-pi-ai` 的 `PiAiProviderProfile.baseURL`，缺省时宿主回落内置目录的默认端点）。本插件**只读不写**，用作模型参数填充的端点匹配依据（`src/lookup.ts` 阶段一）。字段名是 `baseURL`（大写 URL）、路由级（不随模型逐条配置）。
 
 ### settings：变更事件与装载时序
 

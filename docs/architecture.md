@@ -8,8 +8,8 @@
 | `src/config.ts` | 配置解析（快照优先级）与配置源持有 |
 | `src/migrate.ts` | 启动迁移、旧快照清理与自愈（排除列表去重） |
 | `src/upgrade.ts` | 冻结的升级台阶链（v7 → 当前版） |
-| `src/catalog.ts` | models.dev 目录拉取、缓存读写与拍平索引 |
-| `src/lookup.ts` | 模型 id 匹配（三级归一）与档位转换 |
+| `src/catalog.ts` | models.dev 目录拉取、缓存读写与分组 / 端点索引 |
+| `src/lookup.ts` | 模型 id 匹配（端点 → 提供方 → 全局三级级联）与档位转换 |
 | `src/compat.ts` | 路由 compat 纯写入计划 |
 | `src/fix.ts` | 填充与写回：纯计划函数 `planFill` 出 op，`fix` 只做编排 |
 | `src/memory.ts` | 推理级别记忆的失效清理：存活清单 → 纯 `planPruneMemory` → 只写 `efforts` 键 |
@@ -62,7 +62,8 @@
 | `src/client/locale-zh.ts` `locale-en.ts` | 卡片词典（中 / 英） |
 | `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
 | `src/client/back-to-chat.tsx` | 「返回对话」悬浮按钮：中心列左下角直插 DOM + 独立 React 根（宿主 `ctx.layout.selectPanel(null)`） |
-| `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用） |
+| `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用；`pnpm build:cache` 重建） |
+| `scripts/build-cache.mjs` | 重建随包缓存：拉 models.dev 全量数据并跑运行期同一个构建器（jiti 直跑 TS，逻辑不复制） |
 | `icon.svg` `cordis.patch.yml` `locale/*.json` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |
 
 ## 数据流

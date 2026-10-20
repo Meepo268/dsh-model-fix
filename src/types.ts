@@ -19,18 +19,28 @@ export interface ModelEntry {
 
 /** 磁盘缓存条目：去掉 provider/id 两字段（分组键与嵌套键已承担），体积更小；内存索引（IndexEntry）为补全分组键的完整条目 */
 export interface CacheRecord {
-    /** 可选推理级别，'off'/'none' 为目录原值（表示可关闭推理）；无可选档位时为空数组 */
-    efforts: string[]
+    /** 可选推理级别，'off'/'none' 为目录原值（表示可关闭推理）；模型无可用推理能力时整个键不写 */
+    efforts?: string[]
     /** 最大上下文窗口（tokens），仅当 models.dev 提供 */
     contextWindow?: number
     /** 最大输出 tokens，仅当 models.dev 提供 */
     maxTokens?: number
     /** 支持图片输入时为 true；纯文本模型省略此字段（不缓存 false，控制体积） */
     image?: boolean
+    /** 该模型的实际端点（models.dev 模型级 provider.api）；缺省即继承所属提供方的 api */
+    api?: string
 }
 
-/** 磁盘缓存：{ provider-id: { model-id: 缓存条目 } }，provider 只作外层键，消除逐条重复 */
-export type Catalog = Record<string, Record<string, CacheRecord>>
+/** 磁盘缓存的一个提供方分组：组级端点 + 该提供方的模型表 */
+export interface CacheGroup {
+    /** 该提供方的端点（models.dev provider.api；缺失时由静态端点表补全） */
+    api?: string
+    /** 模型表：模型 id → 缓存条目 */
+    models: Record<string, CacheRecord>
+}
+
+/** 磁盘缓存：{ provider-id: 分组 }，provider 只作外层键，消除逐条重复 */
+export type Catalog = Record<string, CacheGroup>
 
 /** 内存索引条目：缓存条目（CacheRecord）补上分组键下的 model id，供 lookup/fix 按 provider+id 消费 */
 export interface IndexEntry {
@@ -51,6 +61,8 @@ export interface ProviderGroup {
 export interface IndexedCatalog {
     catalog: Catalog
     groups: Map<string, ProviderGroup>
+    /** 端点 → 指向该端点的提供方 id（组级 api 与模型级 api 都登记；严格字符串匹配，不做归一） */
+    endpoints: Map<string, string[]>
 }
 
 /** 判断是否为可写回的容量值：正整数且非哨兵（harness schema 要求 step(1).min(1)；0 与 99999999 均视为无数据） */

@@ -51,7 +51,7 @@ export function planFill(
             continue
         }
         if (!isPlainObject(provider)) continue
-        const { api, models, compat: currentCompat } = provider as { api?: unknown; models?: unknown; compat?: unknown }
+        const { api, models, compat: currentCompat, baseURL } = provider as { api?: unknown; models?: unknown; compat?: unknown; baseURL?: unknown }
         if (Array.isArray(models)) {
             let next: Record<string, unknown>[] | undefined
             for (let i = 0; i < models.length; i++) {
@@ -65,7 +65,7 @@ export function planFill(
                     contextWindow?: unknown
                     maxTokens?: unknown
                 }
-                const entry = lookup(indexed, providerId, modelId, looseMatch)
+                const entry = lookup(indexed, providerId, typeof baseURL === 'string' ? baseURL : undefined, modelId, looseMatch)
                 const efforts = toReasoningEfforts(entry)
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input

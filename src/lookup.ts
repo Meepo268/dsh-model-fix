@@ -1,4 +1,4 @@
-import { HINTS, LEVELS } from '@/constants'
+import { LEVELS } from '@/constants'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { isCapacity } from '@/types'
 
@@ -43,18 +43,26 @@ function matchId(localId: string, ids: readonly string[]): string | undefined {
     if (prefix.length === 1) return prefix[0]
 }
 
-/** 按模型名前缀提示官方提供方候选（同一模型常挂在多个官方名下，返回全部候选由调用方依序尝试） */
-function hintedProviders(id: string): readonly string[] {
-    const bare = id.slice(id.lastIndexOf('/') + 1).toLowerCase()
-    return HINTS.find(([prefix]) => bare === prefix || bare.startsWith(`${prefix}-`) || bare.startsWith(`${prefix}.`))?.[1] ?? []
+/** 档位层级：'none' 与 'off' 同归 off 键（关推理），其余为自身 */
+function levelOf(effort: string): string {
+    return effort === 'none' || effort === 'off' ? 'off' : effort
 }
 
-/** 在目录中查找模型条目：组内依次 完整 id → 裸名 → 末段唯一匹配；全局官方提示依序试、兜底仅跨提供方唯一命中才认。多命中判歧义放弃（宁可漏不错配，见 decisions.md「参数来源」）。
- * `loose`（尽量匹配）时歧义不再放弃：兜底命中 ≥2 进加权合成、=1 直接返回；仍无命中则用归一裸名全局 includes 扩展候选，同样单命中直接返回、多命中合成 */
-export function lookup(indexed: IndexedCatalog, providerId: string, modelId: string, loose = false): IndexEntry | undefined {
-    const { groups } = indexed
+/**
+ * 在目录中查找模型条目：端点 → 提供方 id → 全局模型 id 三级级联。
+ * 端点命中时域已定（该端点提供的模型），同名多组只在参数上分歧：先按提供方 id 裁决，裁不了则取保守值。
+ * 全局阶段多命中判歧义放弃（宁可漏不错配）；`loose`（尽量匹配）时改为收集候选合成。
+ */
+export function lookup(
+    indexed: IndexedCatalog,
+    providerId: string,
+    baseUrl: string | undefined,
+    modelId: string,
+    loose = false,
+): IndexEntry | undefined {
+    const { groups, endpoints } = indexed
     const bare = modelId.slice(modelId.lastIndexOf('/') + 1)
-    /** 组内匹配；`tailMatch` 只在 provider 严格匹配（已定域）时开启，避免裸名撞别家末段造成跨提供方错配 */
+    /** 组内匹配；`tailMatch` 只在域已定（端点命中 / 提供方严格匹配）时开启，避免裸名撞别家末段造成跨提供方错配 */
     const matchIn = (provider: string, tailMatch: boolean): IndexEntry | undefined => {
         const group = groups.get(provider)
         if (!group) return
@@ -78,59 +86,51 @@ export function lookup(indexed: IndexedCatalog, providerId: string, modelId: str
         }
         return tailHit
     }
-    // 配置 provider 精确命中目录时，仅在该 provider 内匹配（末段匹配仅在此处启用）
+    // 端点：严格字符串匹配（不归一），命中的提供方集合即域
+    if (baseUrl) {
+        const candidates = endpoints.get(baseUrl)
+        if (candidates) {
+            const hits: { provider: string; entry: IndexEntry }[] = []
+            for (const provider of candidates) {
+                const hit = matchIn(provider, true)
+                if (hit) hits.push({ provider, entry: hit })
+            }
+            if (hits.length === 1) return hits[0].entry
+            if (hits.length > 1) {
+                const named = hits.find((hit) => hit.provider === providerId)
+                if (named) return named.entry
+                return mergeConservative(hits.map((hit) => hit.entry))
+            }
+        }
+    }
+    // 提供方 id：路由 id 命中目录时仅在该提供方内匹配
     if (providerId && groups.has(providerId)) {
         const same = matchIn(providerId, true)
         if (same) return same
     }
-    // 模型名前缀提示的官方提供方：提示本身即定位依据，依序试到命中即认
-    const hinted = hintedProviders(bare)
-    for (const provider of hinted) {
-        const official = matchIn(provider, false)
-        if (official) return official
-    }
-    // 其余提供方：`loose` 时收集全部命中（候选都过了组内三级匹配），否则第二命中即放弃
-    const collected: LooseCandidate[] = []
+    // 全局：跨提供方按模型 id 匹配，唯一命中才认
+    const collected: IndexEntry[] = []
     for (const provider of groups.keys()) {
-        if (provider === providerId || hinted.includes(provider)) continue
+        if (provider === providerId) continue
         const hit = matchIn(provider, false)
         if (!hit) continue
         if (!loose && collected.length) return
-        collected.push({ entry: hit, provider })
+        collected.push(hit)
     }
-
-    // ≥2 命中只有 loose 可达（非 loose 已在循环内返回）
-    if (collected.length === 1) return collected[0].entry
+    if (collected.length === 1) return collected[0]
     if (collected.length > 1) return synthesize(collected)
-
     if (!loose) return
     const wanted = normalizeId(bare)
-    const fuzzy: LooseCandidate[] = []
-    for (const [provider, group] of groups) {
+    const fuzzy: IndexEntry[] = []
+    for (const group of groups.values()) {
         for (const id of group.ids) {
             if (!id.includes(wanted)) continue
             const entry = group.byId.get(id)
-            if (entry) fuzzy.push({ entry, provider })
+            if (entry) fuzzy.push(entry)
         }
     }
-    // 和collected同逻辑
-    if (fuzzy.length === 1) return fuzzy[0].entry
+    if (fuzzy.length === 1) return fuzzy[0]
     if (fuzzy.length > 1) return synthesize(fuzzy)
-}
-
-/** 尽量匹配的 60% 判据：efforts / image 支持门槛，容量分位位置 */
-const LOOSE_SHARE = 0.6
-
-/** 投票权重：官方 ×5，其余 ×1 */
-const LOOSE_OFFICIAL_WEIGHT = 5
-
-/** 官方 = HINTS 值集合（与 hintedProviders 同源） */
-const OFFICIAL_PROVIDERS: ReadonlySet<string> = new Set(HINTS.flatMap(([, providers]) => providers))
-
-/** 候选：条目 + 提供方（提供方定投票权重） */
-interface LooseCandidate {
-    entry: IndexEntry
-    provider: string
 }
 
 /** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效） */
@@ -148,16 +148,39 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
     return mapped
 }
 
-// ---------- 尽量匹配：加权合成（纯函数，见 docs/decisions.md「参数来源」） ----------
+// ---------- 合成：跨提供方同名条目的保守合并与尽量匹配的加权合成（纯函数，见 docs/decisions.md「参数来源」） ----------
 
-function weightOf(provider: string): number {
-    return OFFICIAL_PROVIDERS.has(provider) ? LOOSE_OFFICIAL_WEIGHT : 1
+/** 保守合并：档位取交集、容量取小、图片需全支持（宁小勿大，宁缺勿滥） */
+function mergeConservative(entries: readonly IndexEntry[]): IndexEntry | undefined {
+    const efforts: string[] = []
+    for (const effort of entries[0].efforts) {
+        const level = levelOf(effort)
+        if (entries.every((entry) => entry.efforts.some((other) => levelOf(other) === level))) efforts.push(effort)
+    }
+    const contextWindow = minCapacity(entries.map((entry) => entry.contextWindow))
+    const maxTokens = minCapacity(entries.map((entry) => entry.maxTokens))
+    const image = entries.every((entry) => entry.image === true) ? true : undefined
+    if (efforts.length === 0 && contextWindow === undefined && maxTokens === undefined && !image) return
+    return { id: entries[0].id, efforts, contextWindow, maxTokens, ...(image ? { image: true } : {}) }
 }
 
-/** 容量「安全 N」：有值容量取 60 分位；官方 ×5 不展开进分位（否则单条官方值即可顶高 N） */
-function safeCapacity(candidates: readonly LooseCandidate[], field: 'contextWindow' | 'maxTokens'): number | undefined {
+/** 有值容量取最小（无值不参与比较） */
+function minCapacity(values: readonly (number | undefined)[]): number | undefined {
+    let min: number | undefined
+    for (const value of values) {
+        if (!isCapacity(value)) continue
+        if (min === undefined || value < min) min = value
+    }
+    return min
+}
+
+/** 尽量匹配的 60% 判据：efforts / image 支持门槛，容量分位位置 */
+const LOOSE_SHARE = 0.6
+
+/** 容量「安全 N」：有值容量取 60 分位 */
+function safeCapacity(candidates: readonly IndexEntry[], field: 'contextWindow' | 'maxTokens'): number | undefined {
     const values: number[] = []
-    for (const { entry } of candidates) {
+    for (const entry of candidates) {
         const value = entry[field]
         if (isCapacity(value)) values.push(value)
     }
@@ -165,19 +188,19 @@ function safeCapacity(candidates: readonly LooseCandidate[], field: 'contextWind
     return values[Math.ceil(values.length * LOOSE_SHARE) - 1]
 }
 
-function synthesize(candidates: readonly LooseCandidate[]): IndexEntry | undefined {
-    const total = candidates.reduce((sum, candidate) => sum + weightOf(candidate.provider), 0)
+/** 尽量匹配的合成：档位与图片取 60% 候选支持，容量取有值候选的 60 分位 */
+function synthesize(candidates: readonly IndexEntry[]): IndexEntry | undefined {
+    const total = candidates.length
     const effortVotes = new Map<string, number>() // 档位 -> 票数
     const offSpellings = new Map<string, number>() // off 原拼写 -> 票数（含 none）
-    for (const { entry, provider } of candidates) {
-        const weight = weightOf(provider)
+    for (const entry of candidates) {
         const seen = new Set<string>()
         for (const effort of entry.efforts) {
-            const level = effort === 'none' || effort === 'off' ? 'off' : effort
+            const level = levelOf(effort)
             if (seen.has(level)) continue
             seen.add(level)
-            effortVotes.set(level, (effortVotes.get(level) ?? 0) + weight)
-            if (level === 'off') offSpellings.set(effort, (offSpellings.get(effort) ?? 0) + weight)
+            effortVotes.set(level, (effortVotes.get(level) ?? 0) + 1)
+            if (level === 'off') offSpellings.set(effort, (offSpellings.get(effort) ?? 0) + 1)
         }
     }
     const efforts: string[] = []
@@ -192,8 +215,8 @@ function synthesize(candidates: readonly LooseCandidate[]): IndexEntry | undefin
     }
     const contextWindow = safeCapacity(candidates, 'contextWindow')
     const maxTokens = safeCapacity(candidates, 'maxTokens')
-    // 图片：声明 true 的候选权重 ≥60% 总权重才写（目录只缓存正向信息，false 即无值）
-    const imageVotes = candidates.reduce((sum, { entry, provider }) => entry.image ? sum + weightOf(provider) : sum, 0)
+    // 图片：声明 true 的候选 ≥60% 才写（目录只缓存正向信息，false 即无值）
+    const imageVotes = candidates.reduce((sum, entry) => entry.image ? sum + 1 : sum, 0)
     const image = imageVotes >= total * LOOSE_SHARE || undefined
     if (efforts.length === 0 && contextWindow === undefined && maxTokens === undefined && !image) return
     return {

@@ -25,6 +25,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "build:cache": "node scripts/build-cache.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "tsdown --config tsdown.test.config.ts && node .test-dist/index.mjs",
