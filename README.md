@@ -37,6 +37,7 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 - 没配官方 API 密钥，模型选择器里却挂着一组用不了的官方模型？【隐藏官方API】官方 API 未配置密钥时不在模型选择器中显示
 - 推理级别的名字看着别扭？【本地化推理级别】模型选择器里的推理级别按界面语言显示名称
 - 推理级别翻译后对不上原名称？【显示原档位名】在本地化推理级别时，还显示原档位名（如「最大 · Max」），方便对照。
+- 自动填充效果不理想，总是填充不上？【尽量匹配】尽量给出一组合适的参数填充，**但无法保证准确**。
 
 UI界面还提供了一些额外功能：
 
@@ -47,7 +48,7 @@ UI界面还提供了一些额外功能：
 - 探测档位：**【最真实】**勾选模型后逐个推理级别试出实际支持的档位（「选择未填充」一键勾好还没填档位的模型）；「自动写入」控制是否把结论写回
 - **输入框快捷入口**：聊天输入框工具行常驻「模型优化」入口（点开弹完整配置卡）和「跟随」状态灯（点击即可开关）
 - **返回对话悬浮按钮**：内容区左下角常驻一枚圆形按钮，点击即回到当前正在进行的对话（从自动化任务 / 插件页等面板回会话）
-- **界面显示位置可自定义**：【UI 与行为】控制配置界面显示在哪些地方（模型页 / 内置插件 / 工具栏的模型优化入口 / 工具栏的跟随状态灯 / 返回对话悬浮按钮），关闭即从该处卸载；插件功能本身照常运行，「插件管理」里的入口恒可见且不可关闭（否则无处改回）
+- **插件UI相关配置**：【UI 与行为】控制配置插件UI的行为，如设置卡片出现的位置、是否显示「跟随」状态灯、是否显示「返回对话」按钮等。
 
 ### 可视化设置
 
@@ -78,13 +79,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.32.2/dsh-model-fix.tgz
+https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.33.5/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.32.2/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/TikaFlow/dsh-model-fix/releases/download/v0.33.5/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
@@ -140,6 +141,7 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         hideOfficial: true
         localizeEfforts: true
         showOriginalEfforts: true
+        looseMatch: false
       behavior:           # 界面显示与行为
         showInModels: true
         showInBuiltinPlugins: true
