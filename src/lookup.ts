@@ -187,8 +187,14 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
     return mapped
 }
 
-// ---------- 尽量匹配：加权合成（纯函数，见 docs/decisions.md「参数来源」） ----------
+/** 上游声明的档位名表 -> 宿主 reasoningEfforts 形状：与目录同口径过一遍（只留 harness 七档、`none` 折算 off、
+ * 只剩 off 视为无可选档位不填）；端点声明的写法直接当成目录条目复用同一段映射，避免两套口径漂移 */
+export function toReasoningEffortsFromList(efforts: readonly string[] | undefined): Record<string, string | null> | undefined {
+    if (efforts === undefined) return
+    return toReasoningEfforts({ id: '', efforts: [...efforts] })
+}
 
+// ---------- 尽量匹配：加权合成（纯函数，见 docs/decisions.md「参数来源」） ----------
 function weightOf(provider: string): number {
     return OFFICIAL_PROVIDERS.has(provider) ? LOOSE_OFFICIAL_WEIGHT : 1
 }

@@ -3,7 +3,7 @@ import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { getCatalog } from '@/catalog'
 import { planProviderCompat } from '@/compat'
-import { lookup, toReasoningEfforts } from '@/lookup'
+import { lookup, toReasoningEfforts, toReasoningEffortsFromList } from '@/lookup'
 import { COMPAT_APIS, MAX_ATTEMPTS } from '@/constants'
 import { API_NS, PLUGIN_NAME } from '@/shared/constants'
 import { getConfig } from '@/config'
@@ -12,6 +12,7 @@ import { queueTask } from '@/host'
 import { isCapacity, type IndexedCatalog } from '@/types'
 import { isPlainObject, providersOf, type CompatRules, type PluginConfig } from '@/shared/types'
 import { descriptorOf } from '@/section'
+import { fetchDeclarations, type DeclarationMap } from '@/upstream'
 import { errorText, isSettingsConflict } from '@/shared/errors'
 
 /** 缓存图片信息转换为写回的 input 模态数组：仅支持图片时填 ['text','image']，无数据或纯文本不填（未声明即按纯文本处理） */
@@ -34,6 +35,7 @@ export function planFill(
     providers: Record<string, unknown>,
     indexed: IndexedCatalog,
     force: boolean,
+    declarations?: DeclarationMap,
 ): FillPlan {
     const allowRules = cfg.allowUpdate
     const autoRules = cfg.autoFill
@@ -68,10 +70,12 @@ export function planFill(
                     maxTokens?: unknown
                 }
                 const entry = lookup(indexed, providerId, modelId, looseMatch, modelName)
-                const efforts = toReasoningEfforts(entry)
+                // 参数来源优先级：上游端点声明的维度 > models.dev 目录条目；两侧都缺才留空
+                const declared = declarations?.get(providerId)?.get(modelId)
+                const efforts = toReasoningEffortsFromList(declared?.efforts) ?? toReasoningEfforts(entry)
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input
-                const imageValue = toInputValue(entry?.image)
+                const imageValue = toInputValue(declared?.image ?? entry?.image)
                 // 推理级别
                 const reasoningFillable = autoRules.reasoning
                     && reasoningEfforts === undefined && !!efforts
@@ -79,8 +83,8 @@ export function planFill(
                     && isPlainObject(efforts)
                     && !deepEqualJson(reasoningEfforts, efforts)
                 // 容量新值须为正整数且非哨兵（写 0 会被宿主 schema 拒绝并连累整批写入）
-                const ctxW = entry?.contextWindow
-                const maxT = entry?.maxTokens
+                const ctxW = declared?.contextWindow ?? entry?.contextWindow
+                const maxT = declared?.maxTokens ?? entry?.maxTokens
                 const contextFillable = autoRules.context
                     && contextWindow === undefined && isCapacity(ctxW)
                 const contextUpdatable = (force || allowRules.context)
@@ -131,6 +135,8 @@ export function planFill(
 /** 填充与写回：读最新段 → `planFill` 出计划 → 写 `llm-pi-ai` → 返回变更模型数（不含 compat 计数，保持 RPC 契约）
  * 写回失败先告警再抛出；冲突限次重试时重读整段。刻意不走 writeback.ts 外壳（守卫与端点骨架不同形，理由见该文件头） */
 export async function fix(ctx: Context, force = false): Promise<number> {
+    // 上游声明只在本次修复内抓一次：冲突重试沿用同一份（同一批 providers 不会变），避免连续打端点
+    let declarations: DeclarationMap | undefined
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         // 卸载后不再碰 settings（服务已 dispose，访问即抛 inactive context）
         if (!ctx.fiber.store) return 0
@@ -139,7 +145,8 @@ export async function fix(ctx: Context, force = false): Promise<number> {
         const providers = providersOf(descriptor.user)
         if (!providers) return 0
         const cfg = getConfig()
-        const plan = planFill(cfg, providers, getCatalog(), force)
+        declarations ??= await fetchDeclarations(ctx, providers)
+        const plan = planFill(cfg, providers, getCatalog(), force, declarations)
         if (plan.ops.length === 0) return 0
         try {
             await queueTask(() => ctx.settings.mutate(API_NS, plan.ops, descriptor.revision))

@@ -12,6 +12,7 @@ import { run as runLookup } from '@test/lookup.test'
 import { run as runMemory } from '@test/memory.test'
 import { run as runMigrate } from '@test/migrate.test'
 import { run as runOfficialFilter } from '@test/official-filter.test'
+import { run as runUpstream } from '@test/upstream.test'
 import { run as runUpgrade } from '@test/upgrade.test'
 import { run as runProbe } from '@test/probe.test'
 import { run as runProbeBackup } from '@test/probe-backup.test'
@@ -48,6 +49,8 @@ section('memory.test.ts')
 await runMemory()
 section('migrate.test.ts')
 runMigrate()
+section('upstream.test.ts')
+await runUpstream()
 section('upgrade.test.ts')
 runUpgrade()
 section('official-filter.test.ts')
