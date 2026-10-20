@@ -125,7 +125,7 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         reasoning: true
         context: true
         image: true
-      allowUpdate:        # 允许更新已有模型的字段；默认 false
+      allowUpdate:        # 刷新「插件上次写过的」字段（手改过的字段始终冻结）；默认 false
         reasoning: false
         context: false
         image: false
@@ -134,6 +134,7 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         disableStore: true
       excludes: []        # 排除的提供方 id 列表
       efforts: {}         # 每模型推理级别记忆
+      written: {}         # 插件写过的字段指纹（自动维护，用于识别手改；一般不用手填）
       userExperience:     # 用户体验，对所有提供方生效，不支持排除
         rememberEfforts: true
         defaultHigh: true
