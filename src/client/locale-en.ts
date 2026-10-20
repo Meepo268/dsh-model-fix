@@ -101,7 +101,7 @@ export const en: Record<CardKey, string> = {
     verifyLine: '{provider}: {model} [{effort}]: {result}',
     verifyLinePlain: '{provider}: {model}: {result}',
     verifyLineProvider: '{provider}: {result}',
-    verifySkipped: '({count} skipped)',
+    verifySkipped: '({count} following skipped)',
     verifyOutUsable: 'usable',
     verifyOutUnsupported: 'reasoning effort not supported',
     verifyOutUnreachable: 'unreachable',

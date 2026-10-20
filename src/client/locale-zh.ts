@@ -99,7 +99,7 @@ export const zh: Record<CardKey, string> = {
     verifyLine: '{provider}: {model} [{effort}]：{result}',
     verifyLinePlain: '{provider}: {model}：{result}',
     verifyLineProvider: '{provider}：{result}',
-    verifySkipped: '（已跳过 {count} 项）',
+    verifySkipped: '（已跳过后续 {count} 项）',
     verifyOutUsable: '可用',
     verifyOutUnsupported: '不支持该推理等级',
     verifyOutUnreachable: '无法连接',
