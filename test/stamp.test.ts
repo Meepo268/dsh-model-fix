@@ -4,6 +4,7 @@ import { planFill } from '@/fix'
 import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import type { PluginConfig } from '@/shared/types'
 import type { IndexedCatalog, IndexEntry } from '@/types'
+import type { DeclarationMap } from '@/upstream'
 import { check, stable } from '@test/helper'
 
 /** 默认配置，按需覆盖 */
@@ -67,28 +68,38 @@ export function run(): void {
     const merged2 = withStamps(merged, 'gw', 'm2', b)
     check('不同模型各自一条', merged2.gw?.['m2'] !== undefined && merged2.gw?.['m1'] === text)
 
-    // ---------- 5. 填充策略：缺失照填；已有值按「允许更新 + 仍是插件写的」才更新 ----------
+    // ---------- 5. 填充策略：缺失照填；已有值只在「来源升级」时更新，同级/降级一律锁定 ----------
     const catalog = indexed([
         { id: 'm1', efforts: ['low', 'high'], contextWindow: 1_000_000, maxTokens: 128_000 },
         { id: 'm2', efforts: ['low', 'high'], contextWindow: 1_000_000, maxTokens: 128_000 },
+        { id: 'm3', efforts: ['low', 'high'], contextWindow: 2_000_000, maxTokens: 256_000 },
     ])
     const providers = { gw: { models: [
-        // m1 已有值且是插件写的 -> allowUpdate 开则更新
+        // m1 全部由目录写过（来源 c）-> 目录再报什么都不要动（自动锁定）
         { id: 'm1', reasoningEfforts: { low: 'low' }, contextWindow: 1_000_000, maxTokens: 128_000 },
-        // m2 已有值但被手改 -> 冻结
+        // m2 档位被手改 -> 冻结；缺的容量照补
         { id: 'm2', reasoningEfforts: { medium: 'medium' } },
+        // m3 档位由目录写过，本轮上游声明的档位更全 -> 允许升级
+        { id: 'm3', reasoningEfforts: { low: 'low' }, contextWindow: 2_000_000, maxTokens: 256_000 },
     ] } }
     const writtenCfg = {
         gw: {
-            m1: serializeStamps(fieldStampsOf({ reasoningEfforts: { low: 'low' }, contextWindow: 1_000_000, maxTokens: 128_000 })),
+            m1: serializeStamps(fieldStampsOf({ reasoningEfforts: { low: 'low' }, contextWindow: 1_000_000, maxTokens: 128_000 }, { r: 'c', c: 'c', m: 'c' })),
             m2: serializeStamps(fieldStampsOf({ reasoningEfforts: { low: 'low' } })),
+            m3: serializeStamps(fieldStampsOf({ reasoningEfforts: { low: 'low' }, contextWindow: 2_000_000, maxTokens: 256_000 }, { r: 'c', c: 'c', m: 'c' })),
         },
     }
-    const plan = planFill(cfg({ allowUpdate: { reasoning: true, context: true, image: false }, written: writtenCfg }), providers, catalog, false)
+    const declarations: DeclarationMap = new Map([['gw', new Map([
+        ['m3', { efforts: ['low', 'medium'], contextWindow: 2_000_000, maxTokens: 256_000 }],
+    ])]])
+    const plan = planFill(cfg({ allowUpdate: { reasoning: true, context: true, image: false }, written: writtenCfg }), providers, catalog, false, declarations)
     const rows = written(plan.ops)
-    check('插件写过的字段被更新（补全档位）', stable(rows[0].reasoningEfforts) === stable({ low: 'low', high: 'high' }), rows[0])
-    check('手改字段被冻结', stable(rows[1].reasoningEfforts) === stable({ medium: 'medium' }), rows[1])
-    check('手改行缺失的容量仍按缺失补（缺失不是手改）', rows[1].contextWindow === 1_000_000 && rows[1].maxTokens === 128_000, rows[1])
+    const byId = (id: string): Record<string, unknown> | undefined => rows.find((row) => row.id === id)
+    check('目录写过的值同级不再刷新（已锁定）', stable(byId('m1')?.reasoningEfforts) === stable({ low: 'low' }) && byId('m1')?.contextWindow === 1_000_000, byId('m1'))
+    check('上游声明可把目录值升级', stable(byId('m3')?.reasoningEfforts) === stable({ low: 'low', medium: 'medium' }), byId('m3'))
+    check('升级后指纹记上游来源', parseStamps(plan.written.gw?.m3)?.s?.r === 'u', parseStamps(plan.written.gw?.m3))
+    check('手改字段被冻结', stable(byId('m2')?.reasoningEfforts) === stable({ medium: 'medium' }), byId('m2'))
+    check('手改行缺失的容量仍按缺失补（缺失不是手改）', byId('m2')?.contextWindow === 1_000_000 && byId('m2')?.maxTokens === 128_000, byId('m2'))
 
     // force：单次全放开，手改值也覆盖
     const forced = planFill(cfg({ written: writtenCfg }), providers, catalog, true)
@@ -97,6 +108,6 @@ export function run(): void {
     // 指纹随写入一起更新（下一轮才认得出这行还是插件写的）
     check('写入后指纹表有变化计数', plan.stamps === 2, plan.stamps)
     const stampOfM2 = parseStamps(plan.written.gw?.m2)
-    check('指纹按写入后的行计算', stampOfM2?.c === 1_000_000 && stampOfM2?.r === 'medium=medium', stampOfM2)
+    check('未写字段保留旧指纹（与当前值不符即冻结）', stampOfM2?.c === 1_000_000 && stampOfM2?.r === 'low=low', stampOfM2)
 }
 

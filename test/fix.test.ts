@@ -120,14 +120,14 @@ export async function run(): Promise<void> {
         setConfig(cfg({
             autoFill: { reasoning: true, context: false, image: false },
             allowUpdate: { reasoning: true, context: false, image: false },
-            // 指纹与现有行一致 = 这行是插件上次写的，故允许更新（手改行见下一条用例）
+            // 指纹与现有行一致、且来源是目录：同级不再刷新（自动锁定），本轮不该改写
             written: { testprovider: { 'model-a': serializeStamps(fieldStampsOf({ reasoningEfforts: { low: 'low' } })) } },
         }))
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]
-        check('allowUpdate：覆盖插件写入的推理级别', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }))
-        check('allowUpdate：变更计数为 1', changes === 1)
+        check('allowUpdate：同级来源不再刷新（已锁定）', stable(model?.reasoningEfforts) === stable({ low: 'low' }))
+        check('allowUpdate：锁定后无变更', changes === 0)
     }
 
     // ---------- 3b. allowUpdate 开启但该字段被手改（指纹不符）：不覆盖 ----------

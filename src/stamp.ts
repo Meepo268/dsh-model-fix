@@ -23,6 +23,31 @@ export interface FieldStamps {
     m: number | null
     /** 输入模态（按声明顺序拼接，`text,image`） */
     i: string | null
+    /** 各字段的写入来源：`u` 上游声明、`c` 目录。旧记录没有这一段，按「来源不明」处理（见 mayReplace） */
+    s?: Partial<Record<StampField, StampSource>>
+}
+
+/** 指纹里的字段名 */
+export type StampField = 'r' | 'c' | 'm' | 'i'
+
+/** 写入来源：`u` 上游声明（端点自己报的），`c` 目录（models.dev 缓存） */
+export type StampSource = 'u' | 'c'
+
+/** 来源等级：上游 2 > 目录 1 > 来源不明 1（不明按目录级算——目录不许覆盖它，上游可以纠正它） */
+function rankOf(source: StampSource | undefined): number {
+    return source === 'u' ? 2 : 1
+}
+
+/** 新来源能否覆盖旧来源写下的字段：只有「等级更高」才允许。同级同源由调用方的 allowUpdate 决定，
+ * 而「上游 → 目录」这一降级永不允许——上游端点一时连不上时，目录值不会再把网关声明顶掉 */
+export function mayReplace(previous: StampSource | undefined, next: StampSource | undefined): boolean {
+    if (next === undefined) return false
+    return rankOf(next) > rankOf(previous)
+}
+
+/** 取某字段的来源（旧记录/坏值一律 undefined） */
+export function stampSource(stamps: FieldStamps | undefined, field: StampField): StampSource | undefined {
+    return stamps?.s?.[field]
 }
 
 /** 档位对象归一：只认字符串值，键排序，`off` 排最前（与宿主写回形状无关，只为可比） */
@@ -40,19 +65,21 @@ function stampInput(value: unknown): string | null {
     return items.length === 0 ? null : items.join(',')
 }
 
-/** 一行模型参数的四字段指纹（取本轮"已剔除空壳"的行） */
+/** 一行模型参数的四字段指纹（取本轮"已剔除空壳"的行）；`sources` 给出各字段的写入来源，缺省不记来源 */
 export function fieldStampsOf(row: {
     reasoningEfforts?: unknown
     contextWindow?: unknown
     maxTokens?: unknown
     input?: unknown
-}): FieldStamps {
-    return {
+}, sources?: Partial<Record<StampField, StampSource>>): FieldStamps {
+    const stamps: FieldStamps = {
         r: stampEfforts(row.reasoningEfforts),
         c: typeof row.contextWindow === 'number' ? row.contextWindow : null,
         m: typeof row.maxTokens === 'number' ? row.maxTokens : null,
         i: stampInput(row.input),
     }
+    if (sources !== undefined && Object.keys(sources).length > 0) stamps.s = { ...sources }
+    return stamps
 }
 
 /** 指纹序列化（写进 `written` 键的字符串） */
@@ -70,13 +97,47 @@ export function parseStamps(value: unknown): FieldStamps | undefined {
         return
     }
     if (!isPlainObject(parsed)) return
-    const { r, c, m, i } = parsed
-    return {
+    const { r, c, m, i, s } = parsed
+    const stamps: FieldStamps = {
         r: typeof r === 'string' ? r : null,
         c: typeof c === 'number' ? c : null,
         m: typeof m === 'number' ? m : null,
         i: typeof i === 'string' ? i : null,
     }
+    if (isPlainObject(s)) {
+        const sources: Partial<Record<StampField, StampSource>> = {}
+        for (const field of ['r', 'c', 'm', 'i'] as const) {
+            const source = s[field]
+            if (source === 'u' || source === 'c') sources[field] = source
+        }
+        if (Object.keys(sources).length > 0) stamps.s = sources
+    }
+    return stamps
+}
+
+/** 本轮补写后的指纹：本轮真正写过的字段换成新值 + 新来源，没写过的字段保留旧记录。
+ * 旧记录为 null 或缺失的字段保持 null——它当时不是插件写的，之后也不许被自动来源当成自己的。 */
+export function stampPatched(
+    previous: FieldStamps | undefined,
+    patched: { reasoningEfforts?: unknown; contextWindow?: unknown; maxTokens?: unknown; input?: unknown },
+    writtenFields: Partial<Record<StampField, StampSource>>,
+): FieldStamps {
+    const fresh = fieldStampsOf(patched)
+    const next: FieldStamps = previous === undefined
+        ? { r: null, c: null, m: null, i: null }
+        : { r: previous.r, c: previous.c, m: previous.m, i: previous.i }
+    const sources: Partial<Record<StampField, StampSource>> = { ...previous?.s }
+    const values = next as Record<StampField, string | number | null>
+    const freshValues = fresh as Record<StampField, string | number | null>
+    for (const field of ['r', 'c', 'm', 'i'] as const) {
+        if (!(field in writtenFields)) continue
+        values[field] = freshValues[field]
+        const source = writtenFields[field]
+        if (source === undefined) delete sources[field]
+        else sources[field] = source
+    }
+    if (Object.keys(sources).length > 0) next.s = sources
+    return next
 }
 
 /** 取某模型上次写入的指纹（原始字符串，未解析） */
@@ -92,7 +153,7 @@ export function isPluginWritten(
     written: WrittenMap,
     provider: string,
     model: string,
-    field: keyof FieldStamps,
+    field: StampField,
     stamps: FieldStamps,
 ): boolean {
     const stored = parseStamps(writtenOf(written, provider, model))

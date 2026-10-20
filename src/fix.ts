@@ -12,7 +12,7 @@ import { getConfig } from '@/config'
 import { stripEmptyFields } from '@/empty'
 import { queueTask } from '@/host'
 import { isCapacity, type IndexedCatalog } from '@/types'
-import { fieldStampsOf, isPluginWritten, withStamps, type FieldStamps } from '@/stamp'
+import { fieldStampsOf, isPluginWritten, mayReplace, parseStamps, stampPatched, stampSource, withStamps, writtenOf, type StampField, type StampSource } from '@/stamp'
 import { isPlainObject, providersOf, type CompatRules, type PluginConfig, type WrittenMap } from '@/shared/types'
 import { descriptorOf } from '@/section'
 import { fetchDeclarations, type DeclarationMap } from '@/upstream'
@@ -89,39 +89,48 @@ export function planFill(
                 const { entry, declared, pin } = resolveSource(cfg, indexed, declarations, providerId, modelId, modelName)
                 // 人工指定过来源的模型按用户意图整体生效：不再受指纹冻结（选来源就是要它落下来），但仍记新指纹
                 const pinned = pin !== ''
-                const efforts = toReasoningEffortsFromList(declared?.efforts) ?? toReasoningEfforts(entry)
+                const declaredEfforts = toReasoningEffortsFromList(declared?.efforts)
+                const catalogEfforts = toReasoningEfforts(entry)
+                const efforts = declaredEfforts ?? catalogEfforts
+                const effortsFrom: StampSource | undefined = declaredEfforts !== undefined ? 'u' : catalogEfforts !== undefined ? 'c' : undefined
                 // 图片模态同上：判据取自 cleaned.input
                 const input = cleaned.input
                 const imageValue = toInputValue(declared?.image ?? entry?.image)
+                const imageFrom: StampSource | undefined = declared?.image !== undefined ? 'u' : entry?.image !== undefined ? 'c' : undefined
                 // 指纹口径：逐字段判断「这行还是插件上次写的那一版」，手改过的字段不再被自动来源覆盖（见 src/stamp.ts）
                 const stampsNow = fieldStampsOf(cleaned)
-                const pluginWrote = (field: keyof FieldStamps): boolean =>
+                const previous = parseStamps(writtenOf(cfg.written, providerId, modelId))
+                const pluginWrote = (field: StampField): boolean =>
                     isPluginWritten(cfg.written, providerId, modelId, field, stampsNow)
-                /** 已有值可被自动来源覆盖的条件：强制更新单次全放开；人工指定过来源的模型整体放开；否则该字段的「允许更新」开着、且该字段仍是插件写的 */
-                const editable = (field: keyof FieldStamps): boolean =>
-                    force || pinned || (allowRules[RULE_OF[field]] && pluginWrote(field))
+                /** 已有值可被自动来源覆盖的条件：强制更新单次全放开；人工指定过来源的模型整体放开；否则该字段的
+                 * 「允许更新」开着、仍是插件写的，且新来源等级更高（只有「目录 → 上游声明」这一种升级，同级不再刷新——
+                 * 值一旦写过就锁定，要换用「强制更新」） */
+                const editable = (field: StampField, source: StampSource | undefined): boolean =>
+                    force || pinned || (allowRules[RULE_OF[field]] && pluginWrote(field) && mayReplace(stampSource(previous, field), source))
                 // 推理级别
                 const reasoningFillable = autoRules.reasoning
                     && reasoningEfforts === undefined && !!efforts
-                const reasoningUpdatable = editable('r')
+                const reasoningUpdatable = editable('r', effortsFrom)
                     && isPlainObject(efforts)
                     && !deepEqualJson(reasoningEfforts, efforts)
                 // 容量新值须为正整数且非哨兵（写 0 会被宿主 schema 拒绝并连累整批写入）
                 const ctxW = declared?.contextWindow ?? entry?.contextWindow
                 const maxT = declared?.maxTokens ?? entry?.maxTokens
+                const ctxFrom: StampSource | undefined = declared?.contextWindow !== undefined ? 'u' : entry?.contextWindow !== undefined ? 'c' : undefined
+                const maxFrom: StampSource | undefined = declared?.maxTokens !== undefined ? 'u' : entry?.maxTokens !== undefined ? 'c' : undefined
                 const contextFillable = autoRules.context
                     && contextWindow === undefined && isCapacity(ctxW)
-                const contextUpdatable = editable('c')
+                const contextUpdatable = editable('c', ctxFrom)
                     && ctxW !== contextWindow
                     && isCapacity(ctxW)
                 const maxTokensFillable = autoRules.context
                     && maxTokens === undefined && isCapacity(maxT)
-                const maxTokensUpdatable = editable('m')
+                const maxTokensUpdatable = editable('m', maxFrom)
                     && maxT !== maxTokens
                     && isCapacity(maxT)
                 const imageFillable = autoRules.image
                     && input === undefined && !!imageValue
-                const imageUpdatable = editable('i')
+                const imageUpdatable = editable('i', imageFrom)
                     && !!imageValue
                     && !deepEqualJson(input, imageValue)
                 if (cleaned === model && !reasoningFillable && !reasoningUpdatable
@@ -135,8 +144,13 @@ export function planFill(
                 if (maxTokensFillable || maxTokensUpdatable) patched.maxTokens = maxT
                 if (imageFillable || imageUpdatable) patched.input = imageValue
                 next[i] = patched
-                // 记下「这行现在是插件写的样子」：不给这条指纹，下一轮就认不出这行是自动写入还是手改
-                const stamped = withStamps(written, providerId, modelId, fieldStampsOf(patched))
+                // 记下「这行现在是插件写的样子」：只覆盖本轮写过的字段，其余保留旧指纹（旧值为 null 即从不是插件写的）
+                const writtenFields: Partial<Record<StampField, StampSource>> = {}
+                if (reasoningFillable || reasoningUpdatable) writtenFields.r = effortsFrom
+                if (contextFillable || contextUpdatable) writtenFields.c = ctxFrom
+                if (maxTokensFillable || maxTokensUpdatable) writtenFields.m = maxFrom
+                if (imageFillable || imageUpdatable) writtenFields.i = imageFrom
+                const stamped = withStamps(written, providerId, modelId, stampPatched(previous, patched, writtenFields))
                 if (stamped !== written) {
                     written = stamped
                     stamps++
