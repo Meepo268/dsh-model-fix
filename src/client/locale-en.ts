@@ -206,6 +206,7 @@ export const en: Record<CardKey, string> = {
     sourceExcluded: ' (provider is excluded; this plugin will not touch it)',
     sourceEmpty: 'No configurable models',
     sourceFailed: 'Failed to load or save: {message}',
+    sourceNoUpstream: 'no upstream declaration',
     sourceSearch: 'Search models or sources…',
     sourceOnlyProvider: 'This provider only',
     sourceNoMatch: 'No matching models',

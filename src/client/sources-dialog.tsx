@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
-import { candidateSummary, fitLabel, type SourceModelView, type SourceSnapshot } from '@/shared/source-view'
+import { candidateSummary, fitLabel, upstreamOptionLabel, type SourceModelView, type SourceSnapshot } from '@/shared/source-view'
 
 const { Button, Modal } = primitives
 
@@ -31,6 +31,11 @@ function describeSource(model: SourceModelView, t: Translate): string {
     if (model.source === 'upstream') return t('sourceUpstreamLabel')
     if (model.source === 'catalog') return model.matchedKey ?? t('sourceCatalogLabel')
     return t('sourceNone')
+}
+
+/** 固定项（自动 / 只用上游声明）的文案：并上上游声明的能力摘要，便于和目录候选一眼对比 */
+function fixedLabel(text: string, model: SourceModelView, t: Translate): string {
+    return fitLabel(upstreamOptionLabel(text, model.upstream, t('sourceImageMark'), t('sourceNoUpstream')), 78)
 }
 
 /** 搜索命中：模型 id、显示名、任一候选的来源键里有子串即可（空查询全中） */
@@ -181,8 +186,8 @@ export function SourcesDialog({
                                             disabled={busy}
                                             onChange={(event) => { void onChange(provider.id, model.id, event.target.value) }}
                                         >
-                                            <option value="">{t('sourceAuto')}</option>
-                                            <option value="upstream">{t('sourceUpstreamOnly')}</option>
+                                            <option value="">{fixedLabel(t('sourceAuto'), model, t)}</option>
+                                            <option value="upstream">{fixedLabel(t('sourceUpstreamOnly'), model, t)}</option>
                                             {model.candidates.map((candidate) => {
                                                 // 一行里给全判断依据：提供方 · 目录 id · 能力摘要（容量/档位/图片）
                                                 const summary = candidateSummary(candidate.fields, t('sourceImageMark'))

@@ -6,7 +6,7 @@ import { SOURCE_UPSTREAM, type PluginConfig } from '@/shared/types'
 import type { DeclarationMap } from '@/upstream'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { buildSourceSnapshot, resolveSource } from '@/source'
-import { candidateSummary, capacityText, fitLabel } from '@/shared/source-view'
+import { candidateSummary, capacityText, fitLabel, upstreamOptionLabel } from '@/shared/source-view'
 import { sourceKey } from '@/lookup'
 
 /** 套件入口（	est/index.ts 注册） */
@@ -111,5 +111,9 @@ const UPSTREAM = declarations('gw', 'cn:deepseek-v4-pro', { efforts: ['high', 'x
     check('摘要：缺项跳过 + 图片标记可换', candidateSummary({ efforts: '', image: true }, 'img') === 'img' && candidateSummary({ efforts: '', image: false }) === '')
     check('截断：不超长原样返回', fitLabel('abc', 3) === 'abc')
     check('截断：超长补省略号', fitLabel('abcdef', 4) === 'abc…', fitLabel('abcdef', 4))
+    // ---------- 固定项（自动 / 只用上游声明）也带上游摘要 ----------
+    check('固定项：上游声明带摘要', upstreamOptionLabel('自动', { efforts: 'high / xhigh', contextWindow: 1_000_000, maxTokens: 128_000, image: true }, '图', '上游未声明') === '自动 · 1M/128K · high/xhigh · 图')
+    check('固定项：上游未声明时明说', upstreamOptionLabel('自动', undefined, '图', '上游未声明') === '自动 · 上游未声明')
+    check('固定项：声明存在但四维全空也判未声明', upstreamOptionLabel('自动', { efforts: '', image: false }, '图', '上游未声明') === '自动 · 上游未声明')
 }
 }

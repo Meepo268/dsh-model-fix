@@ -82,6 +82,13 @@ export function candidateSummary(fields: SourceFieldsView, imageMark = '图'): s
     return parts.join(' · ')
 }
 
+/** 下拉里「自动 / 只用上游声明」两个固定项：把上游声明的能力摘要并进标题，方便和目录候选一眼对比；
+ * 端点没给出声明时明说「上游未声明」，而不是让人误以为摘要是空的 */
+export function upstreamOptionLabel(text: string, upstream: SourceFieldsView | undefined, imageMark: string, missing: string): string {
+    const summary = upstream === undefined ? '': candidateSummary(upstream, imageMark)
+    return summary === '' ? `${text} · ${missing}` : `${text} · ${summary}`
+}
+
 /** 单行截断：超长补省略号（原生 `<option>` 不会自己加省略号，只能先截好再交给它） */
 export function fitLabel(text: string, limit = 64): string {
     if (text.length <= limit) return text
