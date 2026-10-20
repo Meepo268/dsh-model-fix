@@ -72,8 +72,8 @@ export function DiagnoseDialog(props: DiagnoseDialogProps) {
     const [tab, setTab] = useState<DiagnoseTab>('models')
     // 开窗回「模型列表」
     useEffect(() => { if (props.open) setTab('models') }, [props.open])
-    // running 时 total>0 才切记录页
-    useEffect(() => { if (props.running && props.total > 0) setTab('records') }, [props.running, props.total])
+    // total>0 才切记录页
+    useEffect(() => { if (props.total > 0) setTab('records') }, [props.total])
     // 相邻同提供方成组
     const groups = useMemo(() => {
         const grouped: { provider: string; models: VerifyCandidate[] }[] = []
