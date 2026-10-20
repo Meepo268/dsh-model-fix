@@ -337,10 +337,32 @@ export function Card(props: CardProps) {
                     />
                 ))}
             </div>
-            {/* 动作键独占一行、置于分隔线之上：键数增长后不再与取消/保存挤在同一行 */}
+            <div className="dsh-mf-footer">
+                <span className="dsh-mf-actions">
+                    {/* 取消键只在有未保存编辑时出现（保存后自动隐去）；保存中保持可见但禁用 */}
+                    {dirty ? (
+                        <button
+                            type="button"
+                            className="dsh-mf-discard"
+                            disabled={busy === 'save'}
+                            onClick={onDiscard}
+                        >
+                            {t('cancel')}
+                        </button>
+                    ) : null}
+                    <button
+                        type="button"
+                        className="dsh-mf-save"
+                        disabled={!canWrite || !dirty || busy !== null}
+                        onClick={onSave}
+                    >
+                        {busy === 'save' ? t('saving') : t('save')}
+                    </button>
+                </span>
+            </div>
             <div className="dsh-mf-bar">
                 <span className="dsh-mf-actions">
-                    {/* 五个动作键共用上方那个占用态：在途或任一弹层开着，其余四个一并禁用 */}
+                    {/* 五个动作键共用一个占用态：在途或任一弹层开着，其余四个一并禁用 */}
                     <button
                         type="button"
                         className="dsh-mf-force"
@@ -382,29 +404,6 @@ export function Card(props: CardProps) {
                         onClick={probe.onOpen}
                     >
                         {t('probe')}
-                    </button>
-                </span>
-            </div>
-            <div className="dsh-mf-footer">
-                <span className="dsh-mf-actions">
-                    {/* 取消键只在有未保存编辑时出现（保存后自动隐去）；保存中保持可见但禁用 */}
-                    {dirty ? (
-                        <button
-                            type="button"
-                            className="dsh-mf-discard"
-                            disabled={busy === 'save'}
-                            onClick={onDiscard}
-                        >
-                            {t('cancel')}
-                        </button>
-                    ) : null}
-                    <button
-                        type="button"
-                        className="dsh-mf-save"
-                        disabled={!canWrite || !dirty || busy !== null}
-                        onClick={onSave}
-                    >
-                        {busy === 'save' ? t('saving') : t('save')}
                     </button>
                 </span>
             </div>

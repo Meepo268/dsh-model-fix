@@ -82,10 +82,8 @@ const STYLE_TEXT = [
     '.dsh-mf-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
     '@media (max-width:680px){.dsh-mf-items{grid-template-columns:minmax(0,1fr)}}',
     '@media (prefers-reduced-motion:reduce){.dsh-mf-itemChevron{transition:none}}',
-    // 动作键行：独占一行靠左，不设分割线（留给其下取消/保存行）；上间距由 .dsh-mf-body 的 gap:12px 给出，本行不再自带
-    '.dsh-mf-bar{display:flex;align-items:center;justify-content:flex-start;gap:8px}',
-    // 取消/保存行：分隔线之下靠右收尾；上间距 8px 是宿主 .section 内部相邻控件的档位（与 body gap 12px 合出 20px）
-    '.dsh-mf-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:8px 0 0;border-top:0.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1))}',
+    '.dsh-mf-bar{display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:12px 0 0;border-top:0.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1))}',
+    '.dsh-mf-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px}',
     '.dsh-mf-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
     // footer 键度量照官方 SettingsForm .save；force 红字透明底照 .dangerButton 语义；discard 官方无同款，度量与 save 成对
     '.dsh-mf-discard,.dsh-mf-save,.dsh-mf-force{appearance:none;border:1px solid transparent;border-radius:var(--dsw-radius-md,12px);padding:5px 14px;font:inherit;font-size:13px;line-height:1.5;cursor:pointer}',
