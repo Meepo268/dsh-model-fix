@@ -38,6 +38,10 @@ function stem(id: string): { base: string; digits: string } {
     return { base, digits }
 }
 
+/** 快照式后缀：只在这样的尾巴上才允许「前缀命中」（`gpt-4o` 收 `gpt-4o-2024-08-06`、`-v3.1-2508`、`-v2`）。
+ * `glm-5.3` 之于 `glm-5.3-flash`、`gpt-5` 之于 `gpt-5-mini` 都是另一个模型，不能被前缀吃掉 */
+const SNAPSHOT_SUFFIX = /^(?:-(?:v?\d+(?:\.\d+)*))+$/
+
 /** 匹配本地模型 id 与目录 id：精确、词干、前缀三级（`ids` 须为归一匹配键，返回归一键供 `byId` 反查） */
 function matchId(localId: string, ids: readonly string[]): string | undefined {
     const normalized = normalizeId(localId)
@@ -54,7 +58,7 @@ function matchId(localId: string, ids: readonly string[]): string | undefined {
         return true
     })
     if (stemHits.length === 1) return stemHits[0]
-    const prefix = ids.filter((id) => id.startsWith(`${normalized}-`) || id.startsWith(`${normalized}.`))
+    const prefix = ids.filter((id) => id.startsWith(normalized) && SNAPSHOT_SUFFIX.test(id.slice(normalized.length)))
     if (prefix.length === 1) return prefix[0]
 }
 
@@ -276,10 +280,29 @@ function signatureOf(entry: IndexEntry): string {
     return [entry.efforts.join(','), entry.contextWindow ?? '', entry.maxTokens ?? '', entry.image === true ? '1' : '0'].join('|')
 }
 
+/** 允许跟在匹配键后的「同模型不同渠道/推理形态」限定词。版本号（`glm-5` 之于 `glm-5.3`）与
+ * `-flash` / `-air` 这类是另一个模型，不在表内——下拉里混进上一代模型比少列一条更糟 */
+const VARIANT_QUALIFIERS: ReadonlySet<string> = new Set(['free', 'free-tier', 'thinking', 'nothinking', 'reasoning', 'noreasoning', 'chat', 'instruct'])
+
+/** 变体距离：末段等于键（渠道加了 `vendor/` 前缀的镜像）记 0；两边只差允许的限定词（`-free`、`:free`、`-thinking`，
+ * 任一方向都算——网关叫 `-free` 而目录叫裸名时同样可选）记差出的长度；`glm-5` 这种版本级父级直接不收 */
+function variantDistance(tail: string, key: string): number | undefined {
+    if (tail === key) return 0
+    const longer = tail.length > key.length ? tail : key
+    const shorter = tail.length > key.length ? key : tail
+    if (!longer.startsWith(shorter)) return
+    const rest = longer.slice(shorter.length)
+    if (rest === '' || !/^[-:]/.test(rest)) return
+    const parts = rest.split(/[-:]/).filter((part) => part !== '')
+    if (parts.length === 0 || parts.some((part) => !VARIANT_QUALIFIERS.has(part))) return
+    return rest.length
+}
+
 /** 收集某模型在目录里的全部候选条目（供人工指定来源）：两轮扫描。
  * 第一轮按三种匹配键（原 id / 剥命名空间前缀后的 id / 归一显示名）逐提供方取首个三级命中；
- * 第二轮补「同族变体」：目录 id 的末段与任一匹配键互为包含关系即收（`glm-5.3-flash` 收 `glm-5.3-flash-free`、
- * `-flashx`；反向也收，网关叫 `-free` 而目录叫裸名时同样可选）。变体只进下拉、绝不参与自动匹配。
+ * 第二轮补「同族变体」：目录 id 的末段等于匹配键（`z-ai/glm-5.3-flash` 只是多一层厂商前缀的镜像），
+ * 或只多出渠道/推理限定词（`glm-5.3-flash` 收 `glm-5.3-flash-free`、`-thinking`；`glm-5` 是上一代模型，不收）。
+ * 变体只进下拉、绝不参与自动匹配。
  * 同 id 形态且参数指纹相同的来源折叠成一行（`also` 记账）：83 条同值镜像否则会把变体全挤掉，而它们填出来的参数一模一样。
  * 精确命中占前 8 个名额（同值折叠后一般只剩一两条），剩余名额按「末段长度差」由近及远给同族变体，
  * 整体截到 `limit` 条。不判歧义也不合成——下拉就是把选择权交还用户 */
@@ -325,9 +348,8 @@ export function collectCandidates(
             break
         }
     }
-    /** 同族变体的远近：先看「末段就是匹配键本身」的重复镜像（排最后，参数不同的它们跟精确命中是同一模型的另一套数），
-     * 再按末段与匹配键的长度差由近及远（`-free` 差 5，`glm-5` 这种父级差 8）。 */
-    const variantRows: Array<{ candidate: CatalogCandidate; rank: number; distance: number }> = []
+    /** 同族变体的远近：末段等于匹配键的镜像排最前（同一模型的另一套数），其余按多出的限定词长短由近及远 */
+    const variantRows: Array<{ candidate: CatalogCandidate; distance: number }> = []
     const variantSeen = new Set<string>()
     for (const provider of order) {
         const group = indexed.groups.get(provider)
@@ -338,18 +360,18 @@ export function collectCandidates(
             const key = sourceKey(provider, entry.id)
             if (exactKeys.has(key) || variantSeen.has(key)) continue
             const tail = id.slice(id.lastIndexOf('/') + 1).toLowerCase()
-            let distance = Number.POSITIVE_INFINITY
+            let distance: number | undefined
             for (const wanted of variantKeys) {
-                if (!tail.includes(wanted) && !wanted.includes(tail)) continue
-                distance = Math.min(distance, Math.abs(tail.length - wanted.length))
+                const found = variantDistance(tail, wanted)
+                if (found === undefined) continue
+                distance = distance === undefined ? found : Math.min(distance, found)
             }
-            if (!Number.isFinite(distance)) continue
+            if (distance === undefined) continue
             variantSeen.add(key)
-            const rank = variantKeys.includes(tail) ? 1 : 0
-            variantRows.push({ candidate: { key, provider, entry, also: [] }, rank, distance })
+            variantRows.push({ candidate: { key, provider, entry, also: [] }, distance })
         }
     }
-    variantRows.sort((left, right) => left.rank - right.rank || left.distance - right.distance)
+    variantRows.sort((left, right) => left.distance - right.distance)
     const variantReps = new Map<string, CatalogCandidate>()
     for (const row of variantRows) foldInto(variantReps, row.candidate)
     // 精确命中占前 8 个名额（同值折叠后一般只剩一两条），剩下的名额按远近给同族变体

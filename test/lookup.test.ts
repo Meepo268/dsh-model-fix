@@ -120,8 +120,9 @@ export function run(): void {
     check('中缀日期变体凭 digits 区分', lookup(catalog({ openai: ['gpt-5-preview', 'gpt-5-20241120-preview'] }), 'openai', 'gpt-5-20240831-preview')?.id === 'gpt-5-preview')
     check('中缀日期多变体无裸名 -> 无匹配', lookup(catalog({ openai: ['gpt-5-20240831-preview', 'gpt-5-20241120-preview'] }), 'openai', 'gpt-5-preview') === undefined)
 
-    // ---------- 前缀匹配：目录 id 以本地 id 加分隔符扩展时唯一命中 ----------
-    check('前缀匹配唯一命中', lookup(catalog({ openai: ['gpt-5-mini'] }), 'openai', 'gpt-5')?.id === 'gpt-5-mini')
+    // ---------- 前缀匹配：目录 id 只多一个数字快照后缀时唯一命中 ----------
+    check('前缀匹配唯一命中（数字快照）', lookup(catalog({ openai: ['gpt-5-20250807'] }), 'openai', 'gpt-5')?.id === 'gpt-5-20250807')
+    check('前缀不吃子型号（gpt-5 ↛ gpt-5-mini）', lookup(catalog({ openai: ['gpt-5-mini'] }), 'openai', 'gpt-5') === undefined)
 
     // ---------- 歧义不猜：词干/前缀命中多个或零个 -> 无匹配 ----------
     check('词干命中多个 -> 无匹配', lookup(catalog({ openai: ['gpt-5-mini', 'gpt-5-turbo'] }), 'openai', 'gpt-5') === undefined)
@@ -228,7 +229,7 @@ export function run(): void {
 
     // ---------- collectCandidates：下拉候选（三种精确键 + 同族变体），只列不判 ----------
     const pool = catalog({
-        openrouter: ['z-ai/glm-5.3-flash-free', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3'],
+        openrouter: ['z-ai/glm-5.3-flash-free', 'z-ai/glm-5.3-flash-thinking', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3', 'z-ai/glm-5'],
         zai: ['glm-5.3-flash'],
     })
     const keysOf = (providerId: string, modelId: string, name?: string): string[] =>
@@ -239,7 +240,11 @@ export function run(): void {
     check('候选：带斜杠前缀的同名条目也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
     // 变体：免费渠道那条 id 更长，包含关键字，必须出现在下拉里（用户点名的 glm-5.3-flash-free 场景）
     check('候选：同族变体（-free）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash-free'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
-    check('候选：更短的父版本（glm-5.3）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    check('候选：同族变体（-thinking）也列出', keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3-flash-thinking'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    // 上一代版本是另一个模型，不是同模型的另一渠道：glm-5.3-flash 不得收 glm-5.3，glm-5.3 更不得收 glm-5
+    check('候选：不收上一代父版本（glm-5.3-flash ↛ glm-5.3）', !keysOf('zai', 'cn:glm-5.3-flash').includes('openrouter/z-ai/glm-5.3'), keysOf('zai', 'cn:glm-5.3-flash').join('|'))
+    check('候选：不收上一代父版本（glm-5.3 ↛ glm-5）', !keysOf('zai', 'cn:glm-5.3').includes('openrouter/z-ai/glm-5'), keysOf('zai', 'cn:glm-5.3').join('|'))
+    check('候选：同族变体只差限定词时保留（glm-5.3-flash 自身可被 glm-5.3 选中）', keysOf('zai', 'cn:glm-5.3-flash-free').includes('zai/glm-5.3-flash'), keysOf('zai', 'cn:glm-5.3-flash-free').join('|'))
     // 变体不得混进自动匹配：lookup 仍然只认精确/词干/前缀
     check('变体不参与自动匹配', lookup(pool, 'zai', 'glm-5.3-flash-free') === undefined, lookup(pool, 'zai', 'glm-5.3-flash-free')?.id)
     // 太短的键（hy3）不做包含扫描：否则整片目录都会被收进来
