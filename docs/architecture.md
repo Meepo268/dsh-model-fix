@@ -9,7 +9,8 @@
 | `src/migrate.ts` | 启动迁移、旧快照清理与自愈（排除列表去重） |
 | `src/upgrade.ts` | 冻结的升级台阶链（v7 → 当前版） |
 | `src/catalog.ts` | models.dev 目录拉取、缓存读写与拍平索引 |
-| `src/lookup.ts` | 模型 id 匹配（三级归一）与档位转换 |
+| `src/lookup.ts` | 模型 id 匹配（三级归一 + 命名空间前缀剥离 + 显示名兜底）与档位转换 |
+| `src/upstream.ts` | 上游能力声明：`GET {baseURL}/models` 自报的档位/容量/模态解析与带缓存的 best-effort 抓取 |
 | `src/compat.ts` | 路由 compat 纯写入计划 |
 | `src/fix.ts` | 填充与写回：纯计划函数 `planFill` 出 op，`fix` 只做编排 |
 | `src/memory.ts` | 推理级别记忆的失效清理：存活清单 → 纯 `planPruneMemory` → 只写 `efforts` 键 |
