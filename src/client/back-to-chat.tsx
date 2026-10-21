@@ -32,6 +32,8 @@ interface SessionView {
     state: StateDotState
     titleKey: CardKey
     params?: Record<string, unknown>
+    /** 会话标题：提示里补上「点下去会回到哪个会话」 */
+    sessionTitle?: string
 }
 
 /** 宿主工作区只认这三种待交互 */
@@ -65,11 +67,12 @@ function sessionView(uiSession: UiSession, sessions: ISessions): SessionView {
         (child) => (statuses.get(child.id)?.running ?? list.byId[child.id]?.running) === true,
     ).length
     const pending = pendingTitleKey(status?.pendingInteraction?.kind)
-    if (pending !== undefined) return { state: 'warning', titleKey: pending }
-    if (status?.running === true) return { state: 'ongoing', ...runningTitle(subagents) }
-    if (subagents > 0) return { state: 'ongoing', ...runningTitle(subagents) }
+    const sessionTitle = list.byId[currentId]?.displayTitle
+    if (pending !== undefined) return { state: 'warning', titleKey: pending, sessionTitle }
+    if (status?.running === true) return { state: 'ongoing', ...runningTitle(subagents), sessionTitle }
+    if (subagents > 0) return { state: 'ongoing', ...runningTitle(subagents), sessionTitle }
     // 「已完成」态不做，理由见 docs/decisions.md
-    return { state: 'idle', titleKey: 'backToChat' }
+    return { state: 'idle', titleKey: 'backToChat', sessionTitle }
 }
 
 export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>): FloatingButton {
@@ -97,14 +100,13 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
         const view = uiSession === null || sessions === null
             ? { state: 'idle' as const, titleKey: 'backToChat' as const }
             : sessionView(uiSession, sessions)
+        const label = t(view.titleKey, view.params)
+        const title = view.sessionTitle === undefined ? label : `${label} · ${view.sessionTitle}`
         if (view.state === 'idle') {
-            button.set({ icon: IconChevronLeftOutlineRegular({ size: 14 }), title: t(view.titleKey) })
+            button.set({ icon: IconChevronLeftOutlineRegular({ size: 14 }), title })
             return
         }
-        button.set({
-            icon: <StateDot state={view.state} />,
-            title: t(view.titleKey, view.params),
-        })
+        button.set({ icon: <StateDot state={view.state} />, title })
     }
 
     // scope 订阅不推首值，故先按当前快照补跑一次

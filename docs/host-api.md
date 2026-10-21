@@ -186,7 +186,7 @@
 - `adapter.current`：`HostObservable<StandardSourceBinding>`，其 `props.sessionId` 即**当前主会话**；快照变化 = 会话切换。
 - 宿主工作区会话行的状态判定在 `ui-workspace/src/client/rows/Rows.tsx`（`sessionStatuses`，**未导出**）与 `ui-workspace/src/client/tree.ts`（`sessionNode`）：pendingInteraction → `warning`；running → `ongoing`；子智能体在跑 → `ongoing`（次要，宿主靠文案区分）；`completionUnread` → `done`；其余 → `idle`（宿主此时不画点，改渲染插槽 `sidebar.session.row.leading`）。本仓按同一套判定本地复刻。
 - `completionUnread` 的置位条件（`ui-session/src/client/index.ts:487-504`）：只给**非主视图**会话置，主视图那份会被清（`isMain` = `retainedBy.mainView > 0`，该 retain 由工作区服务持有，切面板不释放）。
-- 状态文案见 `ui-workspace/src/client/locales.ts`（`status.*` 键），本仓按钮逐条沿用。
+- 状态文案见 `ui-workspace/src/client/locales.ts`（`status.*` 键），本仓按钮逐条沿用；会话标题取 `ctx.sessions.list` 的 `byId[id].displayTitle`（持久化标题 → 目录名 → 会话 id）。
 - 子智能体目录投影 `subagentCatalog` 只在 `@deepseek-ai/dsh-subagent` 的类型面声明（该包会把 Node 侧 `ctx.sessions` 增补带进来），本仓按契约复制最小面（`src/client/back-to-chat.tsx`）。
 - 状态点原语 `StateDot`（`DSH/packages/client/ui-primitives/src/StateDot.tsx`，宿主 `@deepseek-ai/dsh-client-ui-primitives` 导出）：`StateDotState = 'done' | 'warning' | 'ongoing' | 'error' | 'idle'`；`ongoing` 是 24×24 双圆弧 spinner（两条 CSS 动画，1.5s），其余态是 10px 实心圆点（`currentColor` + `--dsw-alias-state-*` 令牌）。
 

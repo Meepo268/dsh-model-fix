@@ -102,7 +102,7 @@
 - **按钮本体是独立 React 根**：图标用宿主导出的 `IconChevronLeftOutlineRegular`（UI 无痕融合纪律：官方有导出组件就用同一组件），它是 React 组件，渲染必须有根 ⇒ `createRoot` 挂在自建容器上，浏览器半因此多一个运行期宿主依赖 `react-dom/client`（平台模块表提供）。
 - **容器不持宿主依赖，条目各自自治**：容器只管定位、布局与渲染；宿主服务依赖（`ctx.layout`）与配置 / 语言订阅归按钮条目自己，谁订阅谁退订（退订挂条目 fiber 的 `ctx.effect`，cordis 天然级联）。
 - **按钮数据是响应式的（React 外部存储形态）**：条目交出可改写的 `{ id, icon, title, active, onClick }`，容器用 `useSyncExternalStore` 读——改任一属性即时反映（`active=false` 即不渲染），快照引用稳定是 uSES 的硬要求。
-- **「返回对话」按钮的图标与提示跟随当前会话状态**：会话进行中 / 待交互时显示宿主 `StateDot` 原语的状态点与对应提示，空闲（或没有当前会话）回退到「左」箭头与「返回对话」。判定与文案与宿主工作区会话行同源。按钮显示的是主视图会话 ⇒ 宿主的「已完成」态到不了，不做。
+- **「返回对话」按钮的图标与提示跟随当前会话状态**：会话进行中 / 待交互时显示宿主 `StateDot` 原语的状态点，空闲（或没有当前会话）回退到「左」箭头；提示一律带会话标题，提示「点下去会回到哪个会话」。判定与文案与宿主工作区会话行同源。按钮显示的是主视图会话 ⇒ 宿主的「已完成」态到不了，不做。
 - **卡片入口条目自带弹层**：打开配置卡需要一棵 React 树，条目自持独立 React 根（宿主 `Modal` 自带 body portal，根只作挂载点）⇒ 容器的按钮数据契约不扩面板字段。弹层本身与输入框 chip 共用 `card-panel.tsx` 一个组件，两处打开的是同一张卡。
 - **给中心列补一条 inline `position: relative`**：宿主中心列没有定位上下文（其上下文是整帧 `.frame`），按钮要贴中心列左侧就得补。补它不改变各页面自身绝对定位元素的基准——它们的近身祖先已是 `position: relative`（已核 `ui-conversation` / `ui-plugin-manager` / `ui-settings-general` / `ui-schedule`）。React 不管理该元素的 style 属性，这条 inline 不被覆盖；容器常驻（不随配置开关装卸），只在插件卸载时还原原值。
 - **中心列的锚点用 `[data-slot="main"]` 的父元素**：宿主 CSS Module 类名（`pI_x6G_centerCol`）随构建 hash 变化，类名不可依赖。
