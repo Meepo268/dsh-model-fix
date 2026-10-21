@@ -4,6 +4,8 @@ import { useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { TIP_MAX_WIDTH } from '@/client/card-styles'
 import type { FloatingButton } from '@/client/floating-button'
 import { PLUGIN_NAME } from '@/shared/constants'
 
@@ -54,16 +56,17 @@ function FloatingButtonItem(props: { button: FloatingButton }): ReactNode {
     const state = useSyncExternalStore(props.button.subscribe, props.button.getSnapshot)
     if (!state.active) return null
     return (
-        <button
-            type="button"
-            id={`${BUTTON_ID_PREFIX}${props.button.id}`}
-            className={BUTTON_CLASS}
-            aria-label={state.title}
-            title={state.title}
-            onClick={state.onClick}
-        >
-            {state.icon}
-        </button>
+        <Tooltip label={state.title} side="right" portal maxWidth={TIP_MAX_WIDTH}>
+            <button
+                type="button"
+                id={`${BUTTON_ID_PREFIX}${props.button.id}`}
+                className={BUTTON_CLASS}
+                aria-label={state.title}
+                onClick={state.onClick}
+            >
+                {state.icon}
+            </button>
+        </Tooltip>
     )
 }
 

@@ -1,13 +1,13 @@
 /** 输入框工具行（conversation.input.left）的两枚 chip，各占一个席位条目：
  * · 「模型优化」（`ComposerEntry`）—— 常驻弱化态入口，点开弹层面板（宿主 Modal 的 headless 形态）
- * · 「跟随」状态灯（`FollowLamp`）—— 随 `followingActive(flags, hostEnabled)` 在亮绿/浅灰间切换；点击即 toggle 开关，写入失败时保持原态 + 琥珀色 + 原生 title 提示原因
+ * · 「跟随」状态灯（`FollowLamp`）—— 随 `followingActive(flags, hostEnabled)` 在亮绿/浅灰间切换；点击即 toggle 开关，写入失败时保持原态 + 琥珀色 + 宿主 Tooltip 提示原因
  * 宿主 list 席位按 `id` 记账（`id` 不同可并存），故两枚 chip 各注册一条、各受自己的 `behavior` 开关支配。渲染点只有一个（`InputBar` 一次画出全部条目）。配色/几何语义见 card-styles.ts */
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Modal, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { VERSION_KEY, followingActive, type Flags } from '@/client/model'
-import { ensureStyles } from '@/client/card-styles'
+import { ensureStyles, TIP_MAX_WIDTH } from '@/client/card-styles'
 import { Card, type CardProps } from '@/client/card'
 import type { DecodedScope } from '@/client/scope'
 
@@ -47,15 +47,16 @@ export function ComposerEntry(props: SlotProps & ComposerProps): ReactNode {
 
     return (
         <>
-            <button
-                type="button"
-                className="dsh-mf-composerChip"
-                data-state="muted"
-                title={t('chipModelOptTitle')}
-                onClick={() => { setOpen(true) }}
-            >
-                {t('chipModelOpt')}
-            </button>
+            <Tooltip label={t('chipModelOptTitle')} side="top" portal maxWidth={TIP_MAX_WIDTH}>
+                <button
+                    type="button"
+                    className="dsh-mf-composerChip"
+                    data-state="muted"
+                    onClick={() => { setOpen(true) }}
+                >
+                    {t('chipModelOpt')}
+                </button>
+            </Tooltip>
             {open && (
                 // headless：卡片直接作 children，不套宿主的标题栏/关闭钮/content/body 一层
                 <Modal
@@ -121,21 +122,22 @@ export function FollowLamp(props: SlotProps & ComposerProps): ReactNode {
     }, [scope, snapFlags, flags, busy])
 
     const state: ChipState = chipFail ? 'fail' : (active ? 'on' : 'off')
-    // 原生 title 随态切换：失败原因 / 关闭提示 / 开启提示
+    // 提示随态切换：失败原因 / 关闭提示 / 开启提示
     const title = chipFail
         ? t('chipFollowFail')
         : active ? t('chipFollowOnTitle') : t('chipFollowOffTitle')
 
     return (
-        <button
-            type="button"
-            className="dsh-mf-composerChip"
-            data-state={state}
-            title={title}
-            disabled={!snapFlags.writable || snapFlags.status !== 'ready' || busy}
-            onClick={onToggle}
-        >
-            {active ? t('chipFollowOn') : t('chipFollowOff')}
-        </button>
+        <Tooltip label={title} side="top" portal maxWidth={TIP_MAX_WIDTH}>
+            <button
+                type="button"
+                className="dsh-mf-composerChip"
+                data-state={state}
+                disabled={!snapFlags.writable || snapFlags.status !== 'ready' || busy}
+                onClick={onToggle}
+            >
+                {active ? t('chipFollowOn') : t('chipFollowOff')}
+            </button>
+        </Tooltip>
     )
 }
