@@ -74,7 +74,7 @@
 ### cordis 基础面
 
 - `ctx.effect(execute, label?)`（`DSH/vendor/cordis/src/fiber.ts`）：execute 立即执行，disposer 调用时或 fiber 卸载时（先到者）逆序执行，重复调用 no-op，已卸载抛 `INACTIVE_EFFECT`；同步异步版均返回可 await 的 disposer。所有「注册必须挂 effect」纪律基于这一条。
-- `ctx.inject(deps, callback)`（`DSH/vendor/cordis/src/registry.ts`）：等价 `this.plugin({ inject, apply: callback })`，返回 `Fiber & PromiseLike`。**未满足的服务保持 PENDING（无超时）** ⇒ 卡片等 `configForms` 必须能长期停在「加载中 / 不可用」而非抛错。
+- `ctx.inject(deps, callback)`（`DSH/vendor/cordis/src/registry.ts`）：等价 `this.plugin({ inject, apply: callback })`，返回 `Fiber & PromiseLike`。**未满足的服务保持 PENDING（无超时）** ⇒ 卡片等 `configForms` 必须能长期停在「加载中 / 不可用」而非抛错。**依赖全部就绪后才执行回调**（缺席则不执行）⇒ 回调内 `ctx.get(服务名)` 必可取到；依赖变更时回调被卸载重跑，回调内的副作用须自带退订。
 - `ctx.get(name, strict = true)`（`DSH/vendor/cordis/src/reflect.ts`）：服务未提供返回 `undefined` 不抛。
 - `export const inject / name / Config` 是 cordis 插件声明面；`Config` 由宿主 settings 读取（下条）。
 
@@ -133,7 +133,8 @@
 
 - `ctx.locale`（`DSH/packages/client/locale/src/client/index.ts`，`LocaleRuntime`）：事件 `'locale/change'`，**字典注册不发该事件**。
 - `register(ns, dicts)` 返回幂等 disposer；**重复注册抛错** `locale namespace "…" already has locale "…"` ⇒ 一律经 `ctx.effect` 挂。
-- `bind(ns)` 每 ns 缓存同一函数引用（身份稳定，可放 label thunk 依赖数组）。
+- `bind(ns)` 每 ns 缓存同一函数引用（身份稳定，可放 label thunk 依赖数组）；`bind` 出来的 `t` **按调用时刻的语言求值**，故语言切换后要重渲才能拿到新文案。
+- `subscribe(fn)` / `getSnapshot()` 是 LocaleFace 契约（快照带 `revision`，变更才换引用）：`src/client/back-to-chat.ts` 订阅它做「语言切换即刷新提示文案」，退订挂自己的 `ctx.effect`。
 - 本仓私接面（非公开类型面，宿主改名即静默失效）：`ctx.locale` 实例上的 `dicts: Map<ns, Map<localeLower, dict>>`、`publish(active, localeChanged, locales?)`、`snapshot: { active, locales }`——因 `register` 禁止同 ns+locale 重复注册，改宿主既有词条值只能 mutate 已注册对象再手动 `publish`。`localeKey()` 是 `toLowerCase`，第二层键是小写 `'zh'`。`src/client/locale-patch.ts` 即走这条路改宿主 `model` NS 的 `effort.providerDefault`（宿主 `ModelSelect.tsx` 自合成的 Default 伪菜单项取该词条，不经数据层，Node 半遮蔽碰不到）。本仓以本地 `LocaleRuntimeHack` 接口 + `as unknown as` 转换。
 - 类型面（`DSH/packages/client/ui-slots/src/index.ts`）：`LocaleNamespaceMap` 声明合并点（`src/client/locale-keys.ts` 扩展）、`Translate<K> = (key, params?) => string`；locale face 在 `DSH/packages/client/ui-slots/src/renderer.ts`。调用形态就是 `t(key, params?)`。
 - 官方范本（`DSH/packages/client/ui-settings-plugin-inventory/src/client/index.ts`）：`label: () => t('…')` + `locale: NS` + `ctx.effect(() => ctx.locale.register(NS, { zh, en }))`。
@@ -173,10 +174,10 @@
 ### layout：中心面板选择（返回对话按钮）
 
 - 契约（`DSH/packages/client/ui-layout/src/client/service.ts`，宿主 `@deepseek-ai/dsh-client-ui-layout` 提供）：`selectPanel(panelId: string | null): void`。`null` 即选中会话界面、不改当前会话；非 `null` 选已注册的全局面板，未注册的 key 抛错并保留当前选择。本插件只用 `selectPanel(null)`。
-- 类型面按契约复制、不引宿主包：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决），故 `src/client/back-to-chat.tsx` 本地声明 `HostLayout` 并 `declare module` 合并 `ctx.layout`。
-- 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位才跑回调，缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
+- 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.ts` 直接 `ctx.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
+- 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位按钮才可见（可见性 = 配置开关 ∧ 服务到位），缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
 - DOM 锚点：`[data-slot="main"]` 锚点的父元素即 AppFrame 中心列（`ui-layout/src/client/AppFrame.tsx` 的 `.centerCol`）。宿主 CSS Module 类名随构建 hash 变化，不可按类名找。
-- 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮要贴中心列左下角 ⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮取 999 低于它（模态框打开时被盖住）。
+- 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮组要贴中心列左下角 ⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，插件卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮组取 999 低于它（模态框打开时被盖住）。
 
 ### credentials：凭据状态面（隐藏官方API的判定依据）
 
@@ -226,7 +227,7 @@
 | `@deepseek-ai/dsh-client-ui-model-selection/client` | `ModelDirectory` | type-only | `src/client/memory-listener.ts` |
 | `@deepseek-ai/dsh-session/types` | `SessionId` | type-only | `src/client/memory-listener.ts`、`src/subagent.ts`、`test/subagent.test.ts`（**只引 `/types` 子路径**：包根把 Node 侧 `SessionStore` 的 `ctx.sessions` 增补带进来，见末条） |
 | `@deepseek-ai/dsh-client-ui-renderer/client` | 合并（`ctx.slots`） | 合并 | `src/client/index.tsx` |
-| `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts` |
+| `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts`、`src/client/back-to-chat.ts` |
 | `@deepseek-ai/dsh-client-ui-settings-models/client` | 合并（slot key `settings.models.footer`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-ui-plugin-manager/client` | 合并（slot key `plugins.bundle.config` / `plugins.row.config`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-ui-conversation/client` | 合并（slot key `conversation.input.left`） | 合并 | `src/client/index.tsx` |

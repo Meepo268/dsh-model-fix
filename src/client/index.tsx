@@ -30,6 +30,7 @@ import { decodeSection } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { makeScope, type DecodedScope } from '@/client/scope'
 import { applySlotVisibility } from '@/client/visibility'
+import { applyFloatingButtons } from '@/client/floating-buttons'
 import { applyBackToChat } from '@/client/back-to-chat'
 import { applyClassicSetting } from '@/client/classic-setting'
 import { decodeHostModelSelection, HOST_MODEL_SELECTION_NS, type HostModelSelectionView } from '@/client/composer'
@@ -104,8 +105,9 @@ function boot(
     applyLocaleReporter(ctx)
     // 宿主 Default 词条 patch：Scope 订阅挂进本 fiber，随卸载自动恢复原状，见 locale-patch.ts
     applyLocalePatch(ctx, scope)
-    // 「返回对话」悬浮按钮：内容区左下角，点击回到当前会话（宿主 ctx.layout 提供该能力）
-    applyBackToChat(ctx, scope)
+    // 悬浮按钮组：内容区左下角的一组悬浮按钮（容器常驻，条目自带依赖与响应式）
+    const floatingButtons = applyFloatingButtons(ctx)
+    floatingButtons.addButton(applyBackToChat(ctx, scope))
     // 「经典设置」入口：遮蔽宿主账号菜单，侧栏底恢复为一枚设置按钮
     applyClassicSetting(ctx, scope)
 }
