@@ -163,7 +163,6 @@ export type CardKey =
     | 'issueBody'
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     | 'chipModelOpt'
-    | 'chipModelOptTitle'
     | 'chipFollowOn'
     | 'chipFollowOnTitle'
     | 'chipFollowOff'
@@ -178,6 +177,7 @@ export type CardKey =
     | 'rowShowFollowStatus'
     | 'rowShowInPluginManager'
     | 'rowBackToChat'
+    | 'rowShowInFloat'
     | 'rowClassicSetting'
     | 'tipShowInModels'
     | 'tipShowInBuiltinPlugins'
@@ -185,7 +185,10 @@ export type CardKey =
     | 'tipShowFollowStatus'
     | 'tipShowInPluginManager'
     | 'tipBackToChat'
+    | 'tipShowInFloat'
     | 'tipClassicSetting'
+    // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
+    | 'tipOpenSettingCard'
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM，不经插槽 t 注入）
     | 'backToChat'
     // 经典设置按钮自身的文案
@@ -213,6 +216,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     showInComposer: 'rowShowInComposer',
     showFollowStatus: 'rowShowFollowStatus',
     backToChat: 'rowBackToChat',
+    showInFloat: 'rowShowInFloat',
     classicSetting: 'rowClassicSetting',
     selfTune: 'rowSelfTuneEffort',
     hideOfficial: 'rowHideOfficial',
@@ -255,6 +259,7 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     showInComposer: 'tipShowInComposer',
     showFollowStatus: 'tipShowFollowStatus',
     backToChat: 'tipBackToChat',
+    showInFloat: 'tipShowInFloat',
     classicSetting: 'tipClassicSetting',
     selfTune: 'tipSelfTuneEffort',
     hideOfficial: 'tipHideOfficial',

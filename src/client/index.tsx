@@ -32,6 +32,7 @@ import { makeScope, type DecodedScope } from '@/client/scope'
 import { applySlotVisibility } from '@/client/visibility'
 import { applyFloatingButtons } from '@/client/floating-buttons'
 import { applyBackToChat } from '@/client/back-to-chat'
+import { applyFloatCard } from '@/client/float-card'
 import { applyClassicSetting } from '@/client/classic-setting'
 import { decodeHostModelSelection, HOST_MODEL_SELECTION_NS, type HostModelSelectionView } from '@/client/composer'
 
@@ -108,6 +109,7 @@ function boot(
     // 悬浮按钮组：内容区左侧居中的一组悬浮按钮（容器常驻，条目自带依赖与响应式）
     const floatingButtons = applyFloatingButtons(ctx)
     floatingButtons.addButton(applyBackToChat(ctx, scope))
+    floatingButtons.addButton(applyFloatCard(ctx, scope, cardProps))
     // 「经典设置」入口：遮蔽宿主账号菜单，侧栏底恢复为一枚设置按钮
     applyClassicSetting(ctx, scope)
 }

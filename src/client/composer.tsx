@@ -4,11 +4,12 @@
  * 宿主 list 席位按 `id` 记账（`id` 不同可并存），故两枚 chip 各注册一条、各受自己的 `behavior` 开关支配。渲染点只有一个（`InputBar` 一次画出全部条目）。配色/几何语义见 card-styles.ts */
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Modal, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { VERSION_KEY, followingActive, type Flags } from '@/client/model'
 import { ensureStyles, TIP_MAX_WIDTH } from '@/client/card-styles'
-import { Card, type CardProps } from '@/client/card'
+import { CardPanel } from '@/client/card-panel'
+import type { CardProps } from '@/client/card'
 import type { DecodedScope } from '@/client/scope'
 
 /** 宿主「允许 Agent 为子智能体选择模型」那段的最小 decode：只取 enabled，不管 allowedModels（我们不调 current()） */
@@ -47,7 +48,7 @@ export function ComposerEntry(props: SlotProps & ComposerProps): ReactNode {
 
     return (
         <>
-            <Tooltip label={t('chipModelOptTitle')} side="top" portal maxWidth={TIP_MAX_WIDTH}>
+            <Tooltip label={t('tipOpenSettingCard')} side="top" portal maxWidth={TIP_MAX_WIDTH}>
                 <button
                     type="button"
                     className="dsh-mf-composerChip"
@@ -57,21 +58,12 @@ export function ComposerEntry(props: SlotProps & ComposerProps): ReactNode {
                     {t('chipModelOpt')}
                 </button>
             </Tooltip>
-            {open && (
-                // headless：卡片直接作 children，不套宿主的标题栏/关闭钮/content/body 一层
-                <Modal
-                    open={open}
-                    onClose={() => { setOpen(false) }}
-                    title={t('title')}
-                    headless
-                    className="dsh-mf-composerDialog"
-                >
-                    <div className="dsh-mf-composerBody">
-                        {/* defaultOpen：弹层内一进来就见全貌；collapsible={false}：面板尺寸固定可滚动，折叠会脱钩 */}
-                        <Card {...cardProps} t={t} scope={scope} providersScope={props.providersScope} defaultOpen collapsible={false} />
-                    </div>
-                </Modal>
-            )}
+            <CardPanel
+                open={open}
+                onClose={() => { setOpen(false) }}
+                t={t}
+                cardProps={{ ...cardProps, scope, providersScope: props.providersScope }}
+            />
         </>
     )
 }

@@ -9,7 +9,7 @@
     "dsh": ">=0.1.7-rc.2"
   },
   "description": "DSH 插件：提供更好的模型使用体验，包括但不限于：多种方式填充模型参数、提升模型兼容性、记住推理级别、子智能体实时跟随模型和推理级别、AI 自主调节档位等。",
-  "icon": "./icon.svg",
+  "icon": "./lib/icon.svg",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
@@ -20,7 +20,6 @@
   "files": [
     "lib",
     "locale",
-    "icon.svg",
     "cordis.patch.yml"
   ],
   "scripts": {

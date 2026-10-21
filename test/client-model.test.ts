@@ -37,7 +37,7 @@ const ALL_ON: Flags = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
-    behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
+    behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
     userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
 }
 
@@ -59,7 +59,7 @@ export function run(): void {
             compat: { disableDeveloper: false, disableStore: false },
             excludes: ['acme-gateway'],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -72,7 +72,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -85,7 +85,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: ['acme-gateway'],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -100,7 +100,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -165,7 +165,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
         toStored(DEFAULT_FLAGS),

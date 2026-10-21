@@ -168,7 +168,6 @@ export const en: Record<CardKey, string> = {
     issueBody: '--Describe the problem in one sentence--\n\n### What happened\n\n### Environment\n- Plugin version: {version}\n- DSH version: --e.g. 0.2.0--\n- OS: --e.g. Windows 11--\n\n### Steps to reproduce\n1. --What you did first--\n2. --What you did next--\n\n### Expected behavior',
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     chipModelOpt: 'Model tuning',
-    chipModelOptTitle: 'Open the full dsh-model-fix plugin settings',
     chipFollowOn: 'Following',
     chipFollowOnTitle: 'Click to turn off: subagents will stop following the parent agent\'s model and reasoning level',
     chipFollowOff: 'Follow',
@@ -183,6 +182,7 @@ export const en: Record<CardKey, string> = {
     rowShowFollowStatus: 'Show follow status',
     rowShowInPluginManager: 'Show in plugin manager',
     rowBackToChat: 'Back to chat',
+    rowShowInFloat: 'Show in floating buttons',
     rowClassicSetting: 'Classic settings',
     tipShowInModels: 'Shows this plugin\'s settings card at the bottom of the Models settings page.',
     tipShowInBuiltinPlugins: 'Shows this plugin\'s settings tab under Settings → Built-in plugins.',
@@ -190,7 +190,10 @@ export const en: Record<CardKey, string> = {
     tipShowFollowStatus: 'Shows the Follow status lamp on the toolbar (green while subagents actually follow the parent agent); clicking it toggles the setting.',
     tipShowInPluginManager: 'This plugin always shows in the plugin manager and cannot be hidden — it is the only way back into any of the surfaces above.',
     tipBackToChat: 'Shows a floating "Back to chat" button at the left edge in the content area; clicking it returns to the conversation in progress.',
+    tipShowInFloat: 'Shows the card entry in the floating button group on the left of the content area.',
     tipClassicSetting: 'Turn this off to keep the host account menu (feedback and sign-in) in the sidebar.',
+    // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
+    tipOpenSettingCard: 'Open the Model tuning settings card',
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
     backToChat: 'Back to chat',
     // 经典设置按钮自身的文案

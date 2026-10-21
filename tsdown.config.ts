@@ -18,6 +18,14 @@ const SRC_ALIAS = { '@': fileURLToPath(new URL('./src', import.meta.url)) }
  */
 const PKG = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
 
+/**
+ * 插件图标的 SVG 标记：浏览器半没有可用的包内文件 URL，只能构建期内联。
+ * 渐变填充改 `currentColor`（随宿主色令牌走，与组内其他图标同色），随之失效的 `<defs>` 一并去掉。
+ */
+const ICON_MARKUP = readFileSync(new URL('./public/icon.svg', import.meta.url), 'utf8')
+    .replace(/fill="url\(#[^"]+\)"/g, 'fill="currentColor"')
+    .replace(/<defs>[\s\S]*?<\/defs>/, '')
+
 export default defineConfig([
     // ---------- Node 半：宿主侧插件本体 ----------
     {
@@ -62,6 +70,8 @@ export default defineConfig([
             'import.meta.env': JSON.stringify({ MODE: process.env.NODE_ENV ?? 'production' }),
             // 卡片末尾的版本标记（声明见 src/client/card-meta.tsx 的 __PLUGIN_VERSION__）
             __PLUGIN_VERSION__: JSON.stringify(PKG.version),
+            // 插件图标标记（声明见 src/client/float-card.tsx 的 __PLUGIN_ICON__）
+            __PLUGIN_ICON__: JSON.stringify(ICON_MARKUP),
         },
         deps: {
             // 外置的交给宿主 require，其余一律打进包内（浏览器半只留纯逻辑与宿主原语引用）

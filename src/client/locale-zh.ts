@@ -167,7 +167,6 @@ export const zh: Record<CardKey, string> = {
     issueBody: '--用一句话描述你遇到的问题--\n\n### 问题现象\n\n### 环境\n- 插件版本：{version}\n- DSH 版本：--如 0.2.0--\n- 操作系统：--如 Windows 11--\n\n### 复现步骤\n1. --第一步做了什么--\n2. --第二步做了什么--\n\n### 期望行为',
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     chipModelOpt: '模型优化',
-    chipModelOptTitle: '打开 dsh-model-fix 插件的完整配置',
     chipFollowOn: '跟随中',
     chipFollowOnTitle: '点击关闭：子智能体将不再跟随父智能体的模型与推理级别',
     chipFollowOff: '跟随',
@@ -182,6 +181,7 @@ export const zh: Record<CardKey, string> = {
     rowShowFollowStatus: '显示跟随状态',
     rowShowInPluginManager: '显示在插件管理',
     rowBackToChat: '返回对话',
+    rowShowInFloat: '显示在悬浮按钮',
     rowClassicSetting: '经典设置',
     tipShowInModels: '在「设置 → 模型」页底部显示本插件的配置卡片。',
     tipShowInBuiltinPlugins: '在「设置 → 内置插件」里显示本插件的配置选项卡。',
@@ -189,7 +189,10 @@ export const zh: Record<CardKey, string> = {
     tipShowFollowStatus: '在工具栏上显示「跟随」状态灯（亮绿表示子智能体跟随父智能体正在生效），点击可切换开关。',
     tipShowInPluginManager: '本插件始终显示在「插件管理」里，且不可关闭——它是你重新打开上述任何界面的唯一入口。',
     tipBackToChat: '在内容区左侧显示一枚「返回对话」悬浮按钮，点击即回到当前正在进行的对话。',
+    tipShowInFloat: '在内容区左侧的悬浮按钮组中显示卡片入口。',
     tipClassicSetting: '若需要意见反馈、登录，关闭即可。',
+    // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
+    tipOpenSettingCard: '打开模型优化设置卡片',
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
     backToChat: '返回对话',
     // 经典设置按钮自身的文案

@@ -63,6 +63,8 @@ export interface BehaviorRules {
     showInBuiltinPlugins: boolean
     /** 在对话框工具栏显示「模型优化」入口 chip；关闭即卸载该条目 */
     showInComposer: boolean
+    /** 在内容区左侧的悬浮按钮组里显示卡片入口（点击打开同一张配置卡）；关闭即不显示该按钮。默认 true */
+    showInFloat: boolean
     /** 在对话框工具栏显示「跟随」状态灯；关闭即卸载该条目 */
     showFollowStatus: boolean
     /** 在内容区左侧显示「返回对话」悬浮按钮；关闭即不显示该按钮 */
