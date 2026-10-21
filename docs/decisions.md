@@ -98,11 +98,11 @@
 - **输入框弹层用 Modal headless 形态**：卡片即唯一可见层，不套宿主 chrome（与卡片 header 重复两层标题）；面板高度内容撑开、640px 封顶；该席禁折叠（折叠让内容与指针脱钩）。
 - **浏览器半编排挂 `configForms` 子 fiber 不挂父 ctx**：cordis 的注册清理只归调用方自身 fiber，挂父 ctx 时子 fiber 重建不清理旧注册（二次 `locale.register` 抛 `already has locale`、slot 重复注册）；挂子 fiber 则重建前先级联撤销。
 - **`behavior` 组管 UI 装卸不是插件行为**：六个开关只决定部件在不在，功能本体照常运行。
-- **悬浮按钮组直插 DOM 不走宿主 slot**：它要贴在宿主 React 树之外的容器（AppFrame 中心列）的角落，无席位可挂。宿主 slot 渲染点都是既定位置，凑不出「悬浮在某容器左下角」；中心列也是宿主 React 树的一部分，宿主重挂即换节点，故用 `MutationObserver` 盯着重新挂载。
+- **悬浮按钮组直插 DOM 不走宿主 slot**：它要贴在宿主 React 树之外的容器（AppFrame 中心列）的角落，无席位可挂。宿主 slot 渲染点都是既定位置，凑不出「悬浮在某容器左缘」；中心列也是宿主 React 树的一部分，宿主重挂即换节点，故用 `MutationObserver` 盯着重新挂载。
 - **按钮本体是独立 React 根**：图标用宿主导出的 `IconChevronLeftOutlineRegular`（UI 无痕融合纪律：官方有导出组件就用同一组件），它是 React 组件，渲染必须有根 ⇒ `createRoot` 挂在自建容器上，浏览器半因此多一个运行期宿主依赖 `react-dom/client`（平台模块表提供）。
 - **容器不持宿主依赖，条目各自自治**：容器只管定位、布局与渲染；宿主服务依赖（`ctx.layout`）与配置 / 语言订阅归按钮条目自己，谁订阅谁退订（退订挂条目 fiber 的 `ctx.effect`，cordis 天然级联）。
 - **按钮数据是响应式的（React 外部存储形态）**：条目交出可改写的 `{ id, icon, title, active, onClick }`，容器用 `useSyncExternalStore` 读——改任一属性即时反映（`active=false` 即不渲染），快照引用稳定是 uSES 的硬要求。
-- **给中心列补一条 inline `position: relative`**：宿主中心列没有定位上下文（其上下文是整帧 `.frame`），按钮要贴中心列左下角就得补。补它不改变各页面自身绝对定位元素的基准——它们的近身祖先已是 `position: relative`（已核 `ui-conversation` / `ui-plugin-manager` / `ui-settings-general` / `ui-schedule`）。React 不管理该元素的 style 属性，这条 inline 不被覆盖；容器常驻（不随配置开关装卸），只在插件卸载时还原原值。
+- **给中心列补一条 inline `position: relative`**：宿主中心列没有定位上下文（其上下文是整帧 `.frame`），按钮要贴中心列左侧就得补。补它不改变各页面自身绝对定位元素的基准——它们的近身祖先已是 `position: relative`（已核 `ui-conversation` / `ui-plugin-manager` / `ui-settings-general` / `ui-schedule`）。React 不管理该元素的 style 属性，这条 inline 不被覆盖；容器常驻（不随配置开关装卸），只在插件卸载时还原原值。
 - **中心列的锚点用 `[data-slot="main"]` 的父元素**：宿主 CSS Module 类名（`pI_x6G_centerCol`）随构建 hash 变化，类名不可依赖。
 - **`ctx.layout` 经子 fiber `inject` 门控**：服务到位按钮才可见（可见性 = 配置开关 ∧ 服务到位），缺席则静默 PENDING（与子智能体 / 档位自调同一手法）。宿主 `ui-layout` 包不引（类型面会顶掉浏览器半 `ctx.sessions` 增补），服务面按契约取用、本地不声明类型（cordis 保证 inject 的依赖就绪后才执行回调）。
 - **开关必须落到「注册 / 撤销注册」**：宿主 tab 头按注册账本画，组件返回 `null` 只空内容、tab 头照旧（点进去空白选项卡）。

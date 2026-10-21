@@ -177,7 +177,7 @@
 - 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.ts` 直接 `ctx.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
 - 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位按钮才可见（可见性 = 配置开关 ∧ 服务到位），缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
 - DOM 锚点：`[data-slot="main"]` 锚点的父元素即 AppFrame 中心列（`ui-layout/src/client/AppFrame.tsx` 的 `.centerCol`）。宿主 CSS Module 类名随构建 hash 变化，不可按类名找。
-- 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮组要贴中心列左下角 ⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，插件卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮组取 999 低于它（模态框打开时被盖住）。
+- 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮组要贴中心列左侧（纵向居中）⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，插件卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮组取 999 低于它（模态框打开时被盖住）。
 
 ### credentials：凭据状态面（隐藏官方API的判定依据）
 

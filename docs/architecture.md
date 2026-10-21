@@ -61,7 +61,7 @@
 | `src/client/locale-keys.ts` | 卡片文案键契约（键并入宿主 `LocaleNamespaceMap`） |
 | `src/client/locale-zh.ts` `locale-en.ts` | 卡片词典（中 / 英） |
 | `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
-| `src/client/floating-buttons.tsx` | 悬浮按钮组容器：中心列左下角直插 DOM + 独立 React 根；管定位 / 布局 / 渲染，导出 `addButton` |
+| `src/client/floating-buttons.tsx` | 悬浮按钮组容器：中心列左侧直插 DOM + 独立 React 根；管定位 / 布局 / 渲染，导出 `addButton` |
 | `src/client/floating-button.ts` | 悬浮按钮的响应式数据契约与工厂（React 外部存储形态） |
 | `src/client/back-to-chat.ts` | 「返回对话」按钮条目：自己的 layout 依赖与配置 / 语言订阅，出响应式数据交容器渲染 |
 | `src/client/classic-setting.tsx` | 「经典设置」入口：以 `priority: -1` 遮蔽宿主 `settings.launcher` 席位上的账号入口，渲染 1:1 复刻 `dsh-v0.2.0-rc.2` 外壳回退按钮的经典设置触发器 |

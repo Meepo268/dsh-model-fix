@@ -65,7 +65,7 @@ export interface BehaviorRules {
     showInComposer: boolean
     /** 在对话框工具栏显示「跟随」状态灯；关闭即卸载该条目 */
     showFollowStatus: boolean
-    /** 在内容区左下角显示「返回对话」悬浮按钮；关闭即销毁该按钮 */
+    /** 在内容区左侧显示「返回对话」悬浮按钮；关闭即不显示该按钮 */
     backToChat: boolean
     /** 经典设置入口：开启时侧栏底部只显示「设置」按钮（遮蔽宿主账号入口，故意见反馈与登录不可见），关闭即恢复宿主账号菜单。默认 true */
     classicSetting: boolean
