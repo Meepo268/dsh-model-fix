@@ -29,8 +29,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "tsdown --config tsdown.test.config.ts && node .test-dist/index.mjs",
-    "pack:release": "pnpm pack --out=\"dist/%s.tgz\"",
+    "all": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "hook:git": "nit install && nit check",
+    "pack:release": "pnpm pack --out=\"dist/%s.tgz\"",
     "prepare": "pnpm build"
   },
   "devDependencies": {

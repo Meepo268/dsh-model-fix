@@ -2,7 +2,7 @@
 
 ## 命令
 
-`pnpm typecheck` / `lint` / `test` / `build`；提交前必跑。只认这些已定义脚本，不得裸跑 bin（`tsdown --config`、`eslint` 的 TS 配置读取都挂在脚本上，裸跑漏开关就与提交前验证不等价）。
+`pnpm typecheck` / `lint` / `test` / `build`；提交前必跑。`pnpm all` 按 `lint → typecheck → test → build` 顺序一次跑完这四项。只认这些已定义脚本，不得裸跑 bin（`tsdown --config`、`eslint` 的 TS 配置读取都挂在脚本上，裸跑漏开关就与提交前验证不等价）。
 
 `pnpm build:cache` 是维护命令（重建随包目录缓存 `public/models-cache.json`），不在提交前验证序列内；它经 jiti 直跑 TS 构建器，与运行期同一份逻辑，不复制。
 
