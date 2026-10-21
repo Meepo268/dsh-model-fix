@@ -31,6 +31,7 @@ import type { Flags } from '@/client/model'
 import { makeScope, type DecodedScope } from '@/client/scope'
 import { applySlotVisibility } from '@/client/visibility'
 import { applyBackToChat } from '@/client/back-to-chat'
+import { applyClassicSetting } from '@/client/classic-setting'
 import { decodeHostModelSelection, HOST_MODEL_SELECTION_NS, type HostModelSelectionView } from '@/client/composer'
 
 /** 提供方 scope 的解码占位值：本卡只消费 snapshot.user（原始用户层），value 无用途；decode 必须永不返回 undefined */
@@ -70,7 +71,7 @@ function boot(
     // 浏览器半调 Node 半的全部出口（三个写回端点 + 两条诊断链的读流）见 rpc-carrier.ts
     const { forceUpdate, resetModels, restoreModels, verifyModels, probeEfforts } =
         makeRpcCarrier(rpc)
-    // 五席共用的卡片入参：载体与 scope 逐席相同
+    // 共用的卡片入参：载体与 scope 逐席相同
     const cardProps = {
         scope,
         providersScope,
@@ -105,4 +106,6 @@ function boot(
     applyLocalePatch(ctx, scope)
     // 「返回对话」悬浮按钮：内容区左下角，点击回到当前会话（宿主 ctx.layout 提供该能力）
     applyBackToChat(ctx, scope)
+    // 「经典设置」入口：遮蔽宿主账号菜单，侧栏底恢复为一枚设置按钮
+    applyClassicSetting(ctx, scope)
 }

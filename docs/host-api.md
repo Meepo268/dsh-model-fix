@@ -104,7 +104,7 @@
 - 引用身份稳定、就地更新（`_commitVolatile` 逐个 `updateVolatile` 并 emit `loader/volatile-update`，仅发给 owning fiber）⇒ volatile 变更**不重启 fiber**。
 - volatile 位置约束：根 volatile 受支持，`.volatile()` 不能叠加；volatile 字段要求固定对象路径（无外裹 volatile）。
 
-### slots：五席注册
+### slots：六席注册
 
 - `ctx.slots`（`DSH/packages/client/ui-renderer/src/client/registry.ts`，`SlotRegistry`）。
 - `register` 是原型赋值、内部包 `ctx.effect` ⇒ **register 必须能挂 effect 生命周期**（实际都经 effect）；向未声明 slot 注册直接抛 `slot "…" is not declared`。
@@ -112,7 +112,7 @@
 - 带 inject 的 register 重载（`DSH/packages/client/ui-slots/src/index.ts`）：`BaseOptions{ name; children?; store?; locale?; registrant? }`；工厂参数给严格 session 席位 `sessionId`、session-maybe 席位 `sessionId | undefined`，声明 store 时追加 `actions`；**没有 binding 对象参数**。
 - props 合成：`InjectFace<I>` 里 `hooks` 被渲染器绑成 `use<Name>` 选择器 hook（组件看不到裸 observable）；`PropsStore<H> = { useStore; actions }`；**只有 `register({ locale: NS })` 声明了命名空间，props 上才出现 `t`**。
 - 条目字段（`KindOptions`）：list `{ id; order?; label?; priority? }`、keyed `{ key; priority? }`、chain `{ select; priority? }`；`SlotLabel = string | (() => string)`（每次渲染求值）。
-- 本插件五席：
+- 本插件六席：
 
 | slot key | SlotMap 定义 | kind | 条目字段 |
 | --- | --- | --- | --- |
@@ -121,7 +121,12 @@
 | `plugins.row.config` | 同上（JSDoc：keyed by `<package>#<row id>`） | keyed | 同上 |
 | `settings.plugins.tab` | `DSH/packages/client/ui-settings/src/client/contract/slots.ts` | list | `id` / `order?` / `label?` / `priority?` |
 | `conversation.input.left` | `DSH/packages/client/ui-conversation/src/client/contract/slots.ts`（无 owner props），渲染点该包 `src/client/skeleton/InputBar.tsx` | list | `id` / `order?` / `label?` / `priority?` |
+| `settings.launcher` | `DSH/packages/client/ui-settings/src/client/contract/slots.ts`（owner props `SettingsLauncherOwnerProps`：wide / settingsOpen / settingsShortcut / openSettings / openOnboarding） | single | `priority?`（遮蔽用） |
 
+- 席位声明者是宿主外壳 `ui-settings-general`（它的 `children` 表声明 `settings.launcher`）⇒ 本仓注册必须写在 `ctx.slots.inject('settings.launcher', …)` 回调里，向未声明席位注册直接抛。
+- **single 席位的遮蔽（shadowing）**：同一格可共存于不同 `priority`，**数字最小者渲染**（`DSH/packages/client/ui-slots/src/index.ts` 的 `SlotCore.register` JSDoc 与错误消息 `register at a different priority to shadow it (lowest renders)`；账本按 priority 升序稳定排序，渲染器取 `entriesOfSlot(key)[0]`）；同 priority 再注册才抛错。宿主账号包注册 launcher 时未设 priority（默认 0），本仓以 `priority: -1` 注册即遮蔽它。
+- `StoredEntry.registrant` 是运行时盖的**注册方 fiber 名**（`DSH/packages/client/ui-renderer/src/client/registry.ts`：`options.registrant ?? fiber.name`）⇒ 据此判「账本里有没有本插件之外的占位者」。
+- `ctx.slots.entries(key)` 与 `ctx.slots.subscribe(key, fn)` 均为公开面（`SlotRegistry`）：前者给条目表，后者给账本变更通知。
 - keyed 拼接（`DSH/packages/client/ui-plugin-manager/src/client/config-ledger.ts`）：`rowConfigKey(bundle, rowId) = \`${bundle}#${rowId}\`` ⇒ 本仓 `${PLUGIN_NAME}#${PLUGIN_NS}` 逐字成立。
 
 ### locale：词典与 `t`
@@ -282,6 +287,7 @@
 - **非 loopback 连接的 settings 卡不再固定 `unavailable`**（alpha.3 把 `status` 收窄为 `idle | loading | ready`）：本仓 `card.tsx` 的 `status === 'unavailable'` 分支来自 `ConfigForm.derive()`（查无 NS），与连接性质无关，插件未被宿主登记时仍会命中，保留。
 - **宿主自 `0.2.1-alpha.2` 起原生隐藏「未配密钥的官方 API 组」**（`llm-deepseek-api-key` 的 `discoverModels` 在 `MISSING_CREDENTIAL` 时返回 `[]`，与 rc.2 本仓功能同效）：本仓功能保留作老宿主兜底。`deepseek-account` 自 `0.1.7-rc.2` 起自带登录门，宿主自己的凭据判定显式跳过它（`hasProviderApiKey` 的 `continue`）⇒ **不得加进 `HIDDEN_OFFICIAL_PROVIDERS`**（account 段无 `apiKeyEnv` 键，判定会回退 `DEEPSEEK_API_KEY` 误隐藏可用账号组）。
 - **`Pill` 的形态由 `onClick` 是否存在决定**（无 `onClick` 渲染静态 `span`，有则渲染 `button` 并加 `.interactive`；`Pill.module.css` 无 `:disabled` 规则）⇒ 卡片「恒定展示行」的不可操作态用「不传 `onClick`」表达，`disabled` 只落在 button 路径上、对静态 span 无效；置灰线索改由本地 `.dsh-mf-pillLocked{opacity:.5}` 提供，值取宿主 Switch 的 `.switch:disabled` 同值。升级宿主时复核该形态。
+- **「经典设置」依赖宿主两件事**：账号包的客户端半要 `remote.account`/`remote.session`（服务缺席则 fiber PENDING、**不认领 `settings.launcher`**，侧栏底显示的是外壳自己的回退触发器——本仓复刻的正是它，基线 `dsh-v0.2.0-rc.2`，现行宿主的回退按钮与该版同形）；以及该席位的遮蔽规则与注册者盖名（`priority` 升序、最小者渲染；`registrant` = 注册方 fiber 名）。宿主改这两条语义须复核 `src/client/classic-setting.tsx`。
 
 ## 升级宿主时的检查清单
 
@@ -291,7 +297,7 @@
 - 逐条复核「宿主服务与运行时面」各节签名与行为假设，尤其 settings 写入语义、命名空间登记时序、连接断开语义。
 - 复核 `SETTINGS_CONFLICT` 与 LLM 失败码字面量（尤其 `classifyPiAiError` 的文案正则——它决定 `TRANSPORT` / `STREAM_CLOSED` 的归一化来源）。
 - 复核适配器是否仍兑现 `options.signal`（`LlmAdapter.stream` 契约 `implementations must honor options.signal`）：本仓 30s 软超时 + 3s 硬兜底靠它传中止；连带复核 pi-ai `idleWatchdog`（rc.2 有、alpha.3 删过、按当时版本确认）与 `LLM_STREAM_IDLE_TIMEOUT`。
-- 复核五个 slot key、`rowConfigKey` 拼接、`SlotLabel` thunk 与 `PropsLocale`（`t` 只在声明 `locale:` 时上 props）。
+- 复核六个 slot key、`rowConfigKey` 拼接、`SlotLabel` thunk 与 `PropsLocale`（`t` 只在声明 `locale:` 时上 props）；另复核 `settings.launcher` 席位的遮蔽规则（`priority` 升序、最小者渲染）与 `StoredEntry.registrant` 的盖名方式是否仍如本文所述。
 - 复核 `ctx.sessions.binding()`（返回 `undefined`）与 `ctx.modelDirectories.directoryFor()`（抛错）的失败契约，互换会让记忆链路 try/catch 失准。
 - 复核 compat 两字段的宿主契约（`openai-completions` gate、检测默认与 `??` 合并口径）。
 - 复核 `Config` 仍是 volatile 实时引用（`Volatile<T>` + `loader/volatile-update`）及 `z.any()` 与 `z.object` 在 settings `projectForm` 的投影差异。

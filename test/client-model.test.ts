@@ -37,7 +37,7 @@ const ALL_ON: Flags = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: [],
     efforts: {},
-    behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
+    behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
     userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: true, selfTune: true, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
 }
 
@@ -59,7 +59,7 @@ export function run(): void {
             compat: { disableDeveloper: false, disableStore: false },
             excludes: ['acme-gateway'],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -72,7 +72,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -85,7 +85,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: ['acme-gateway'],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -100,7 +100,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: { 'z-ai': { 'glm-5.2': 'high' } },
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
     )
@@ -165,7 +165,7 @@ export function run(): void {
             compat: { disableDeveloper: true, disableStore: true },
             excludes: [],
             efforts: {},
-            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true },
+            behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, classicSetting: true },
             userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
         }),
         toStored(DEFAULT_FLAGS),
@@ -407,15 +407,15 @@ export function run(): void {
     const followOff: Flags = { ...ALL_ON, userExperience: { ...ALL_ON.userExperience, followParent: false } }
     check('followingActive followParent=false：宿主未开启 → 不生效', !followingActive(followOff, false))
     check('followingActive followParent=false：宿主已开启 → 不生效', !followingActive(followOff, true))
-    // behavior 组五个开关各驱动一个 UI 部件的装卸，取值与其它组同一函数
-    check('groupValue 默认配置 behavior 五项全开', BEHAVIOR_KEYS.every((key) => groupValue(DEFAULT_FLAGS, 'behavior', key)))
+    // behavior 组六个开关各驱动一个 UI 部件的装卸，取值与其它组同一函数
+    check('groupValue 默认配置 behavior 六项全开', BEHAVIOR_KEYS.every((key) => groupValue(DEFAULT_FLAGS, 'behavior', key)))
     check('groupValue behavior 显式 false → 关', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInModels: false } }, 'behavior', 'showInModels'))
-    check('groupValue behavior 关一项不影响其余四项', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', 'showInComposer')
-        && ['showInModels', 'showInBuiltinPlugins', 'showFollowStatus', 'backToChat'].every((key) => groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', key as (typeof BEHAVIOR_KEYS)[number])))
+    check('groupValue behavior 关一项不影响其余五项', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', 'showInComposer')
+        && ['showInModels', 'showInBuiltinPlugins', 'showFollowStatus', 'backToChat', 'classicSetting'].every((key) => groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', key as (typeof BEHAVIOR_KEYS)[number])))
     // 「返回对话」悬浮按钮的开关：显式 false 即销毁按钮
     check('groupValue behavior backToChat 显式 false → 关', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, backToChat: false } }, 'behavior', 'backToChat'))
-    // 五个开关是 behavior 组的全部行键，故组总控与脏检测都覆盖到它们
-    check('behavior 组行键为五个可见性开关', stable([...GROUP_KEYS.behavior]) === stable([...BEHAVIOR_KEYS]))
+    // 六个开关是 behavior 组的全部行键，故组总控与脏检测都覆盖到它们
+    check('behavior 组行键为六个可见性开关', stable([...GROUP_KEYS.behavior]) === stable([...BEHAVIOR_KEYS]))
     check('isDirty 覆盖 behavior 翻转', isDirty(
         { ...ALL_ON, behavior: { ...ALL_ON.behavior, showInModels: false } },
         ALL_ON,

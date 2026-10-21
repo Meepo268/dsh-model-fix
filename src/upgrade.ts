@@ -63,6 +63,7 @@ const V8_SHOW_ORIGINAL_EFFORTS_DEFAULT = true
 const V8_DISABLE_STORE_DEFAULT = true
 const V8_LOOSE_MATCH_DEFAULT = false
 const V8_BEHAVIOR_DEFAULT = true
+const V8_CLASSIC_SETTING_DEFAULT = true
 
 // ---------- 最低一级台阶（持守卫） ----------
 
@@ -109,6 +110,7 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
             showInComposer: V8_BEHAVIOR_DEFAULT,
             showFollowStatus: V8_BEHAVIOR_DEFAULT,
             backToChat: V8_BEHAVIOR_DEFAULT,
+            classicSetting: V8_CLASSIC_SETTING_DEFAULT,
         },
         userExperience: {
             ...parsed.userExperience,

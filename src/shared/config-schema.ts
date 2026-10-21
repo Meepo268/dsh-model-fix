@@ -49,6 +49,7 @@ const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showInComposer: true,
     showFollowStatus: true,
     backToChat: true,
+    classicSetting: true,
 }
 
 /** 默认配置：全新用户的配置基线（存储形态经 `toStored` 物化；取值改动须同步 src/upgrade.ts 的台阶字面量） */
@@ -88,6 +89,7 @@ export const BEHAVIOR_KEYS = [
     'showInComposer',
     'showFollowStatus',
     'backToChat',
+    'classicSetting',
 ] as const
 
 /** 解析版本快照键 version-N；非法返回 undefined。严格匹配规范键（禁宽泛归一） */

@@ -182,12 +182,16 @@ export const zh: Record<CardKey, string> = {
     rowShowFollowStatus: '显示跟随状态',
     rowShowInPluginManager: '显示在插件管理',
     rowBackToChat: '返回对话',
+    rowClassicSetting: '经典设置',
     tipShowInModels: '在「设置 → 模型」页底部显示本插件的配置卡片。',
     tipShowInBuiltinPlugins: '在「设置 → 内置插件」里显示本插件的配置选项卡。',
     tipShowInComposer: '在聊天输入框的工具栏上显示「模型优化」入口，点击即打开完整配置。',
     tipShowFollowStatus: '在工具栏上显示「跟随」状态灯（亮绿表示子智能体跟随父智能体正在生效），点击可切换开关。',
     tipShowInPluginManager: '本插件始终显示在「插件管理」里，且不可关闭——它是你重新打开上述任何界面的唯一入口。',
     tipBackToChat: '在内容区左下角显示一枚「返回对话」悬浮按钮，点击即回到当前正在进行的对话。',
+    tipClassicSetting: '若需要意见反馈、登录，关闭即可。',
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
     backToChat: '返回对话',
+    // 经典设置按钮自身的文案
+    classicSettingLabel: '设置',
 }

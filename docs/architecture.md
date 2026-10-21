@@ -39,7 +39,7 @@
 | `src/constants.ts` | Node 半常量 |
 | `src/shared/` | 跨半共享层（零 Node 依赖）：常量、`errorText`、探测/验证契约、当前版本配置 schema 与行键表 |
 | `src/client/index.tsx` | 浏览器半入口：席位注册、卡片、词典、调用面接线、scope 释放，全挂 `configForms` 子 fiber |
-| `src/client/card.tsx` | 五席共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
+| `src/client/card.tsx` | 六席共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
 | `src/client/tile.tsx` | 瓦片层：布尔矩阵组 / 动态排除集合两种形态 |
 | `src/client/card-meta.tsx` | 卡片联系行（仓库 / 版本 / 反馈） |
 | `src/client/card-styles.ts` | 卡片样式层：全部样式数值的唯一出处 |
@@ -62,6 +62,7 @@
 | `src/client/locale-zh.ts` `locale-en.ts` | 卡片词典（中 / 英） |
 | `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
 | `src/client/back-to-chat.tsx` | 「返回对话」悬浮按钮：中心列左下角直插 DOM + 独立 React 根（宿主 `ctx.layout.selectPanel(null)`） |
+| `src/client/classic-setting.tsx` | 「经典设置」入口：以 `priority: -1` 遮蔽宿主 `settings.launcher` 席位上的账号入口，渲染 1:1 复刻 `dsh-v0.2.0-rc.2` 外壳回退按钮的经典设置触发器 |
 | `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用；`pnpm build:cache` 重建） |
 | `scripts/build-cache.mjs` | 重建随包缓存：拉 models.dev 全量数据并跑运行期同一个构建器（jiti 直跑 TS，逻辑不复制） |
 | `icon.svg` `cordis.patch.yml` `locale/*.json` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |

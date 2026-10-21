@@ -183,12 +183,16 @@ export const en: Record<CardKey, string> = {
     rowShowFollowStatus: 'Show follow status',
     rowShowInPluginManager: 'Show in plugin manager',
     rowBackToChat: 'Back to chat',
+    rowClassicSetting: 'Classic settings',
     tipShowInModels: 'Shows this plugin\'s settings card at the bottom of the Models settings page.',
     tipShowInBuiltinPlugins: 'Shows this plugin\'s settings tab under Settings → Built-in plugins.',
     tipShowInComposer: 'Shows the "Model tuning" entry on the chat composer toolbar; clicking it opens the full settings.',
     tipShowFollowStatus: 'Shows the Follow status lamp on the toolbar (green while subagents actually follow the parent agent); clicking it toggles the setting.',
     tipShowInPluginManager: 'This plugin always shows in the plugin manager and cannot be hidden — it is the only way back into any of the surfaces above.',
     tipBackToChat: 'Shows a floating "Back to chat" button at the bottom-left of the content area; clicking it returns to the conversation in progress.',
+    tipClassicSetting: 'Turn this off to keep the host account menu (feedback and sign-in) in the sidebar.',
     // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
     backToChat: 'Back to chat',
+    // 经典设置按钮自身的文案
+    classicSettingLabel: 'Settings',
 }
