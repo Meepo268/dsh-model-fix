@@ -35,7 +35,7 @@ export type RowKey =
     | (typeof BEHAVIOR_KEYS)[number]
     | (typeof USER_EXPERIENCE_KEYS)[number]
 
-/** 卡片侧消费的完整当前配置（与 PluginConfig 同形：四组布尔 + excludes + efforts） */
+/** 卡片侧消费的完整当前配置（与 PluginConfig 同形：五组布尔 + excludes + efforts） */
 export type Flags = PluginConfig
 
 /** 解码命名空间整段：只读当前版本快照（键见 `VERSION_KEY`）；段非法、快照缺失或非法均回退默认。永不返回 undefined（返回 undefined 会让宿主 scope 永挂 loading） */

@@ -30,7 +30,7 @@ import type { Flags } from '@/client/model'
 import { EFFORT_LEVELS } from '@/shared/constants'
 import { BEHAVIOR_KEYS } from '@/shared/config-schema'
 
-/** 三组全开的配置（总控与整组置位用例的基准，无排除项，无记忆，用户体验与 UI 可见性各项全开） */
+/** 五组全开的配置（总控与整组置位用例的基准，无排除项，无记忆，用户体验与 UI 可见性各项全开） */
 const ALL_ON: Flags = {
     autoFill: { reasoning: true, context: true, image: true },
     allowUpdate: { reasoning: true, context: true, image: true },
@@ -155,7 +155,7 @@ export function run(): void {
     for (const junk of [undefined, null, 42, 'x', [], { foo: 1 }, { 'version-8': null }, { 'version-x': {} }]) {
         check(`decode 垃圾输入兜默认 ${stable(junk)}`, stable(decodeSection(junk)) === stable(DEFAULT_FLAGS), junk)
     }
-    // ---------- toStored：规范形态（configVersion + 三组布尔 + 排除列表 + efforts + userExperience 全显式，无多余键） ----------
+    // ---------- toStored：规范形态（configVersion + 五组布尔 + 排除列表 + efforts 全显式，无多余键） ----------
     check(
         'snapshot 规范化为 v8 存储形态',
         stable(toStored(DEFAULT_FLAGS)) === stable({
@@ -407,15 +407,15 @@ export function run(): void {
     const followOff: Flags = { ...ALL_ON, userExperience: { ...ALL_ON.userExperience, followParent: false } }
     check('followingActive followParent=false：宿主未开启 → 不生效', !followingActive(followOff, false))
     check('followingActive followParent=false：宿主已开启 → 不生效', !followingActive(followOff, true))
-    // behavior 组六个开关各驱动一个 UI 部件的装卸，取值与其它组同一函数
-    check('groupValue 默认配置 behavior 六项全开', BEHAVIOR_KEYS.every((key) => groupValue(DEFAULT_FLAGS, 'behavior', key)))
+    // behavior 组七个开关各决定一个 UI 部件的在不在，取值与其它组同一函数
+    check('groupValue 默认配置 behavior 七项全开', BEHAVIOR_KEYS.every((key) => groupValue(DEFAULT_FLAGS, 'behavior', key)))
     check('groupValue behavior 显式 false → 关', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInModels: false } }, 'behavior', 'showInModels'))
-    check('groupValue behavior 关一项不影响其余五项', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', 'showInComposer')
-        && ['showInModels', 'showInBuiltinPlugins', 'showFollowStatus', 'backToChat', 'classicSetting'].every((key) => groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', key as (typeof BEHAVIOR_KEYS)[number])))
+    check('groupValue behavior 关一项不影响其余六项', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', 'showInComposer')
+        && ['showInModels', 'showInBuiltinPlugins', 'showInFloat', 'showFollowStatus', 'backToChat', 'classicSetting'].every((key) => groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, showInComposer: false } }, 'behavior', key as (typeof BEHAVIOR_KEYS)[number])))
     // 「返回对话」悬浮按钮的开关：显式 false 即销毁按钮
     check('groupValue behavior backToChat 显式 false → 关', !groupValue({ ...ALL_ON, behavior: { ...ALL_ON.behavior, backToChat: false } }, 'behavior', 'backToChat'))
-    // 六个开关是 behavior 组的全部行键，故组总控与脏检测都覆盖到它们
-    check('behavior 组行键为六个可见性开关', stable([...GROUP_KEYS.behavior]) === stable([...BEHAVIOR_KEYS]))
+    // 七个开关是 behavior 组的全部行键，故组总控与脏检测都覆盖到它们
+    check('behavior 组行键为七个可见性开关', stable([...GROUP_KEYS.behavior]) === stable([...BEHAVIOR_KEYS]))
     check('isDirty 覆盖 behavior 翻转', isDirty(
         { ...ALL_ON, behavior: { ...ALL_ON.behavior, showInModels: false } },
         ALL_ON,

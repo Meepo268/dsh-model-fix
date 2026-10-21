@@ -26,7 +26,7 @@ Node.js（ESM）+ `@deepseek-ai/cordis`；tsdown 双配置构建到 `lib/`（Nod
 ### 导入与打包
 
 - 源码导入只用 `@/`（→`src/`）与 `@test/`（→`test/`），禁相对路径；别名须同时声明在 tsconfig `paths` 与各 tsdown 配置 `alias`（tsdown 不读 paths），键锚定 `@` 以免吞 `@deepseek-ai/*`。
-- 代码合规检查一律归 lint，编译配置（`tsdown.config.ts`）只管编译。跨半纯度是 `eslint.config.ts` 的三条 lint 规则（Node 半禁 `@/client` 值导入；浏览器半的 `@/` 与 `@deepseek-ai/*` 值导入只放行 `@/shared/*`、`@/client/*` 与基线 `BROWSER_HOST_BASELINE`）；只判值导入（`import type` 由 `verbatimModuleSyntax` + `consistent-type-imports` 保证）。
+- 代码合规检查一律归 lint，编译配置（`tsdown.config.ts`）只管编译。跨半纯度是 `eslint.config.ts` 的四条 lint 规则（Node 半禁 `@/client` 值导入；浏览器半的 `@/` 与 `@deepseek-ai/*` 值导入只放行 `@/shared/*`、`@/client/*` 与基线 `BROWSER_HOST_BASELINE`）；只判值导入（`import type` 由 `verbatimModuleSyntax` + `consistent-type-imports` 保证）。
 - 宿主模块排除表单一来源 `scripts/build-externals.mjs`（tsdown 与 eslint 共用），按半各一份、只列该半运行期实际值导入的宿主包；浏览器半基座以宿主 `PLATFORM_MODULES`（冻结表）为准，漂移即运行期 require 未命中。
 - settings 命名空间键 = `cordis.patch.yml` 的 `id` = `PLUGIN_NS`，浏览器半 `configForms.get(NS)` 与 Node 半写回共用同一字面量。
 - `package.json` 的 `dsh.client.inject` 是**依赖包图边**（槽位所有者包），不是 cordis 服务名；服务名只写 `src/client/index.tsx` 的 `export const inject`。声明 `dsh.client` 后缺 `lib/client.js` 会让宿主激活期聚合抛错 ⇒ **build 必须先于安装**。

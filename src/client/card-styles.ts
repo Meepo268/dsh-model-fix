@@ -142,7 +142,6 @@ const STYLE_TEXT = [
     // warn 语义键：卡片 footer 触发键与弹层确认键共用，仅换 warn 令牌描边/字色；hover 用 10% 稀释（宿主无 warn 悬停底令牌）；叠加 .dsh-mf-discard 时靠 :not(:disabled) 特异性压过默认
     '.dsh-mf-warn:not(:disabled){border-color:var(--dsw-alias-state-warn-label,#dd8629);color:var(--dsw-alias-state-warn-label,#dd8629)}',
     '.dsh-mf-warn:hover:not(:disabled){background:color-mix(in srgb, var(--dsw-alias-state-warn-label,#dd8629) 10%, transparent)}',
-    // 输入框工具行 chip（conversation.input.left）：几何复刻宿主 PlanModeControl `.chip`（对称 padding 0 8px、min-width 34px）；配色按语义分档，各态见下方逐条注释
     // 弹层面板：宽度与 flex 参与复刻宿主 SettingsRoot.module.css `.panel`；高度由内容撑开、640px 封顶（min 保留窄视口收敛，calc 分支给顶栏留与 .root padding 同的上下气），超封顶在包裹层滚动
     // flex:none：Modal .root 是 align-items:center 的 flex 容器，不加则按内容高度参与对齐、面板不居中
     // Modal 走 headless（卡片直接作 children，宿主标题栏/关闭钮/content/body 一律不渲染），故 .dialog 的 padding:0 0 24px 与 gap:20px 在此清空（原为 chrome 而设）
@@ -153,6 +152,7 @@ const STYLE_TEXT = [
     // 面板内的卡片去掉自身描边与底色，透出面板的 --dsw-alias-bg-layer-2，
     // 与设置面板的内容列同观感（那边 .nav/.content 亦无 own fill，面板底色透出）
     '.dsh-mf-composerBody>.dsh-mf-card{border-color:transparent;background:transparent}',
+    // 输入框工具行 chip（conversation.input.left）：几何复刻宿主 PlanModeControl `.chip`（对称 padding 0 8px、min-width 34px）；配色按语义分档，各态见下方逐条注释
     '.dsh-mf-composerChip{display:inline-flex;align-items:center;gap:4px;min-width:34px;height:28px;padding:0 8px;border:none;border-radius:var(--dsw-radius-sm);font-size:13px;font-weight:500;line-height:20px;cursor:pointer}',
     '.dsh-mf-composerChip:focus-visible{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline:none}',
     '.dsh-mf-composerChip:disabled{cursor:default;opacity:.6}',

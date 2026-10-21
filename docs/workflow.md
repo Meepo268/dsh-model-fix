@@ -11,7 +11,7 @@
 - pnpm 脚本必须在 shell 里直接跑，不得经 Node 子进程包裹（沙箱下 `child_process` 启 pnpm 报 `spawn EPERM`）。
 - `pnpm test` 走专用单对象配置 `tsdown.test.config.ts`；禁止指回数组主配置（CLI 参数合并进每一项，浏览器半的工厂 banner 会污染测试产物）。
 - TS 7 与 ESLint 并存靠 npm 别名：TS 7 原生版无 JS API、typescript-eslint 见之即抛错。故 `typescript` = `npm:@typescript/typescript6@^6.0.2`（bin 为 `tsc6`），TS 7 挂别名 `@typescript/native`。
-- `pnpm lint` 走 `eslint.config.ts`（ESLint 经 devDep `jiti` 读 TS 配置）：只排除 `lib/`，其余交给 ESLint 默认忽略。硬约束五条——禁相对导入、`consistent-type-imports`、三条跨半纯度自定义规则（细则在 `AGENTS.md`「导入与打包」）。根目录两个 tsdown 配置与本配置自身都在 lint 范围内。
+- `pnpm lint` 走 `eslint.config.ts`（ESLint 经 devDep `jiti` 读 TS 配置）：只排除 `lib/`，其余交给 ESLint 默认忽略。硬约束六条——禁相对导入、`consistent-type-imports`、四条跨半纯度自定义规则（细则在 `AGENTS.md`「导入与打包」）。根目录两个 tsdown 配置与本配置自身都在 lint 范围内。
 - 宿主包本地依赖全走 devDeps 且须与宿主 latest 同号；一律 `pnpm add` 变更（`-E` 保精确、`--save-peer` 写 peer）；升级只能写具体版本号（各子包 `latest` tag 陈旧）。
 - 钩子脚本读 stdin 只能异步：Windows 上 stdin 是管道时 `fs.readFileSync(0)` 抛 `EOF`（nodejs/node#35997），git 正是用管道喂 pre-push 清单，故 `scripts/check-tag.mjs` 走 `process.stdin` 异步迭代。
 

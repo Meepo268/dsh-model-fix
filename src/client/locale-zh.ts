@@ -172,7 +172,7 @@ export const zh: Record<CardKey, string> = {
     chipFollowOff: '跟随',
     chipFollowOffTitle: '点击开启：子智能体将跟随父智能体的模型与推理级别',
     chipFollowFail: '保存失败，操作未生效',
-    // 「UI 与行为」组：四个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
+    // 「UI 与行为」组：七个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
     colBehavior: 'UI 与行为',
     hintBehavior: '控制本插件的 UI 与行为。',
     rowShowInModels: '显示在模型',

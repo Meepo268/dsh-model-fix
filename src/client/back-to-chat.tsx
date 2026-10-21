@@ -3,17 +3,17 @@
  * （宿主 `ctx.layout.selectPanel(null)`）。图标与提示跟随当前会话状态。
  */
 
-import {IconChevronLeftOutlineRegular, StateDot} from '@deepseek-ai/dsh-client-ui-primitives'
-import type {StateDotState} from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronLeftOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // ctx.locale 服务面
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // ctx.uiSession 服务面（当前会话与会话状态，声明合并）
-import type {UiSession} from '@deepseek-ai/dsh-client-ui-session/client'
+import type { UiSession } from '@deepseek-ai/dsh-client-ui-session/client'
 // ctx.sessions 服务面（会话列表与投影，声明合并）
-import type {ISessions} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 // SessionId 品牌 id
-import type {SessionId} from '@deepseek-ai/dsh-session/types'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { CARD_NS } from '@/client/locale-keys'
 import type { CardKey } from '@/client/locale-keys'
 import { groupValue } from '@/client/model'

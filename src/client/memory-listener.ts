@@ -43,7 +43,8 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
 
     // 记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用）：纯监听，只订阅会话投影；
     // 自动设置经宿主公开 directory.select，保存经自有 NS 的 settings scope 直写
-    ctx.inject(['sessions', 'modelDirectories'], (subCtx) => {        const sessions = subCtx.sessions
+    ctx.inject(['sessions', 'modelDirectories'], (subCtx) => {
+        const sessions = subCtx.sessions
         const modelDirectories = subCtx.modelDirectories
 
         subCtx.effect(() => {

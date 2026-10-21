@@ -17,7 +17,7 @@ const BROWSER_HOST_BASELINE = CLIENT_EXTERNALS.filter(source => source.startsWit
 /**
  * 跨半纯度门禁：Node 半与浏览器半的依赖方向约束。
  *
- * 三条都只判**值导入**：tsconfig 开 verbatimModuleSyntax，且 `consistent-type-imports` 强制纯类型导入
+ * 四条都只判**值导入**：tsconfig 开 verbatimModuleSyntax，且 `consistent-type-imports` 强制纯类型导入
  * 写成 `import type`，故未标 type 的 import 即真正落运行期的依赖——与构建期看得到的依赖集合一致，
  * type-only 导入豁免（跨插件类型协作正是靠它）。
  */

@@ -147,6 +147,8 @@ DSH `0.1.7-rc.2` ~ `0.2.1-alpha.3`
         showInModels: true
         showInBuiltinPlugins: true
         showInComposer: true
+        showInFloat: true
         showFollowStatus: true
         backToChat: true
+        classicSetting: true
 ```

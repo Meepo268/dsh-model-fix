@@ -42,11 +42,6 @@ export function isProviderBlocking(outcome: ProbeOutcome): outcome is Exclude<Pr
     return outcome === 'unreachable' || outcome === 'credential'
 }
 
-/** 该结果是否只是本次没跑成（限流 / 超时）：不算不可用，也不能用来短该模型的后续档位。 */
-export function isTransientOutcome(outcome: ProbeOutcome): boolean {
-    return outcome === 'rate-limit' || outcome === 'timeout'
-}
-
 /** 失败的原始事实（宿主 `LlmFailure` 的可序列化子集）：供调用方做更细的分类与展示。 */
 export interface VerifyFailureFacts {
     code: string

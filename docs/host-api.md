@@ -134,7 +134,7 @@
 - `ctx.locale`（`DSH/packages/client/locale/src/client/index.ts`，`LocaleRuntime`）：事件 `'locale/change'`，**字典注册不发该事件**。
 - `register(ns, dicts)` 返回幂等 disposer；**重复注册抛错** `locale namespace "…" already has locale "…"` ⇒ 一律经 `ctx.effect` 挂。
 - `bind(ns)` 每 ns 缓存同一函数引用（身份稳定，可放 label thunk 依赖数组）；`bind` 出来的 `t` **按调用时刻的语言求值**，故语言切换后要重渲才能拿到新文案。
-- `subscribe(fn)` / `getSnapshot()` 是 LocaleFace 契约（快照带 `revision`，变更才换引用）：`src/client/back-to-chat.ts` 订阅它做「语言切换即刷新提示文案」，退订挂自己的 `ctx.effect`。
+- `subscribe(fn)` / `getSnapshot()` 是 LocaleFace 契约（快照带 `revision`，变更才换引用）：`src/client/back-to-chat.tsx` 订阅它做「语言切换即刷新提示文案」，退订挂自己的 `ctx.effect`。
 - 本仓私接面（非公开类型面，宿主改名即静默失效）：`ctx.locale` 实例上的 `dicts: Map<ns, Map<localeLower, dict>>`、`publish(active, localeChanged, locales?)`、`snapshot: { active, locales }`——因 `register` 禁止同 ns+locale 重复注册，改宿主既有词条值只能 mutate 已注册对象再手动 `publish`。`localeKey()` 是 `toLowerCase`，第二层键是小写 `'zh'`。`src/client/locale-patch.ts` 即走这条路改宿主 `model` NS 的 `effort.providerDefault`（宿主 `ModelSelect.tsx` 自合成的 Default 伪菜单项取该词条，不经数据层，Node 半遮蔽碰不到）。本仓以本地 `LocaleRuntimeHack` 接口 + `as unknown as` 转换。
 - 类型面（`DSH/packages/client/ui-slots/src/index.ts`）：`LocaleNamespaceMap` 声明合并点（`src/client/locale-keys.ts` 扩展）、`Translate<K> = (key, params?) => string`；locale face 在 `DSH/packages/client/ui-slots/src/renderer.ts`。调用形态就是 `t(key, params?)`。
 - 官方范本（`DSH/packages/client/ui-settings-plugin-inventory/src/client/index.ts`）：`label: () => t('…')` + `locale: NS` + `ctx.effect(() => ctx.locale.register(NS, { zh, en }))`。
@@ -222,19 +222,19 @@
 | `@deepseek-ai/schemastery` | 默认导出 `z` | **值导入** | `src/index.ts`（`Config`）、`src/upgrade.ts`（v7 冻结 schema） |
 | `@deepseek-ai/dsh-settings` | `SettingsPathOp`、`SettingsDescriptor` | type-only | 各写回端点与 `src/client/scope.ts`（前者）；`src/section.ts`（后者） |
 | `@deepseek-ai/dsh-settings/types` | `SettingsPathOpView` | type-only | `src/client/scope.ts`（浏览器半写回 op 目标形态；**只引 `/types` 子路径**，包根未导出） |
-| `@deepseek-ai/dsh-util-values` | `deepEqualJson`（值）、`JsonValue`（type-only） | **值导入** + type-only | `src/fix.ts` `src/migrate.ts` `src/compat.ts` `src/restore.ts`（前者）；`src/client/scope.ts`（后者） |
-| `@deepseek-ai/dsh-llm` | `LlmRuntime`、`ReasoningEffortId` | type-only | `src/probe-engine.ts`；`src/rpc.ts` 另有合并导入（`ctx.llm` 服务面） |
+| `@deepseek-ai/dsh-util-values` | `deepEqualJson`（值）、`JsonValue`（type-only） | **值导入** + type-only | `src/fix.ts` `src/migrate.ts` `src/compat.ts` `src/restore.ts` `src/probe-backup.ts`（前者）；`src/client/scope.ts`（后者） |
+| `@deepseek-ai/dsh-llm` | `LlmRuntime`、`ReasoningEffortId`、`LlmResolvedModelInfo`、`LlmModelInfo` | type-only | `src/probe-engine.ts`、`src/verify.ts`、`src/probe.ts`、`src/effort-name.ts`、`src/official-filter.ts`；`src/rpc.ts` 另有合并导入（`ctx.llm` 服务面） |
 | `@deepseek-ai/dsh-llm/types` | `LlmFailure` | type-only | `src/probe-verdict.ts`、`src/probe-engine.ts`（**只在 `/types` 子路径**，包根未再导出） |
 | `@deepseek-ai/dsh-client-connection` | `ConnectionRpcResult`、`HostConnectionService` | type-only | `src/rpc.ts`、`src/rpc-route.ts`、`src/client/rpc-carrier.ts`、`src/client/card.tsx` |
 | `@deepseek-ai/dsh-host-webserver` | `WebServer` | type-only | `src/rpc.ts` |
-| `@deepseek-ai/dsh-credentials` | `credentialRef`、`isCredentialRefName`（**值导入**）、`CredentialProvider`（type-only） | **值导入** + type-only | `src/official-filter.ts`。本仓第一个 Node 半宿主值导入：Node 半不受浏览器半基线门禁约束，但实现必须由宿主提供，故打包外置（`tsdown.config.ts` 的 `HOST_EXTERNALS` 同名条目与 Node 半 `deps.neverBundle`） |
+| `@deepseek-ai/dsh-credentials` | `credentialRef`、`isCredentialRefName`（**值导入**） | **值导入** | `src/official-filter.ts`。本仓第一个 Node 半宿主值导入：Node 半不受浏览器半基线门禁约束，但实现必须由宿主提供，故打包外置（`scripts/build-externals.mjs` 的 `NODE_EXTERNALS` 同名条目与 Node 半 `deps.neverBundle`） |
 | `node:http` | `IncomingMessage`、`ServerResponse` | type-only | `src/rpc-route.ts` |
 | `@deepseek-ai/dsh-client-ui-primitives` | `import * as primitives`、`TerminalBlockLabels`、`StateDot`、`StateDotState` | **值导入** + type-only | `src/client/` 各卡片文件（浏览器半唯一的运行期宿主 UI 依赖）。**契约漂移点**：`TerminalBlockLabels` 自 `0.2.1-alpha.2` 起新增必填 `commandLine`；devDep 停在 0.1.7-rc.2 编译面看不到，故 `terminalLabelsOf` 以 `TerminalBlockLabels & { commandLine }` 声明（避开 excess-property 报错、保住其余字段必填）；多余字段在 0.1.7-rc.2 上被静默忽略，两端兼容 |
 | `@deepseek-ai/dsh-client-ui-settings/client` | `ConfigForm`、`ConfigFormSnapshot` | type-only | `src/client/index.tsx`、`src/client/scope.ts` |
 | `@deepseek-ai/dsh-client-connection/client` | `ClientConnectionRpc` | type-only | `src/client/rpc-carrier.ts` |
 | `@deepseek-ai/dsh-client-ui-slots` | `TranslateNS` + 合并（`LocaleNamespaceMap` 纳入 `CARD_NS`） | type-only + 合并 | 各卡片文件；合并：`src/client/locale-keys.ts` |
 | `@deepseek-ai/dsh-api-session-controller/client` | 合并（`ctx.sessions`） | 合并 | `src/client/memory-listener.ts`、`src/client/back-to-chat.tsx` |
-| `@deepseek-ai/dsh-api-session-controller/types` | `ModelSelection`、`ModelSelectionProjection`、`ModelProviderGroup`、`ModelCatalog` | type-only | `src/client/memory-listener.ts`、`src/client/effort.ts`、`src/client/effort-name.ts`（目录载荷） |
+| `@deepseek-ai/dsh-api-session-controller/types` | `ModelSelection`、`ModelSelectionProjection`、`ModelProviderGroup` | type-only | `src/client/memory-listener.ts`、`src/client/effort.ts` |
 | `@deepseek-ai/dsh-client-ui-model-selection/client` | `ModelDirectory` | type-only | `src/client/memory-listener.ts` |
 | `@deepseek-ai/dsh-session/types` | `SessionId` | type-only | `src/client/memory-listener.ts`、`src/client/back-to-chat.tsx`、`src/subagent.ts`、`test/subagent.test.ts`（**只引 `/types` 子路径**：包根把 Node 侧 `SessionStore` 的 `ctx.sessions` 增补带进来，见末条） |
 | `@deepseek-ai/dsh-client-ui-session/client` | 合并（`ctx.uiSession`）、`UiSession` | 合并 + type-only | `src/client/back-to-chat.tsx`（其类型面只引 `dsh-session/types` 安全子路径，不顶掉 `ctx.sessions` 增补） |
@@ -265,7 +265,7 @@
 - **RPC endpoint**：`forceUpdate` / `resetModels` / `restoreModels`，结果信封 `{ ok: true, value: { changed } }`。
 - **本插件错误码**（`ConnectionRpcResult` 的 `error.code`）：`model-fix/write-in-progress`、`model-fix/force-update-failed`、`model-fix/reset-models-failed`、`model-fix/restore-models-failed`、`model-fix/unknown-endpoint`。
 - **宿主错误码**：`SETTINGS_CONFLICT`；信封层 `gateway/bad-request`；`invalid-request`（宿主自复刻的非法 rpcId 哨兵，非宿主常量）。
-- **slot 席位名**：上表五键；`plugins.row.config` 的 `key` 拼接规则 `${包名}#${patch 条目 id}`。
+- **slot 席位名**：上表六键；`plugins.row.config` 的 `key` 拼接规则 `${包名}#${patch 条目 id}`。
 - **locale 命名空间**：`CARD_NS = 'settings.modelFix'`。
 - **LLM 失败码**（按 `failure.code` 判，不看 `status`、不比对文案）：`UNSUPPORTED_REASONING_EFFORT`、`QUOTA`、`ACCOUNT_QUOTA`、`INVALID_CREDENTIAL`、`MISSING_CREDENTIAL`、`TRANSPORT`、`STREAM_CLOSED`、`RATE_LIMIT`、`TIMEOUT`、`INVALID_REQUEST`。
 - **构建期注入标识**：`__PLUGIN_VERSION__`（`tsdown.config.ts` define 内联 `package.json` version）。
@@ -286,10 +286,10 @@
 - **查阅的宿主源码可能比 devDep 新**（本仓 devDep/engines 为 `0.1.7-rc.2`）：差异记入此处，不顺手改代码、不据此升 devDep（README 支持范围与类型面基线是两件事）。
 - **settings 路径 op 数组下标中间段**：较新版本已支持（越界抛 `Config array index "…" is out of range`）。本仓按 provider 整段 `set` 的写法在两种语义下都成立，不改代码；0.2.x 后若改用下标写法须先在 devDep 版本实测。
 - **`unset` 不折叠空父对象**：devDep 与较新版本一致；宿主将来若折叠，本仓「整段 unset」写法仍安全。
-- **平台模块表**：本仓两份副本（`eslint.config.ts` 的 `BROWSER_HOST_BASELINE` 与 `tsdown.config.ts` 的 `HOST_EXTERNALS`）比宿主 `platform.ts` 少一项 `@deepseek-ai/dsh-client-ui-dockkit`（宿主另有 `PRELOADED_CLIENT_EXTERNALS = []`）——当前无碍，宿主若把本仓在用的模块移出表则会被打进浏览器包而运行期拿不到宿主实例。升宿主时两份一起逐位比对。
+- **平台模块表**：本仓两份副本（`eslint.config.ts` 的 `BROWSER_HOST_BASELINE` 与 `scripts/build-externals.mjs` 的 `CLIENT_EXTERNALS`）比宿主 `platform.ts` 少一项 `@deepseek-ai/dsh-client-ui-dockkit`（宿主另有 `PRELOADED_CLIENT_EXTERNALS = []`）——当前无碍，宿主若把本仓在用的模块移出表则会被打进浏览器包而运行期拿不到宿主实例。升宿主时两份一起逐位比对。
 - **`connection` 不注入 `webServer`**：较新版本确认，与本仓「必须自己 inject 两个服务」的写法一致。
 - **官方 provider 的 `models` 有默认兜底**（`llm-deepseek` 的 `.default(DEFAULT_MODELS)`，读取侧 `(models ?? DEFAULT_MODELS).map`）：清空配置来隐藏它实测不生效，故本仓拦目录生成链路（见「模型清单面」节）。该兜底若被去掉，这条观察可撤。
-- **`HOST_EXTERNALS` 含 Node 半专用条目 `@deepseek-ai/dsh-credentials`**：tsdown 默认只外置 dependencies/peerDependencies、devDependencies 会被内联（实测 0.22.14：内联出的 `credentialRef` 与宿主服务面脱钩），故该条目加进 `HOST_EXTERNALS` 让 Node 半配置复用同一张表（`deps.neverBundle`）。浏览器半不 import 它、运行期无差异；升 tsdown 时复核 `lib/index.js` 首行仍是外置 import。
+- **`NODE_EXTERNALS` 含 Node 半专用条目 `@deepseek-ai/dsh-credentials`**：tsdown 默认只外置 dependencies/peerDependencies、devDependencies 会被内联（实测 0.22.14：内联出的 `credentialRef` 与宿主服务面脱钩），故该条目加进 `NODE_EXTERNALS` 让 Node 半配置复用同一张表（`deps.neverBundle`）。浏览器半不 import 它、运行期无差异；升 tsdown 时复核 `lib/index.js` 首行仍是外置 import。
 - **宿主 settings 无客户端包、无命名空间登记/ready 事件**（全仓检索确认；`ConfigForms` 也无 `whileServed` 之外的等待原语）⇒ `src/migrate.ts` 的有界轮询不可省。
 - **`settings.models.footer` 的 SlotMap 定义在 `@deepseek-ai/dsh-client-ui-settings-models` 而非 ui-settings**——搜 slot 定义时别只搜后者。
 - **`ConfigForm` 写入「被拒 vs 传输失败」是两件事**（被拒/跳过 false、传输失败 reject）：本仓卡片只读返回值；宿主若改为传输失败也返回 false，用户只会看到「未生效」。注意 `0.2.1-alpha.3` 起非 loopback 连接不再整体 `memory` 模式（宿主删掉 `persistence = isLoopback ? 'host' : 'memory'`），远程浏览器写入也走宿主文档。
@@ -304,9 +304,9 @@
 
 ## 升级宿主时的检查清单
 
-- 逐位比对 `BROWSER_HOST_BASELINE` 与 `HOST_EXTERNALS` 同宿主 `DSH/packages/client/web/src/platform.ts`（已比对 `0.2.1-alpha.3`：宿主表仅多 `dockkit` 一项，本仓在用的模块无被移出）。
+- 逐位比对 `BROWSER_HOST_BASELINE` 与 `CLIENT_EXTERNALS` 同宿主 `DSH/packages/client/web/src/platform.ts`（已比对 `0.2.1-alpha.3`：宿主表仅多 `dockkit` 一项，本仓在用的模块无被移出）。
 - 对本文每个宿主类型导入跑 typecheck；值导入的符号漂移 typecheck 抓不到，须人工比对 `@deepseek-ai/dsh-client-ui-primitives` 全部用到的符号。
-- 逐字段比对 `TerminalBlockLabels`（0.2.1-alpha.2 起新增必填 `commandLine`）：宿主新增必填字段时编译期不报错、只在首次渲染记录区时崩。已核 `0.1.7-rc.2` 与 `0.2.1-alpha.3`：alpha.3 字段全集 = rc.2 的 13 字段 + `commandLine`，无其它新增改名，`terminalLabelsOf` 无需补字段；唯一待收是 `src/client/card.tsx` 两处 `useMemo<TerminalBlockLabels>` 标注与实参（多带 `commandLine`）不一致，升 devDep 后一并改。
+- 逐字段比对 `TerminalBlockLabels`（0.2.1-alpha.2 起新增必填 `commandLine`）：宿主新增必填字段时编译期不报错、只在首次渲染记录区时崩。已核 `0.1.7-rc.2` 与 `0.2.1-alpha.3`：alpha.3 字段全集 = rc.2 的 13 字段 + `commandLine`，无其它新增改名，`terminalLabelsOf` 无需补字段；唯一待收是 `src/client/card-verify.ts` 与 `src/client/card-probe.ts` 两处 `useMemo<TerminalBlockLabels>` 标注与实参（多带 `commandLine`）不一致，升 devDep 后一并改。
 - 逐条复核「宿主服务与运行时面」各节签名与行为假设，尤其 settings 写入语义、命名空间登记时序、连接断开语义。
 - 复核 `SETTINGS_CONFLICT` 与 LLM 失败码字面量（尤其 `classifyPiAiError` 的文案正则——它决定 `TRANSPORT` / `STREAM_CLOSED` 的归一化来源）。
 - 复核适配器是否仍兑现 `options.signal`（`LlmAdapter.stream` 契约 `implementations must honor options.signal`）：本仓 30s 软超时 + 3s 硬兜底靠它传中止；连带复核 pi-ai `idleWatchdog`（rc.2 有、alpha.3 删过、按当时版本确认）与 `LLM_STREAM_IDLE_TIMEOUT`。

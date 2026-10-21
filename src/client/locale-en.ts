@@ -173,7 +173,7 @@ export const en: Record<CardKey, string> = {
     chipFollowOff: 'Follow',
     chipFollowOffTitle: 'Click to turn on: subagents will follow the parent agent\'s model and reasoning level',
     chipFollowFail: 'Save failed; the change did not take effect',
-    // 「UI 与行为」组：四个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
+    // 「UI 与行为」组：七个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
     colBehavior: 'UI & behavior',
     hintBehavior: 'Controls this plugin\'s UI and behavior.',
     rowShowInModels: 'Show in models',

@@ -39,7 +39,7 @@
 | `src/constants.ts` | Node 半常量 |
 | `src/shared/` | 跨半共享层（零 Node 依赖）：常量、`errorText`、探测/验证契约、当前版本配置 schema 与行键表 |
 | `src/client/index.tsx` | 浏览器半入口：席位注册、卡片、词典、调用面接线、scope 释放，全挂 `configForms` 子 fiber |
-| `src/client/card.tsx` | 六席共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
+| `src/client/card.tsx` | 四处席位 + 两处弹层共用的可折叠卡片外壳（草稿与保存、写回动作、瓦片与弹层挂接） |
 | `src/client/tile.tsx` | 瓦片层：布尔矩阵组 / 动态排除集合两种形态 |
 | `src/client/card-meta.tsx` | 卡片联系行（仓库 / 版本 / 反馈） |
 | `src/client/card-styles.ts` | 卡片样式层：全部样式数值的唯一出处 |
@@ -63,13 +63,16 @@
 | `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
 | `src/client/floating-buttons.tsx` | 悬浮按钮组容器：中心列左侧直插 DOM + 独立 React 根；管定位 / 布局 / 渲染，导出 `addButton` |
 | `src/client/floating-button.ts` | 悬浮按钮的响应式数据契约与工厂（React 外部存储形态） |
-| `src/client/back-to-chat.ts` | 「返回对话」按钮条目：自己的 layout 依赖与配置 / 语言订阅，出响应式数据交容器渲染 |
+| `src/client/back-to-chat.tsx` | 「返回对话」按钮条目：自己的 layout 依赖与配置 / 语言订阅，出响应式数据交容器渲染 |
 | `src/client/float-card.tsx` | 悬浮按钮组里的卡片入口条目：图标取插件图标，点击打开与【模型优化】chip 同一张配置卡 |
 | `src/client/card-panel.tsx` | 配置卡弹层面板：输入框 chip 与悬浮按钮共用的那张卡（宿主 Modal 的 headless 形态） |
 | `src/client/classic-setting.tsx` | 「经典设置」入口：以 `priority: -1` 遮蔽宿主 `settings.launcher` 席位上的账号入口，渲染 1:1 复刻 `dsh-v0.2.0-rc.2` 外壳回退按钮的经典设置触发器 |
 | `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用；`pnpm build:cache` 重建） |
 | `public/icon.svg` | 插件图标：随构建复制进 `lib/`（包内 `icon` 字段指向它），浏览器半另由构建期内联同一份标记 |
 | `scripts/build-cache.mjs` | 重建随包缓存：拉 models.dev 全量数据并跑运行期同一个构建器（jiti 直跑 TS，逻辑不复制） |
+| `scripts/build-externals.mjs` | 两半外置宿主包清单（tsdown 与 eslint 共用的单一来源）：`NODE_EXTERNALS` / `CLIENT_EXTERNALS` |
+| `scripts/check-version.mjs` | pre-commit 钩子：README 钉死的 tarball 链接须与 `package.json` 的 version 同号 |
+| `scripts/check-tag.mjs` | pre-push 钩子：一次只许推一个标签，且须为 v + 语义化版本并与 version 同号 |
 | `cordis.patch.yml` `locale/*.json` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |
 
 ## 数据流

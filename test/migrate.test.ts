@@ -105,12 +105,12 @@ export function run(): void {
 
     // canonicalizeCurrentOp：当前版本快照规范化——以当前生效值物化规范完整快照（resolveConfig → toStored），与盘上当前版本键不一致才产出 op
     const CURRENT = versionKey(CONFIG_VERSION)
-    // 残缺当前版本键（只有 efforts）→ parseSnapshot 补默认判为合法，但与规范完整快照不一致 → 重写（补四组默认 + configVersion，保留 efforts 记忆）
+    // 残缺当前版本键（只有 efforts）→ parseSnapshot 补默认判为合法，但与规范完整快照不一致 → 重写（补五组默认 + configVersion，保留 efforts 记忆）
     check('残缺当前版本键（只有 efforts）被规范化重写且保留记忆', stable(canonicalizeCurrentOp({ [CURRENT]: { efforts: { 'z-ai': { 'glm-5.2': 'high' } } } })) === stable([{ op: 'set', path: [CURRENT], value: { ...DEFAULT_STORED, efforts: { 'z-ai': { 'glm-5.2': 'high' } } } }]), canonicalizeCurrentOp({ [CURRENT]: { efforts: { 'z-ai': { 'glm-5.2': 'high' } } } }))
     // 残缺当前版本键（只有 excludes）→ 同理重写，保留 excludes 现值
     check('残缺当前版本键（只有 excludes）被规范化重写且保留 excludes', stable(canonicalizeCurrentOp({ [CURRENT]: { excludes: ['acme-gateway'] } })) === stable([{ op: 'set', path: [CURRENT], value: { ...DEFAULT_STORED, excludes: ['acme-gateway'] } }]), canonicalizeCurrentOp({ [CURRENT]: { excludes: ['acme-gateway'] } }))
-    // 残缺当前版本键同时保留 efforts 与 excludes，并补齐四组默认
-    check('残缺当前版本键同时保留 efforts 与 excludes 并补四组默认', stable(canonicalizeCurrentOp({ [CURRENT]: { efforts: { 'z-ai': { 'glm-5.2': 'high' } }, excludes: ['acme-gateway'] } })) === stable([{ op: 'set', path: [CURRENT], value: { ...DEFAULT_STORED, efforts: { 'z-ai': { 'glm-5.2': 'high' } }, excludes: ['acme-gateway'] } }]), canonicalizeCurrentOp({ [CURRENT]: { efforts: { 'z-ai': { 'glm-5.2': 'high' } }, excludes: ['acme-gateway'] } }))
+    // 残缺当前版本键同时保留 efforts 与 excludes，并补齐五组默认
+    check('残缺当前版本键同时保留 efforts 与 excludes 并补五组默认', stable(canonicalizeCurrentOp({ [CURRENT]: { efforts: { 'z-ai': { 'glm-5.2': 'high' } }, excludes: ['acme-gateway'] } })) === stable([{ op: 'set', path: [CURRENT], value: { ...DEFAULT_STORED, efforts: { 'z-ai': { 'glm-5.2': 'high' } }, excludes: ['acme-gateway'] } }]), canonicalizeCurrentOp({ [CURRENT]: { efforts: { 'z-ai': { 'glm-5.2': 'high' } }, excludes: ['acme-gateway'] } }))
     // 非法当前版本键（非对象）→ resolveConfig 无其他可用快照时回落默认，重写为 DEFAULT_STORED
     check('非法当前版本键（非对象）按默认重写', stable(canonicalizeCurrentOp({ [CURRENT]: 42 })) === stable([{ op: 'set', path: [CURRENT], value: DEFAULT_STORED }]), canonicalizeCurrentOp({ [CURRENT]: 42 }))
     // 非法当前版本键但段内有可用更高版本 → 沿用高版本降级值重写（不落默认，保留语义）

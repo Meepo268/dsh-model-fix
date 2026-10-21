@@ -168,7 +168,7 @@ export type CardKey =
     | 'chipFollowOff'
     | 'chipFollowOffTitle'
     | 'chipFollowFail'
-    // 「UI 与行为」组：四个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
+    // 「UI 与行为」组：七个可见性开关 + 一条恒定展示行（插件管理，不绑配置、不可关闭）
     | 'colBehavior'
     | 'hintBehavior'
     | 'rowShowInModels'

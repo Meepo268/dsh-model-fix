@@ -26,7 +26,7 @@ const v7CompatRules: z<V7CompatRules> = z.object({
     disableDeveloper: z.boolean().default(true),
 })
 
-/** v7 用户体验规则 schema：不含 v8 新增的五键 */
+/** v7 用户体验规则 schema：不含 v8 新增的 */
 const v7UserExperienceRules: z<V7UserExperienceRules> = z.object({
     rememberEfforts: z.boolean().default(true),
     defaultHigh: z.boolean().default(true),

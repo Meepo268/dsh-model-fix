@@ -10,7 +10,7 @@ import { reportProvider, summarizeProviders } from '@/probe-report'
 import { classifyFailure, providerBlockReason, shouldSkipModelTail } from '@/probe-verdict'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm/types'
-import { decodeProgressFrame, encodeProgressFrame, isProviderBlocking, isTransientOutcome } from '@/shared/verify-progress'
+import { decodeProgressFrame, encodeProgressFrame, isProviderBlocking } from '@/shared/verify-progress'
 import type { ProbeOutcome, ProviderBlockReason, VerifyFailureFacts, VerifyProbe, VerifyProbeResult, VerifyProbedFrame, VerifyProgressFrame, VerifyProviderReport } from '@/shared/verify-progress'
 import { check, stable } from '@test/helper'
 
@@ -193,13 +193,6 @@ export async function run(): Promise<void> {
     check('shouldSkipModelTail 限流与超时不断（只否定了这一次）', shouldSkipModelTail('rate-limit', failureFacts('RATE_LIMIT')) === false && shouldSkipModelTail('timeout', failureFacts('TIMEOUT')) === false)
     check('shouldSkipModelTail 可用不短', shouldSkipModelTail('usable', undefined) === false)
     check('shouldSkipModelTail 退化完成（有结论但无失败事实）不短', shouldSkipModelTail('quota', undefined) === false)
-
-    // ---------- isTransientOutcome：瞬态既不算不可用，也不能用来短该模型的后续档位 ----------
-    check('isTransientOutcome 限流', isTransientOutcome('rate-limit') === true)
-    check('isTransientOutcome 超时', isTransientOutcome('timeout') === true)
-    check('isTransientOutcome 厂商侧拒绝不是瞬态', isTransientOutcome('other') === false)
-    check('isTransientOutcome 档位不支持不是瞬态', isTransientOutcome('unsupported-effort') === false)
-    check('isTransientOutcome 可用不是瞬态', isTransientOutcome('usable') === false)
 
     // ---------- reportProvider：可用模型去重、档位不支持单列、可达与凭据取自全程 ----------
     const detail = (model: string, outcome: ProbeOutcome, effort?: string): VerifyProbeResult =>

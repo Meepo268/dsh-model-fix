@@ -53,7 +53,7 @@ export function run(): void {
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), upgradeConfig('garbage', 7))
-    // 升级产物只含当前 schema 的已知键（configVersion + 六组），剥离多余键（schema 未声明的键被忽略）
+    // 升级产物只含当前 schema 的已知键（configVersion + 五组布尔 + excludes + efforts），剥离多余键（schema 未声明的键被忽略）
     check('升级产物剥离多余键', Object.keys(upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7)).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,configVersion,efforts,excludes,userExperience', upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7))
 
     // efforts 宽松保留：坏结构回落 {}，不拖垮整段配置

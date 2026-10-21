@@ -1,4 +1,4 @@
-/** 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。五个挂载席位共用同一外壳，差异只有折叠态策略（`defaultOpen` 与保存后是否自动收起）与是否允许折叠（输入框弹层禁用）。
+/** 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。六处挂载点（四个席位 + 输入框 / 悬浮按钮两处弹层）共用同一外壳，差异只有折叠态策略（`defaultOpen` 与保存后是否自动收起）与是否允许折叠（输入框弹层禁用）。
  * 本文件只做**卡片外壳的编排**：草稿与保存、三个写回动作（强制更新 / 重置 / 恢复）、四层二次确认、瓦片与 footer 渲染；诊断两条链在 `card-verify.ts` / `card-probe.ts`，弹层外壳在 `diagnose-dialog.tsx`（探测的组装层在 `probe-dialog.tsx`），记录区文案层在 `card-records.ts`，状态行助手在 `card-notice.ts`。
  * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发），瓦片手风琴：默认收起、同时只开一个。编辑只改本地草稿，「保存」才经 settings scope 原子写当前版本快照键（efforts 取写入当刻实时值，卡片不拥有该字段）；草稿跨折叠存活。除验证外的操作结果一律走卡片内联状态行。
  * 样式数值见 `card-styles.ts`，末尾联系行见 `card-meta.tsx`。行为细节见 docs/decisions.md「宿主与卡片」 */
@@ -45,7 +45,7 @@ import { useProbeRun } from '@/client/card-probe'
 const CHEVRON_DOWN = primitives.IconChevronDownOutlineRegular
 const { Tag } = primitives
 
-/** 卡片组件 props（t 由 locale 席位合成注入；六个调 Node 半的方法取 `RpcCarrier` 调用面，语言上报不经过卡片故剔掉） */
+/** 卡片组件 props（t 由 locale 席位合成注入；调 Node 半的五个方法取 `RpcCarrier` 调用面，语言上报不经过卡片故不传） */
 export interface CardProps extends Omit<RpcCarrier, 'reportLocale'> {
     t: TranslateNS<'settings.modelFix'>
     scope: DecodedScope<Flags>
