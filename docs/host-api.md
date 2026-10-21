@@ -174,10 +174,21 @@
 ### layout：中心面板选择（返回对话按钮）
 
 - 契约（`DSH/packages/client/ui-layout/src/client/service.ts`，宿主 `@deepseek-ai/dsh-client-ui-layout` 提供）：`selectPanel(panelId: string | null): void`。`null` 即选中会话界面、不改当前会话；非 `null` 选已注册的全局面板，未注册的 key 抛错并保留当前选择。本插件只用 `selectPanel(null)`。
-- 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.ts` 直接 `ctx.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
+- 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.tsx` 直接 `ctx.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
 - 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位按钮才可见（可见性 = 配置开关 ∧ 服务到位），缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
 - DOM 锚点：`[data-slot="main"]` 锚点的父元素即 AppFrame 中心列（`ui-layout/src/client/AppFrame.tsx` 的 `.centerCol`）。宿主 CSS Module 类名随构建 hash 变化，不可按类名找。
 - 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮组要贴中心列左侧（纵向居中）⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，插件卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮组取 999 低于它（模态框打开时被盖住）。
+
+### uiSession：当前会话与会话状态（返回对话按钮的图标与提示）
+
+- 服务（`DSH/packages/client/ui-session/src/client/index.ts`，宿主 `@deepseek-ai/dsh-client-ui-session` 提供）：`ctx.uiSession`，类 `UiSession`；缺席则静默 PENDING（按钮按空闲显示）。
+- `sessionStatus: HostObservable<SessionStatusSnapshot>`：`Map<SessionId, SessionStatus>`，`SessionStatus = { running: boolean | undefined; pendingInteraction: SessionPendingInteraction | undefined; completionUnread: boolean }`。`running` 来自远端事件 `api-session/status`；`pendingInteraction` 由各领域经 `registerPendingInteraction` 发布（kind：`approval` / `plan-review` / `question`）。
+- `adapter.current`：`HostObservable<StandardSourceBinding>`，其 `props.sessionId` 即**当前主会话**；快照变化 = 会话切换。
+- 宿主工作区会话行的状态判定在 `ui-workspace/src/client/rows/Rows.tsx`（`sessionStatuses`，**未导出**）与 `ui-workspace/src/client/tree.ts`（`sessionNode`）：pendingInteraction → `warning`；running → `ongoing`；子智能体在跑 → `ongoing`（次要，宿主靠文案区分）；`completionUnread` → `done`；其余 → `idle`（宿主此时不画点，改渲染插槽 `sidebar.session.row.leading`）。本仓按同一套判定本地复刻。
+- `completionUnread` 的置位条件（`ui-session/src/client/index.ts:487-504`）：只给**非主视图**会话置，主视图那份会被清（`isMain` = `retainedBy.mainView > 0`，该 retain 由工作区服务持有，切面板不释放）。
+- 状态文案见 `ui-workspace/src/client/locales.ts`（`status.*` 键），本仓按钮逐条沿用。
+- 子智能体目录投影 `subagentCatalog` 只在 `@deepseek-ai/dsh-subagent` 的类型面声明（该包会把 Node 侧 `ctx.sessions` 增补带进来），本仓按契约复制最小面（`src/client/back-to-chat.tsx`）。
+- 状态点原语 `StateDot`（`DSH/packages/client/ui-primitives/src/StateDot.tsx`，宿主 `@deepseek-ai/dsh-client-ui-primitives` 导出）：`StateDotState = 'done' | 'warning' | 'ongoing' | 'error' | 'idle'`；`ongoing` 是 24×24 双圆弧 spinner（两条 CSS 动画，1.5s），其余态是 10px 实心圆点（`currentColor` + `--dsw-alias-state-*` 令牌）。
 
 ### credentials：凭据状态面（隐藏官方API的判定依据）
 
@@ -218,16 +229,17 @@
 | `@deepseek-ai/dsh-host-webserver` | `WebServer` | type-only | `src/rpc.ts` |
 | `@deepseek-ai/dsh-credentials` | `credentialRef`、`isCredentialRefName`（**值导入**）、`CredentialProvider`（type-only） | **值导入** + type-only | `src/official-filter.ts`。本仓第一个 Node 半宿主值导入：Node 半不受浏览器半基线门禁约束，但实现必须由宿主提供，故打包外置（`tsdown.config.ts` 的 `HOST_EXTERNALS` 同名条目与 Node 半 `deps.neverBundle`） |
 | `node:http` | `IncomingMessage`、`ServerResponse` | type-only | `src/rpc-route.ts` |
-| `@deepseek-ai/dsh-client-ui-primitives` | `import * as primitives`、`TerminalBlockLabels` | **值导入** + type-only | `src/client/` 各卡片文件（浏览器半唯一的运行期宿主 UI 依赖）。**契约漂移点**：`TerminalBlockLabels` 自 `0.2.1-alpha.2` 起新增必填 `commandLine`；devDep 停在 0.1.7-rc.2 编译面看不到，故 `terminalLabelsOf` 以 `TerminalBlockLabels & { commandLine }` 声明（避开 excess-property 报错、保住其余字段必填）；多余字段在 0.1.7-rc.2 上被静默忽略，两端兼容 |
+| `@deepseek-ai/dsh-client-ui-primitives` | `import * as primitives`、`TerminalBlockLabels`、`StateDot`、`StateDotState` | **值导入** + type-only | `src/client/` 各卡片文件（浏览器半唯一的运行期宿主 UI 依赖）。**契约漂移点**：`TerminalBlockLabels` 自 `0.2.1-alpha.2` 起新增必填 `commandLine`；devDep 停在 0.1.7-rc.2 编译面看不到，故 `terminalLabelsOf` 以 `TerminalBlockLabels & { commandLine }` 声明（避开 excess-property 报错、保住其余字段必填）；多余字段在 0.1.7-rc.2 上被静默忽略，两端兼容 |
 | `@deepseek-ai/dsh-client-ui-settings/client` | `ConfigForm`、`ConfigFormSnapshot` | type-only | `src/client/index.tsx`、`src/client/scope.ts` |
 | `@deepseek-ai/dsh-client-connection/client` | `ClientConnectionRpc` | type-only | `src/client/rpc-carrier.ts` |
 | `@deepseek-ai/dsh-client-ui-slots` | `TranslateNS` + 合并（`LocaleNamespaceMap` 纳入 `CARD_NS`） | type-only + 合并 | 各卡片文件；合并：`src/client/locale-keys.ts` |
-| `@deepseek-ai/dsh-api-session-controller/client` | 合并（`ctx.sessions`） | 合并 | `src/client/memory-listener.ts` |
+| `@deepseek-ai/dsh-api-session-controller/client` | 合并（`ctx.sessions`） | 合并 | `src/client/memory-listener.ts`、`src/client/back-to-chat.tsx` |
 | `@deepseek-ai/dsh-api-session-controller/types` | `ModelSelection`、`ModelSelectionProjection`、`ModelProviderGroup`、`ModelCatalog` | type-only | `src/client/memory-listener.ts`、`src/client/effort.ts`、`src/client/effort-name.ts`（目录载荷） |
 | `@deepseek-ai/dsh-client-ui-model-selection/client` | `ModelDirectory` | type-only | `src/client/memory-listener.ts` |
-| `@deepseek-ai/dsh-session/types` | `SessionId` | type-only | `src/client/memory-listener.ts`、`src/subagent.ts`、`test/subagent.test.ts`（**只引 `/types` 子路径**：包根把 Node 侧 `SessionStore` 的 `ctx.sessions` 增补带进来，见末条） |
+| `@deepseek-ai/dsh-session/types` | `SessionId` | type-only | `src/client/memory-listener.ts`、`src/client/back-to-chat.tsx`、`src/subagent.ts`、`test/subagent.test.ts`（**只引 `/types` 子路径**：包根把 Node 侧 `SessionStore` 的 `ctx.sessions` 增补带进来，见末条） |
+| `@deepseek-ai/dsh-client-ui-session/client` | 合并（`ctx.uiSession`）、`UiSession` | 合并 + type-only | `src/client/back-to-chat.tsx`（其类型面只引 `dsh-session/types` 安全子路径，不顶掉 `ctx.sessions` 增补） |
 | `@deepseek-ai/dsh-client-ui-renderer/client` | 合并（`ctx.slots`） | 合并 | `src/client/index.tsx` |
-| `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts`、`src/client/back-to-chat.ts` |
+| `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts`、`src/client/back-to-chat.tsx` |
 | `@deepseek-ai/dsh-client-ui-settings-models/client` | 合并（slot key `settings.models.footer`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-ui-plugin-manager/client` | 合并（slot key `plugins.bundle.config` / `plugins.row.config`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-ui-conversation/client` | 合并（slot key `conversation.input.left`） | 合并 | `src/client/index.tsx` |

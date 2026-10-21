@@ -193,8 +193,14 @@ export const zh: Record<CardKey, string> = {
     tipClassicSetting: '若需要意见反馈、登录，关闭即可。',
     // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
     tipOpenSettingCard: '打开模型优化设置卡片',
-    // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
+    // 「返回对话」悬浮按钮自身的文案
     backToChat: '返回对话',
+    backToChatRunning: '进行中',
+    backToChatSubagentsOne: '{n} 个子智能体运行中',
+    backToChatSubagentsOther: '{n} 个子智能体运行中',
+    backToChatWaitingApproval: '等待审批',
+    backToChatPlanReview: '计划待审',
+    backToChatWaitingAnswer: '等待回答',
     // 经典设置按钮自身的文案
     classicSettingLabel: '设置',
 }

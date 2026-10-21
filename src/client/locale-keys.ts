@@ -189,8 +189,15 @@ export type CardKey =
     | 'tipClassicSetting'
     // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
     | 'tipOpenSettingCard'
-    // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM，不经插槽 t 注入）
+    // 「返回对话」悬浮按钮自身的文案
     | 'backToChat'
+    // 「返回对话」按钮跟随当前会话状态的提示
+    | 'backToChatRunning'
+    | 'backToChatSubagentsOne'
+    | 'backToChatSubagentsOther'
+    | 'backToChatWaitingApproval'
+    | 'backToChatPlanReview'
+    | 'backToChatWaitingAnswer'
     // 经典设置按钮自身的文案
     | 'classicSettingLabel'
 

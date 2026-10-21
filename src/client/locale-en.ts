@@ -194,8 +194,14 @@ export const en: Record<CardKey, string> = {
     tipClassicSetting: 'Turn this off to keep the host account menu (feedback and sign-in) in the sidebar.',
     // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
     tipOpenSettingCard: 'Open the Model tuning settings card',
-    // 「返回对话」悬浮按钮自身的文案（浏览器半直挂 DOM）
+    // 「返回对话」悬浮按钮自身的文案
     backToChat: 'Back to chat',
+    backToChatRunning: 'Running',
+    backToChatSubagentsOne: '{n} subagent running',
+    backToChatSubagentsOther: '{n} subagents running',
+    backToChatWaitingApproval: 'Waiting for approval',
+    backToChatPlanReview: 'Plan awaiting review',
+    backToChatWaitingAnswer: 'Waiting for answer',
     // 经典设置按钮自身的文案
     classicSettingLabel: 'Settings',
 }
