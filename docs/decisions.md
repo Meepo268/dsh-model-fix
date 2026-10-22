@@ -104,7 +104,7 @@
 - **按钮数据是响应式的（React 外部存储形态）**：条目交出可改写的 `{ id, icon, title, active, onClick }`，容器用 `useSyncExternalStore` 读——改任一属性即时反映（`active=false` 即不渲染），快照引用稳定是 uSES 的硬要求。
 - **「返回对话」按钮锚主视图会话、图标与提示跟随它**：子智能体视图下锚点取**直接父**（只看一层 ⇒ 嵌套时每点一次向上退一级），状态与标题都按锚点取 ⇒ 与宿主工作区会话行同源（工作区不渲染子智能体行）。进行中 / 待交互 / 已完成时显示宿主 `StateDot` 状态点，空闲回退「左」箭头。提示一律带会话标题。
 - **「已完成」绿点只在子智能体视图下可达**：宿主 `completionUnread` 只给非主视图会话置位；锚点是父 ⟹ mainView 在子会话上时父满足该条件，绿点会亮且「点回去」即消失。
-- **点击行为分两支**：已在会话界面时 `selectPanel(null)` 是无操作（只切中心面板、不动当前会话）⇒ 子智能体视图必须走 `ctx.uiWorkspace.openSession(父)`；非会话页面维持 `selectPanel(null)`。`UiWorkspaceService.mainReference` 私有 ⇒ 换 mainView 只有 `openSession` 一个入口。`uiWorkspace` 缺席时该支退化为 `selectPanel(null)`，按钮不消失也不报错。
+- **点击行为分三支**：子智能体视图走 `ctx.uiWorkspace.openSession(父)`（已在会话界面时 `selectPanel(null)` 是无操作）；主视图 + 根智能体 + 当前不在对话页签时切对话页签（派发宿主页签按钮的 click，宿主 `actions.setView` 插件侧不可达）；其余维持 `selectPanel(null)`。`UiWorkspaceService.mainReference` 私有 ⇒ 换 mainView 只有 `openSession` 一个入口。`uiWorkspace` 缺席时该支退化为 `selectPanel(null)`，按钮不消失也不报错。
 - **卡片入口条目自带弹层**：打开配置卡需要一棵 React 树，条目自持独立 React 根（宿主 `Modal` 自带 body portal，根只作挂载点）⇒ 容器的按钮数据契约不扩面板字段。弹层本身与输入框 chip 共用 `card-panel.tsx` 一个组件，两处打开的是同一张卡。
 - **给中心列补一条 inline `position: relative`**：宿主中心列没有定位上下文（其上下文是整帧 `.frame`），按钮要贴中心列左侧就得补。补它不改变各页面自身绝对定位元素的基准——它们的近身祖先已是 `position: relative`（已核 `ui-conversation` / `ui-plugin-manager` / `ui-settings-general` / `ui-schedule`）。React 不管理该元素的 style 属性，这条 inline 不被覆盖；容器常驻（不随配置开关装卸），只在插件卸载时还原原值。
 - **中心列的锚点用 `[data-slot="main"]` 的父元素**：宿主 CSS Module 类名（`pI_x6G_centerCol`）随构建 hash 变化，类名不可依赖。

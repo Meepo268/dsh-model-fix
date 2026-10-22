@@ -1,6 +1,7 @@
 /**
  * 「返回对话」悬浮按钮：点击回到主视图会话
- * （子智能体视图走 `ctx.uiWorkspace.openSession`，否则 `ctx.layout.selectPanel(null)`）。
+ * （子智能体视图走 `ctx.uiWorkspace.openSession`；主视图不在对话页签时切对话页签；
+ * 其余情况 `ctx.layout.selectPanel(null)`）。
  */
 
 import { IconChevronLeftOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -18,6 +19,15 @@ import type { DecodedScope } from '@/client/scope'
 import { createFloatingButton } from '@/client/floating-button'
 import type { FloatingButton } from '@/client/floating-button'
 
+/** 宿主会话页签条的稳定锚点 */
+const CONVERSATION_TABS_SELECTOR = '[data-conversation-tabs]'
+/** 宿主页签按钮 */
+const CONVERSATION_TAB_SELECTOR = 'button[role="tab"]'
+/** 宿主 per-session conversation store 的 localStorage key 前缀 */
+const CONVERSATION_STORE_KEY = 'dsh.conversation'
+/** 宿主 view id：对话页签 */
+const CHAT_VIEW_ID = 'chat'
+
 /** 子智能体目录投影的最小面（宿主 subagent 包的类型面会把 Node 侧 session 增补带进来，故复制契约） */
 interface SubagentCatalogValues {
     readonly subagentCatalog?: readonly { readonly id: SessionId }[]
@@ -26,6 +36,29 @@ interface SubagentCatalogValues {
 /** uiWorkspace 服务的最小面（同上） */
 interface UiWorkspaceNav {
     openSession(sessionId: SessionId): void
+}
+
+/** 找宿主的「对话」页签按钮（页签条内首枚即「对话」） */
+function findChatTab(): HTMLButtonElement | null {
+    if (typeof document === 'undefined') return null
+    const strip = document.querySelector(CONVERSATION_TABS_SELECTOR)
+    if (strip === null) return null
+    return strip.querySelector<HTMLButtonElement>(CONVERSATION_TAB_SELECTOR)
+}
+
+/** 读某 session 持久化的 view 偏好（宿主持有的真实 view id） */
+function readStoredViewId(sessionId: SessionId): string | null {
+    if (typeof localStorage === 'undefined') return null
+    try {
+        const raw = localStorage.getItem(`${CONVERSATION_STORE_KEY}.${sessionId}`)
+        if (raw === null) return null
+        const stored: unknown = JSON.parse(raw)
+        if (typeof stored !== 'object' || stored === null) return null
+        const view = (stored as { view?: unknown }).view
+        return typeof view === 'string' ? view : null
+    } catch {
+        return null
+    }
 }
 
 interface BackTarget {
@@ -98,6 +131,7 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
     const t = ctx.locale.bind(CARD_NS)
     let selectPanel: ((panelId: string | null) => void) | null = null
     let openSession: ((sessionId: SessionId) => void) | null = null
+    let isMainView: (() => boolean) | null = null
     let target: BackTarget | null = null
     let uiSession: UiSession | null = null
     let sessions: ISessions | null = null
@@ -107,9 +141,20 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
         title: t('backToChat'),
         active: false,
         onClick: () => {
-            // 子智能体视图下已在会话界面，切面板无效果
-            if (target !== null && target.isChild && openSession !== null) openSession(target.id)
-            else selectPanel?.(null)
+            // 1) 子智能体视图 → 回到父会话（切 workspace 选择）
+            if (target !== null && target.isChild && openSession !== null) {
+                openSession(target.id)
+                return
+            }
+            // 2) 主视图 + 根智能体 + 当前不在对话页签 → 切到对话页签
+            if (target !== null && !target.isChild
+                && isMainView?.() === true
+                && readStoredViewId(target.id) !== CHAT_VIEW_ID) {
+                findChatTab()?.click()
+                return
+            }
+            // 3) 其余情况 → 宿主面板 null（从插件管理器等全局面板回到会话主视图）
+            selectPanel?.(null)
         },
     })
 
@@ -137,7 +182,9 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
     const unsubscribeScope = scope.subscribe(syncActive)
     const unsubscribeLocale = ctx.locale.subscribe(syncStatus)
     ctx.inject(['layout'], (child) => {
-        selectPanel = (panelId) => { child.get('layout').selectPanel(panelId) }
+        const layout = child.get('layout')
+        selectPanel = (panelId) => { layout.selectPanel(panelId) }
+        isMainView = () => layout.panelInfo.getSnapshot().activePanelId === null
         syncActive()
     })
     syncActive()

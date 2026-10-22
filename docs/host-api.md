@@ -174,6 +174,7 @@
 ### layout：中心面板选择（返回对话按钮）
 
 - 契约（`DSH/packages/client/ui-layout/src/client/service.ts`，宿主 `@deepseek-ai/dsh-client-ui-layout` 提供）：`selectPanel(panelId: string | null): void`。`null` 即选中会话界面、不改当前会话；非 `null` 选已注册的全局面板，未注册的 key 抛错并保留当前选择。本插件只用 `selectPanel(null)`。
+- `panelInfo.getSnapshot().activePanelId === null` 即**主视图**（与宿主 `DocumentTitle.tsx` / `AppFrame.tsx` 同口径）。
 - 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.tsx` 在子 fiber 内 `child.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
 - 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位按钮才可见（可见性 = 配置开关 ∧ 服务到位），缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
 - DOM 锚点：`[data-slot="main"]` 锚点的父元素即 AppFrame 中心列（`ui-layout/src/client/AppFrame.tsx` 的 `.centerCol`）。宿主 CSS Module 类名随构建 hash 变化，不可按类名找。
@@ -197,6 +198,13 @@
 - 换 mainView 只有这一个入口：`UiWorkspaceService.mainReference` 是私有字段。
 - 经子 fiber `ctx.inject(['uiWorkspace'], …)` 取用，缺席则静默 PENDING——**不门控按钮可见性**（仍只由 `layout` + 配置开关决定）：缺席时子智能体视图下的点击退化为 `selectPanel(null)`，按钮不消失也不报错。
 - 服务面按契约取用，本地不声明类型也不引宿主包：它经 `@deepseek-ai/dsh-subagent/client` 把 Node 侧 `ctx.sessions` 增补带进 typecheck 程序（同「宿主类型导入清单」末条裁决），故本地声明最小面 `UiWorkspaceNav`。
+
+### 会话页签：当前页签判定与切换（返回对话按钮）
+
+- 当前页签读 localStorage `dsh.conversation.{sid}` 的 `view` 字段（宿主 per-session store 的持久化值，即真实 view id）。
+- 切页签派发宿主页签按钮的原生 click：宿主 `actions.setView` 只经 slot 内部 store 绑定下发，插件侧不可达。
+- 页签条锚点 `[data-conversation-tabs]`，其内首枚 `button[role="tab"]` 即「对话」（宿主 `conversation.view` 席位按 `order` 排，`ui-chat` 的 `chat` 为 order 0；宿主若调整该 order，本定位即失效）。
+
 ### credentials：凭据状态面（隐藏官方API的判定依据）
 
 - `ctx.credentials` 在 `src/index.ts` 的 `inject` 里作顶级依赖（与 `settings` / `llm` 并列），不用 `ctx.get`：宿主基础配置无条件挂载它（`DSH/packages/bundle/base/cordis.patch.yml` 无 `disabled` 条件）⇒ 缺失即异常部署，PENDING 暴露好过静默降级。
