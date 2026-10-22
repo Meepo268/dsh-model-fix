@@ -293,6 +293,7 @@
 - client 模块须 `export const name` 与 `export const apply`，复刻 `__ModuleLoader__` 闭包契约（`tsdown.config.ts` banner/intro/footer 取自宿主 `tsdown.client.ts`）。**禁 default export**（`unwrapExports` 的 `exports.default ?? exports` 会吃掉 `inject`/`Config`）。声明 `dsh.client` 后缺 `lib/client.js` 会让宿主激活期聚合抛错 ⇒ **build 必须先于安装**。
 - Node 半 `export const inject = ['settings','llm','credentials']`；`configForms` 只作子 fiber 标记（不进父级 inject），共享编排体全走子 fiber ctx（理由见 decisions.md「宿主与卡片」）；`connection` / `webServer` 在 `src/rpc.ts` 子 fiber 内声明；`hmr` / `agents` / `sessionProjections` / `subagentModelSelection` 各在 `src/index.ts` / `src/subagent.ts` 子 fiber 内声明。
 - **子 fiber 卸载不清理父 ctx 上的注册**（`_unload` 只清自身 disposables）：一次性注册（`locale.register`、slot 注册）必须挂会随重建而卸载的那个 fiber，否则第二次注册抛 `already has locale`。取服务不受限（属性读沿父链上溯）。
+- **遮蔽 `ctx.llm` 上的方法在 HMR 重载后会套第二层**：重载整函数重跑，服务属性不随 fiber 卸载复原 ⇒ 遮蔽层各带一枚 `Symbol.for` 品牌标记作幂等（`official-filter` 遮 `listModels`、`effort-name` 遮 `resolveModelInfo`）；卸载一律不动服务上的属性——链式遮蔽下动属性会抹掉别人的遮蔽。
 - **宿主 `ObservableSnapshot.subscribe` 一律不推首值** ⇒ 所有订阅都要手动补跑一次。
 - 浏览器半样式经模块级幂等 `<style>` 注入并带 `data-plugin` 标记供宿主 HMR 认领；`ctx.locale.register` 重复注册抛错，disposer 必须经 `ctx.effect` 挂。
 - 卡片样式与文案的宿主同款来源见 `docs/decisions.md` 与 `docs/ui-fusion.md`，本文不重复。

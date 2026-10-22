@@ -54,18 +54,29 @@ function isZh(locale: string): boolean {
     return ZH_LOCALE_IDS.some((id) => locale === id || locale.startsWith(`${id}-`))
 }
 
+/** 本层遮蔽的品牌标记：`Symbol.for` 全局注册，HMR 重载后同字符串仍是同一 Symbol */
+const LOCALIZED_LAYER = Symbol.for('model-fix.effort-localized')
+
+/** 带品牌标记的遮蔽层：`in` 探测与赋值共用这个面 */
+interface LocalizedLayer {
+    (provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>
+    [LOCALIZED_LAYER]?: boolean
+}
+
 /** 装上档位名本地化：把 `ctx.llm` 的 `resolveModelInfo` 遮成「中文界面下换名、否则直通」的一层。
- * 卸载不动服务上的属性（遮蔽链式，动属性会抹掉别人的遮蔽）；wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫，不通过即直通 original */
+ * 卸载不动服务上的属性（遮蔽链式，动属性会抹掉别人的遮蔽）；wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫，不通过即直通 original；HMR 重载整函数重跑，靠品牌标记幂等 */
 export function installEffortNameLocale(ctx: Context): void {
     const llm = ctx.llm
     const original = llm.resolveModelInfo
-    const wrapped = async (provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> => {
+    if (LOCALIZED_LAYER in original) return
+    const wrapped: LocalizedLayer = async (provider, model, signal) => {
         const info = await original.call(llm, provider, model, signal)
         if (ctx.fiber.store && getConfig().userExperience.localizeEfforts && isZh(localeNow(ctx))) {
             return localizeEffortNames(info, getConfig().userExperience.showOriginalEfforts)
         }
         return info
     }
+    wrapped[LOCALIZED_LAYER] = true
     llm.resolveModelInfo = wrapped
 }
 
