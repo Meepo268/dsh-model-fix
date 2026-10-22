@@ -11,7 +11,7 @@ import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/
 // SessionId 品牌 id（sessions / modelDirectories 服务的键类型）
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DEFAULT_CONFIG } from '@/shared/config-schema'
-import { MAX_ATTEMPTS } from '@/shared/constants'
+import { MAX_ATTEMPTS, PLUGIN_NAME } from '@/shared/constants'
 import { VERSION_KEY } from '@/client/model'
 import type { Flags } from '@/client/model'
 import { applyEffort, classifyTransition, sameSelection } from '@/client/effort'
@@ -155,6 +155,6 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
                 for (const id of [...tracked.keys()]) untrack(id)
                 tracked.clear()
             }
-        }, `${name}: effort memory listener`)
+        }, `${PLUGIN_NAME}: effort memory listener`)
     })
 }
