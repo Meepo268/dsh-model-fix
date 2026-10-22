@@ -138,7 +138,10 @@ export function applyFloatingButtons(ctx: ClientContext): FloatingButtonGroup {
     }
 
     // 中心列属宿主 React 树，宿主重挂即换节点 ⇒ 容器跟着搬（React 根随节点走，不重建）
-    const observer = new MutationObserver(() => {
+    const NO_FRAME = 0
+    let scheduled = NO_FRAME
+    const sync = (): void => {
+        scheduled = NO_FRAME
         const target = centerColumn()
         if (target === null) return
         if (column !== target) {
@@ -150,6 +153,11 @@ export function applyFloatingButtons(ctx: ClientContext): FloatingButtonGroup {
             return
         }
         if (container.parentElement !== target) target.appendChild(container)
+    }
+    // 合并到下一帧只跑一次：逐个 mutation 各跑一次全树查询代价过高
+    const observer = new MutationObserver(() => {
+        if (scheduled !== NO_FRAME) return
+        scheduled = requestAnimationFrame(sync)
     })
     observer.observe(document.body, { childList: true, subtree: true })
 
@@ -157,6 +165,9 @@ export function applyFloatingButtons(ctx: ClientContext): FloatingButtonGroup {
 
     ctx.effect(() => () => {
         observer.disconnect()
+        // 已排未跑的帧须取消：sync 会在 disconnect 之后跑 mount，重建出已卸载的容器
+        if (scheduled !== NO_FRAME) cancelAnimationFrame(scheduled)
+        scheduled = NO_FRAME
         root?.unmount()
         root = null
         container?.remove()
