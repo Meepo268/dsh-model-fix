@@ -21,7 +21,7 @@ const BUTTON_GAP = 8
 
 /** 按钮数值照宿主 `ui-chat` 的 `.toBottom` */
 const STYLE_TEXT = [
-    `.${CONTAINER_CLASS}{position:absolute;left:${EDGE_GAP}px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column-reverse;align-items:center;gap:${BUTTON_GAP}px;opacity:0.4}`,
+    `.${CONTAINER_CLASS}{position:absolute;left:${EDGE_GAP}px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column-reverse;align-items:center;gap:${BUTTON_GAP}px;opacity:0.25}`,
     `.${CONTAINER_CLASS}:hover{opacity:1}`,
     `.${BUTTON_CLASS}{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:34px;height:34px;padding:0;border:0;border-radius:100px;corner-shape:round;--dsw-elevation-stroke-color:var(--dsw-alias-border-l3);color:var(--dsw-alias-label-primary,#0f1115);background:var(--dsw-alias-button-floating-fill,#fff);box-shadow:var(--dsw-elevation-panel);cursor:pointer}`,
     `.${BUTTON_CLASS}:hover{background:var(--dsw-alias-button-floating-hover,#f5f6f7)}`,
