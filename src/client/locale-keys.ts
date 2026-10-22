@@ -198,6 +198,7 @@ export type CardKey =
     | 'backToChatWaitingApproval'
     | 'backToChatPlanReview'
     | 'backToChatWaitingAnswer'
+    | 'backToChatCompleted'
     // 经典设置按钮自身的文案
     | 'classicSettingLabel'
 

@@ -201,6 +201,7 @@ export const zh: Record<CardKey, string> = {
     backToChatWaitingApproval: '等待审批',
     backToChatPlanReview: '计划待审',
     backToChatWaitingAnswer: '等待回答',
+    backToChatCompleted: '已完成',
     // 经典设置按钮自身的文案
     classicSettingLabel: '设置',
 }

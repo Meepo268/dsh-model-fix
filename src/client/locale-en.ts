@@ -202,6 +202,7 @@ export const en: Record<CardKey, string> = {
     backToChatWaitingApproval: 'Waiting for approval',
     backToChatPlanReview: 'Plan awaiting review',
     backToChatWaitingAnswer: 'Waiting for answer',
+    backToChatCompleted: 'Completed',
     // 经典设置按钮自身的文案
     classicSettingLabel: 'Settings',
 }

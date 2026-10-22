@@ -174,22 +174,29 @@
 ### layout：中心面板选择（返回对话按钮）
 
 - 契约（`DSH/packages/client/ui-layout/src/client/service.ts`，宿主 `@deepseek-ai/dsh-client-ui-layout` 提供）：`selectPanel(panelId: string | null): void`。`null` 即选中会话界面、不改当前会话；非 `null` 选已注册的全局面板，未注册的 key 抛错并保留当前选择。本插件只用 `selectPanel(null)`。
-- 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.tsx` 直接 `ctx.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
+- 服务面按契约取用，不引宿主包也不在本地声明类型：该包不在 devDep 清单（其类型面会把宿主包根类型拉进 typecheck 程序，顶掉浏览器半的 `ctx.sessions` 增补，同「宿主类型导入清单」里子智能体 / 档位自调两项的裁决）；cordis 保证 inject 的依赖就绪后才执行回调（见上「cordis 基础面」），故 `src/client/back-to-chat.tsx` 在子 fiber 内 `child.get('layout')` 取用。宿主改名不再有编译期信号，靠本节契约登记兜底。
 - 经子 fiber `ctx.inject(['layout'], …)` 门控：服务到位按钮才可见（可见性 = 配置开关 ∧ 服务到位），缺席则该 fiber 静默 PENDING（宿主不提供 ui-layout 的组合下按钮不出现）。
 - DOM 锚点：`[data-slot="main"]` 锚点的父元素即 AppFrame 中心列（`ui-layout/src/client/AppFrame.tsx` 的 `.centerCol`）。宿主 CSS Module 类名随构建 hash 变化，不可按类名找。
 - 中心列没有 `position`（其定位上下文是整帧 `.frame`），按钮组要贴中心列左侧（纵向居中）⇒ 就地补一条 inline `position: relative`；该元素只由宿主 className 渲染，inline style 不被覆盖，插件卸载时还原原值。宿主 Modal 的 `z-index` 是 1000，按钮组取 999 低于它（模态框打开时被盖住）。
 
-### uiSession：当前会话与会话状态（返回对话按钮的图标与提示）
+### uiSession / sessions：主视图会话与会话状态（返回对话按钮的锚点、图标与提示）
 
 - 服务（`DSH/packages/client/ui-session/src/client/index.ts`，宿主 `@deepseek-ai/dsh-client-ui-session` 提供）：`ctx.uiSession`，类 `UiSession`；缺席则静默 PENDING（按钮按空闲显示）。
-- `sessionStatus: HostObservable<SessionStatusSnapshot>`：`Map<SessionId, SessionStatus>`，`SessionStatus = { running: boolean | undefined; pendingInteraction: SessionPendingInteraction | undefined; completionUnread: boolean }`。`running` 来自远端事件 `api-session/status`；`pendingInteraction` 由各领域经 `registerPendingInteraction` 发布（kind：`approval` / `plan-review` / `question`）。
-- `adapter.current`：`HostObservable<StandardSourceBinding>`，其 `props.sessionId` 即**当前主会话**；快照变化 = 会话切换。
-- 宿主工作区会话行的状态判定在 `ui-workspace/src/client/rows/Rows.tsx`（`sessionStatuses`，**未导出**）与 `ui-workspace/src/client/tree.ts`（`sessionNode`）：pendingInteraction → `warning`；running → `ongoing`；子智能体在跑 → `ongoing`（次要，宿主靠文案区分）；`completionUnread` → `done`；其余 → `idle`（宿主此时不画点，改渲染插槽 `sidebar.session.row.leading`）。本仓按同一套判定本地复刻。
-- `completionUnread` 的置位条件（`ui-session/src/client/index.ts:487-504`）：只给**非主视图**会话置，主视图那份会被清（`isMain` = `retainedBy.mainView > 0`，该 retain 由工作区服务持有，切面板不释放）。
-- 状态文案见 `ui-workspace/src/client/locales.ts`（`status.*` 键），本仓按钮逐条沿用；会话标题取 `ctx.sessions.list` 的 `byId[id].displayTitle`（持久化标题 → 目录名 → 会话 id）。
+- `adapter.current.props.sessionId` 即**当前主视图会话**（快照变化 = 会话切换）。子智能体被打开时 mainView 落到子会话上（`ui-workspace/src/client/navigation.ts` 的 `replaceMain` 释放前一个 reference）⇒ 主视图会话可以是子智能体。
+- `sessionStatus`：`Map<SessionId, { running; pendingInteraction; completionUnread }>`。`running` 来自远端事件 `api-session/status`；`pendingInteraction` 由各领域经 `registerPendingInteraction` 发布（kind：`approval` / `plan-review` / `question`）。
+- 宿主工作区会话行的状态判定（`ui-workspace/src/client/rows/Rows.tsx` 的 `sessionStatuses`，**未导出**；`ui-workspace/src/client/tree.ts` 的 `sessionNode`）：pendingInteraction → `warning`；running → `ongoing`；子智能体在跑 → `ongoing`；`completionUnread` → `done`；其余 → `idle`（不画点）。本仓按同一套判定本地复刻。
+- `completionUnread` 的置位条件（`ui-session/src/client/index.ts:487-518`）：只给**非主视图**会话置（`isMain` = `retainedBy.mainView > 0`）。按钮锚父会话时子智能体视图下该态可达。
+- 层级事实（`ui-workspace/src/client/tree.ts`、`api-session-controller/src/client/sessions/service.ts`、`api-session-controller/src/list.ts`）：`origin === 'subagent'` 才标记子智能体（**fork 子会话也带 `parentId` 但 origin 不是它，工作区里是独立一行**）；`parentId` 只到**直接父**（list 只透传 header 一层 `parentSession`）；父目录未物化时 retain 回退分支不写 `parentId` ⇒ 该窗口内按当前会话显示。
+- 工作区**不渲染子智能体行**（`tree.ts` 的 `sessionVisible`）⇒ 工作区永远显示主视图会话行，按钮锚主视图会话即与它同源。
+- 状态文案见 `ui-workspace/src/client/locales.ts`（`status.*` 键），本仓逐条沿用；会话标题取 `ctx.sessions.list` 的 `byId[id].displayTitle`（持久化标题 → descriptor label → 会话 id）。
 - 子智能体目录投影 `subagentCatalog` 只在 `@deepseek-ai/dsh-subagent` 的类型面声明（该包会把 Node 侧 `ctx.sessions` 增补带进来），本仓按契约复制最小面（`src/client/back-to-chat.tsx`）。
-- 状态点原语 `StateDot`（`DSH/packages/client/ui-primitives/src/StateDot.tsx`，宿主 `@deepseek-ai/dsh-client-ui-primitives` 导出）：`StateDotState = 'done' | 'warning' | 'ongoing' | 'error' | 'idle'`；`ongoing` 是 24×24 双圆弧 spinner（两条 CSS 动画，1.5s），其余态是 10px 实心圆点（`currentColor` + `--dsw-alias-state-*` 令牌）。
 
+### uiWorkspace：换主视图会话（子智能体视图下的返回动作）
+
+- 契约（`DSH/packages/client/ui-workspace/src/client/navigation.ts`，宿主 `@deepseek-ai/dsh-client-ui-workspace` 提供）：`openSession(target: SessionTarget): void`，`SessionTarget = SessionId | SubagentAddress`。内部 `replaceMain(target, …, 'reveal')`：retain 新会话为 `mainView` → 释放前一个 reference → `selectPanel(null)`，一次完成「换主视图会话 + 显示会话界面」。本插件只传 `SessionId`。
+- 换 mainView 只有这一个入口：`UiWorkspaceService.mainReference` 是私有字段。
+- 经子 fiber `ctx.inject(['uiWorkspace'], …)` 取用，缺席则静默 PENDING——**不门控按钮可见性**（仍只由 `layout` + 配置开关决定）：缺席时子智能体视图下的点击退化为 `selectPanel(null)`，按钮不消失也不报错。
+- 服务面按契约取用，本地不声明类型也不引宿主包：它经 `@deepseek-ai/dsh-subagent/client` 把 Node 侧 `ctx.sessions` 增补带进 typecheck 程序（同「宿主类型导入清单」末条裁决），故本地声明最小面 `UiWorkspaceNav`。
 ### credentials：凭据状态面（隐藏官方API的判定依据）
 
 - `ctx.credentials` 在 `src/index.ts` 的 `inject` 里作顶级依赖（与 `settings` / `llm` 并列），不用 `ctx.get`：宿主基础配置无条件挂载它（`DSH/packages/bundle/base/cordis.patch.yml` 无 `disabled` 条件）⇒ 缺失即异常部署，PENDING 暴露好过静默降级。
@@ -233,11 +240,12 @@
 | `@deepseek-ai/dsh-client-ui-settings/client` | `ConfigForm`、`ConfigFormSnapshot` | type-only | `src/client/index.tsx`、`src/client/scope.ts` |
 | `@deepseek-ai/dsh-client-connection/client` | `ClientConnectionRpc` | type-only | `src/client/rpc-carrier.ts` |
 | `@deepseek-ai/dsh-client-ui-slots` | `TranslateNS` + 合并（`LocaleNamespaceMap` 纳入 `CARD_NS`） | type-only + 合并 | 各卡片文件；合并：`src/client/locale-keys.ts` |
-| `@deepseek-ai/dsh-api-session-controller/client` | 合并（`ctx.sessions`） | 合并 | `src/client/memory-listener.ts`、`src/client/back-to-chat.tsx` |
+| `@deepseek-ai/dsh-api-session-controller/client` | 合并（`ctx.sessions`）、`SessionListState` | 合并 + type-only | 合并：`src/client/memory-listener.ts`、`src/client/back-to-chat.tsx`；`SessionListState`：`src/client/back-to-chat.tsx` |
 | `@deepseek-ai/dsh-api-session-controller/types` | `ModelSelection`、`ModelSelectionProjection`、`ModelProviderGroup` | type-only | `src/client/memory-listener.ts`、`src/client/effort.ts` |
 | `@deepseek-ai/dsh-client-ui-model-selection/client` | `ModelDirectory` | type-only | `src/client/memory-listener.ts` |
 | `@deepseek-ai/dsh-session/types` | `SessionId` | type-only | `src/client/memory-listener.ts`、`src/client/back-to-chat.tsx`、`src/subagent.ts`、`test/subagent.test.ts`（**只引 `/types` 子路径**：包根把 Node 侧 `SessionStore` 的 `ctx.sessions` 增补带进来，见末条） |
 | `@deepseek-ai/dsh-client-ui-session/client` | 合并（`ctx.uiSession`）、`UiSession` | 合并 + type-only | `src/client/back-to-chat.tsx`（其类型面只引 `dsh-session/types` 安全子路径，不顶掉 `ctx.sessions` 增补） |
+| **宿主服务名 `uiWorkspace` 按契约复制、不引宿主包**（`src/client/back-to-chat.tsx` 的 `UiWorkspaceNav`，只取 `openSession(sessionId: SessionId)`）：理由同末条 |
 | `@deepseek-ai/dsh-client-ui-renderer/client` | 合并（`ctx.slots`） | 合并 | `src/client/index.tsx` |
 | `@deepseek-ai/dsh-client-locale/client` | 合并（`ctx.locale`） | 合并 | `src/client/index.tsx`、`src/client/effort-name.ts`、`src/client/back-to-chat.tsx` |
 | `@deepseek-ai/dsh-client-ui-settings-models/client` | 合并（slot key `settings.models.footer`） | 合并 | `src/client/index.tsx` |
@@ -307,7 +315,7 @@
 - 逐位比对 `BROWSER_HOST_BASELINE` 与 `CLIENT_EXTERNALS` 同宿主 `DSH/packages/client/web/src/platform.ts`（已比对 `0.2.1-alpha.3`：宿主表仅多 `dockkit` 一项，本仓在用的模块无被移出）。
 - 对本文每个宿主类型导入跑 typecheck；值导入的符号漂移 typecheck 抓不到，须人工比对 `@deepseek-ai/dsh-client-ui-primitives` 全部用到的符号。
 - 逐字段比对 `TerminalBlockLabels`（0.2.1-alpha.2 起新增必填 `commandLine`）：宿主新增必填字段时编译期不报错、只在首次渲染记录区时崩。已核 `0.1.7-rc.2` 与 `0.2.1-alpha.3`：alpha.3 字段全集 = rc.2 的 13 字段 + `commandLine`，无其它新增改名，`terminalLabelsOf` 无需补字段；唯一待收是 `src/client/card-verify.ts` 与 `src/client/card-probe.ts` 两处 `useMemo<TerminalBlockLabels>` 标注与实参（多带 `commandLine`）不一致，升 devDep 后一并改。
-- 逐条复核「宿主服务与运行时面」各节签名与行为假设，尤其 settings 写入语义、命名空间登记时序、连接断开语义。
+- 逐条复核「宿主服务与运行时面」各节签名与行为假设，尤其 settings 写入语义、命名空间登记时序、连接断开语义；另复核 `uiWorkspace.openSession` 仍是换 `mainView` 的唯一入口（`UiWorkspaceService.mainReference` 若被公开或有第二个入口，本节契约要重写）。
 - 复核 `SETTINGS_CONFLICT` 与 LLM 失败码字面量（尤其 `classifyPiAiError` 的文案正则——它决定 `TRANSPORT` / `STREAM_CLOSED` 的归一化来源）。
 - 复核适配器是否仍兑现 `options.signal`（`LlmAdapter.stream` 契约 `implementations must honor options.signal`）：本仓 30s 软超时 + 3s 硬兜底靠它传中止；连带复核 pi-ai `idleWatchdog`（rc.2 有、alpha.3 删过、按当时版本确认）与 `LLM_STREAM_IDLE_TIMEOUT`。
 - 复核六个 slot key、`rowConfigKey` 拼接、`SlotLabel` thunk 与 `PropsLocale`（`t` 只在声明 `locale:` 时上 props）；另复核 `settings.launcher` 席位的遮蔽规则（`priority` 升序、最小者渲染）与 `StoredEntry.registrant` 的盖名方式是否仍如本文所述。
