@@ -4,6 +4,8 @@
  * 其余情况 `ctx.layout.selectPanel(null)`）。
  */
 
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { IconChevronLeftOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -88,6 +90,19 @@ function runningTitle(subagents: number): { titleKey: CardKey; params?: Record<s
     }
 }
 
+function BackToChatIcon(props: { base: ReactNode }): ReactNode {
+    const [hovered, setHovered] = useState(false)
+    return (
+        <span
+            style={{ width: '100%', alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onPointerEnter={() => setHovered(true)}
+            onPointerLeave={() => setHovered(false)}
+        >
+            {hovered ? IconChevronLeftOutlineRegular({ size: 14 }) : props.base}
+        </span>
+    )
+}
+
 /** 返回目标：子智能体视图取直接父（只看一层 ⇒ 每点一次向上一级），否则当前会话自己 */
 function backTarget(list: SessionListState, currentId: SessionId): BackTarget {
     const row = list.byId[currentId]
@@ -133,7 +148,7 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
     let sessions: ISessions | null = null
 
     const button = createFloatingButton('back-to-chat', {
-        icon: IconChevronLeftOutlineRegular({ size: 14 }),
+        icon: <BackToChatIcon base={IconChevronLeftOutlineRegular({ size: 14 })} />,
         title: t('backToChat'),
         active: false,
         onClick: () => {
@@ -168,10 +183,10 @@ export function applyBackToChat(ctx: ClientContext, scope: DecodedScope<Flags>):
         const label = t(view.titleKey, view.params)
         const title = view.sessionTitle === undefined ? label : `${label} · ${view.sessionTitle}`
         if (view.state === 'idle') {
-            button.set({ icon: IconChevronLeftOutlineRegular({ size: 14 }), title })
+            button.set({ icon: <BackToChatIcon base={IconChevronLeftOutlineRegular({ size: 14 })} />, title })
             return
         }
-        button.set({ icon: <StateDot state={view.state} />, title })
+        button.set({ icon: <BackToChatIcon base={<StateDot state={view.state} />} />, title })
     }
 
     // scope 订阅不推首值，先按当前快照补跑一次
