@@ -1,4 +1,4 @@
-/** 推理级别记忆的失效清理：按宿主全量模型列表剪掉已不存在的条目（口径见 docs/decisions.md「推理级别记忆」） */
+/** 推理级别记忆的失效清理：按宿主全量模型列表剪掉已不存在的条目（口径见 docs/decisions-session.md「推理级别记忆」） */
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_ATTEMPTS } from '@/constants'
 import { getConfig } from '@/config'

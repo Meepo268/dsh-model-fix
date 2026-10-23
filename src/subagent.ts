@@ -7,11 +7,11 @@ import { PLUGIN_NAME } from '@/shared/constants'
 
 /** 子智能体推理级别的注入面：在宿主 `agent/request` 瀑布里改写子 Agent 本次请求的调用配置。
  * 子 Agent 无推理级别设置面，委派调用配置流经此瀑布；按 `followParent` 开关在 `next()` 后改写，宿主随后照常校验（不预检不降级）。
- * 每请求现算不缓存（父档位与子实际模型可能变动）。裁决见 docs/decisions.md「子智能体」 */
+ * 每请求现算不缓存（父档位与子实际模型可能变动）。裁决见 docs/decisions-session.md「子智能体」 */
 
 /** 宿主契约（`Agent` 只读面、子智能体选模型设置服务、会话投影服务）——按契约复制，不引宿主包类型。
  * 原因：宿主富面 `Agent` 只在 `@deepseek-ai/dsh-agent` 包根导出，「允许选择模型」设置住在 `@deepseek-ai/dsh-tool-subagent/model-selection-settings`；这两个包都会把 `@deepseek-ai/dsh-session` 包根类型拉进程序，顶掉浏览器半 `ctx.sessions` 的增补（`ISessions` → `SessionStore`）。
- * 故只声明实际读取的成员；升级宿主按 `docs/host-api.md` 对应条目复核 */
+ * 故只声明实际读取的成员；升级宿主按 `docs/host/` 对应条目复核 */
 interface SubagentHost {
     readonly session: {
         readonly header: { readonly origin?: string; readonly parentSession?: SessionId }
@@ -37,7 +37,7 @@ interface HostSessionProjections {
     stateOf(session: SubagentHost['session'], key: 'modelSelection'): HostModelSelectionState | undefined
 }
 
-/** `agent/request` 瀑布监听签名（与宿主 `AgentEvents` 一致，见 [`docs/host-api.md`](docs/host-api.md)） */
+/** `agent/request` 瀑布监听签名（与宿主 `AgentEvents` 一致，见 [`docs/host/`](docs/host/)） */
 type SubagentRequestListener = (
     payload: { agent: SubagentHost },
     next: () => Promise<LlmCallConfig>,
@@ -90,7 +90,7 @@ function hostSelectionEnabled(service: HostSelectionService): boolean {
     }
 }
 
-/** 父 Agent 下一次请求该用的路由：先取父会话「待生效的选择」，没有才取会话日志的请求头，再无则回落 Agent 自身 options。裁决见 docs/decisions.md「子智能体」 */
+/** 父 Agent 下一次请求该用的路由：先取父会话「待生效的选择」，没有才取会话日志的请求头，再无则回落 Agent 自身 options。裁决见 docs/decisions-session.md「子智能体」 */
 function resolveFollow(agents: HostAgentRegistry, projections: HostSessionProjections, agent: SubagentHost): FollowRoute | undefined {
     const parentId = agent.session.header.parentSession
     if (parentId === undefined) return undefined

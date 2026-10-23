@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-/** 把写回 task 从宿主 HMR 事务的 AsyncLocalStorage 上下文中摘出执行；注入落地前有界等待（2s 封顶、只等一次，超时降级裸 task()），裁决见 docs/decisions.md「写回端点」 */
+/** 把写回 task 摘出宿主 HMR 事务的 AsyncLocalStorage 上下文执行；注入落地前的有界等待与时限见 docs/decisions-config.md「写回端点」 */
 
 let _hmrExecuting: unknown | undefined
 

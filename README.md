@@ -98,7 +98,7 @@ dsh plugin --profile web add github:TikaFlow/dsh-model-fix
 
 DSH 正在快速迭代，本插件所兼容的 DSH 宿主版本追随较新版本。若插件功能异常，请检查 DSH 版本是否满足插件依赖版本。
 
-支持范围：DSH `0.1.7-rc.2` ~ `0.2.1-rc.2`
+支持范围：DSH `0.1.7-rc.2` ~ `0.2.1-rc.3`
 
 ## 使用说明
 

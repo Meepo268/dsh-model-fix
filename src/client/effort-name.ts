@@ -1,5 +1,5 @@
 /** 浏览器半的界面语言上报：启动时把当前界面语言经 RPC 告知 Node 半。
- * 换名本体在 Node 半（遮 `resolveModelInfo`，全链覆盖），但 Node 侧读不到浏览器的自动探测语言，故由本模块在启动时上报补齐（见 docs/decisions.md「宿主与卡片」）。不上报即视为 en，Node 侧安全回退、不换名 */
+ * 换名本体在 Node 半（遮 `resolveModelInfo`，全链覆盖），但 Node 侧读不到浏览器的自动探测语言，故由本模块在启动时上报补齐（见 docs/decisions-ui.md「卡片与编排」）。不上报即视为 en，Node 侧安全回退、不换名 */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // ctx.locale 服务面（LocaleRuntime）
 import type {} from '@deepseek-ai/dsh-client-locale/client'

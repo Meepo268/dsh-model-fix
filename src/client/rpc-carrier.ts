@@ -28,7 +28,7 @@ export interface RpcCarrier {
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => Promise<VerifySummary | undefined>
-    /** 探测档位：走进度流端点，Node 半先把候选档位临时预声明进配置、再逐档各发一次最小请求，跑完按「自动写入」开关收敛写回或整轮还原；终帧的 `summary.fill` 一律带收敛结论的增删统计。开关须与 Node 半同值。被中止（停止 / 关窗 / 断连）回 undefined——中止不发终帧，且未跑完的模型一律还原成预声明之前的形态；没能开跑或中途异常则抛错 */
+    /** 探测档位：终止态语义同 `verifyModels`；未跑满的模型一律还原成预声明之前的形态（口径见 docs/decisions-diagnose.md「探测」） */
     probeEfforts: (
         models: readonly VerifyTarget[],
         flags: { dropUnsupported: boolean; autoWrite: boolean },

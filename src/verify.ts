@@ -1,5 +1,5 @@
 /** 模型可用性验证：每勾选模型发一次不带 `reasoningEffort` 的最小请求，仅以适配器是否开始产出内容块（`block-start`）判可用；
- * 全程只读（不碰 settings、不占事件流守卫、不落「已验证」账本），口径见 docs/decisions.md「验证」 */
+ * 全程只读（不碰 settings、不占事件流守卫、不落「已验证」账本），口径见 docs/decisions-diagnose.md「验证」 */
 
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { PLUGIN_NAME } from '@/shared/constants'

@@ -8,7 +8,7 @@ import { setConfigSource } from '@/config'
 import { DEFAULT_CONFIG } from '@/shared/config-schema'
 import type { PluginConfig, UserExperienceRules } from '@/shared/types'
 
-/** 最小 Agent 桩类型——与 `src/subagent.ts` 里那份契约复制同形。不引宿主 `@deepseek-ai/dsh-agent` 包根类型：它会把 `@deepseek-ai/dsh-session` 包根类型拉进整个 typecheck 程序，顶掉浏览器半 `ctx.sessions` 的 `ISessions` 增补（详见 `docs/host-api.md`） */
+/** 最小 Agent 桩类型——与 `src/subagent.ts` 里那份契约复制同形。不引宿主 `@deepseek-ai/dsh-agent` 包根类型：它会把 `@deepseek-ai/dsh-session` 包根类型拉进整个 typecheck 程序，顶掉浏览器半 `ctx.sessions` 的 `ISessions` 增补（详见 `docs/host/`） */
 interface Agent {
     readonly session: {
         readonly header: { readonly origin?: string; readonly parentSession?: SessionId }

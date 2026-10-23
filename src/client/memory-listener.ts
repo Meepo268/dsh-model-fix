@@ -20,7 +20,7 @@ import { isSettingsConflict } from '@/shared/errors'
 
 /** 挂上记忆监听子 fiber（宿主无 sessions/modelDirectories 时静默不启用） */
 export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScope<Flags>): void {
-    // 记忆写入带三条护栏（理由见 docs/decisions.md「推理级别记忆」）：
+    // 记忆写入带三条护栏（理由见 docs/decisions-session.md「推理级别记忆」）：
     // 1. 段未 ready 放弃——ConfigForm loading 时 value 回落 DEFAULT_CONFIG（efforts={}），整段 set 等于清空全部记忆。
     // 2. expectedRevision 围栏——与 Node 半 updateMemory 对称。
     // 3. SETTINGS_CONFLICT 重读重算——按旧段回放会抹掉他方刚写入的记忆。

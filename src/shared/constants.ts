@@ -51,5 +51,5 @@ export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
 /** settings 写回冲突与语言上报共用的重试次数（跨半共享）。值变更须同步两端 */
 export const MAX_ATTEMPTS = 3
 
-/** 三个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 除调用方给的 `signal` 外没有任何计时器，不给就有「等不到结果即永远占着卡片占用态」的挂死路径。超时只中止等待，Node 半写回照跑完（取舍见 docs/decisions.md「写回端点」） */
+/** 三个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 自身无计时器，不给就有永久占着卡片占用态的挂死路径（取舍见 docs/decisions-config.md「写回端点」） */
 export const WRITEBACK_MS = 10_000

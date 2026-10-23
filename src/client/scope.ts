@@ -31,7 +31,7 @@ export function makeScope<T>(form: ConfigForm<unknown>, decode: (raw: unknown) =
         mode: 'host',
     }
     const listeners = new Set<() => void>()
-    /** form 变化时重建快照引用（useSyncExternalStore 的稳定引用契约：变化前同一引用） */
+    /** 重建快照而非就地改：useSyncExternalStore 要求变化前引用稳定 */
     const sync = (): void => {
         const s = form.getSnapshot()
         snap = {

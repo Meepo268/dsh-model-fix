@@ -36,7 +36,7 @@ export interface UserExperienceRules {
     rememberEfforts: boolean
     /** 切换模型时若未设置推理级别、也无记住的级别、且目标模型公告 `high` 档位，则自动设为 `high`。仅在「model-change」分支生效，不干预同模型切换级别（effort-change）。默认 true */
     defaultHigh: boolean
-    /** 模型/提供方被删除时随之忘记该模型的推理级别记忆：开启时按宿主全量模型列表剪枝（`src/memory.ts`，列表里不再存在的条目删除、目录读失败的保留）。默认 true，口径见 docs/decisions.md「推理级别记忆」 */
+    /** 模型/提供方被删除时随之忘记其推理级别记忆（清理归 `src/memory.ts`）。默认 true，口径见 docs/decisions-session.md「推理级别记忆」 */
     forgetRemoved: boolean
     /** 子智能体跟随父 Agent：宿主「允许 Agent 为子智能体选择模型」关闭着的组合里，委派出去的子 Agent 每次请求整条沿用父 Agent 当前生效的提供方 + 模型 + 推理级别。默认 false */
     followParent: boolean
@@ -48,7 +48,7 @@ export interface UserExperienceRules {
     localizeEfforts: boolean
     /** 同时显示原档位名：为 true 时，本地化推理级别开启后把中文与英文原档位一起显示（`中文名 · 原档位`，如 `最大 · Max`）；关闭则只显示中文。默认 true */
     showOriginalEfforts: boolean
-    /** 尽量匹配：精确匹配失败（无命中/歧义）时收集候选合成参数填充（候选等权、60% 口径，作用于 Node 半填充，见 docs/decisions.md「参数来源」）。默认 false */
+    /** 尽量匹配：精确匹配失败（无命中/歧义）时收集候选合成参数填充（合成口径见 `src/lookup.ts`）。默认 false，见 docs/decisions-config.md「参数来源」 */
     looseMatch: boolean
 }
 

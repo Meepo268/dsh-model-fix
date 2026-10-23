@@ -1,7 +1,7 @@
 /**
  * 「探测档位」的崩溃兜底备份：探测开始前把探测目标档位表原值存进自有段；
  * 启动末尾若还留着，按备份撤掉上一轮没收尾的档位表。
- * 备份只覆盖预声明动过的那一个字段：不碰其他模型/字段，不复活探测期间被删的模型。见 docs/decisions.md「探测档位」。
+ * 备份只覆盖预声明动过的那一个字段：不碰其他模型/字段，不复活探测期间被删的模型。见 docs/decisions-diagnose.md「探测」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
@@ -50,7 +50,7 @@ export function captureProbeBackup(
     return backup
 }
 
-/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩，理由见 docs/decisions.md「探测档位」 */
+/** 备份落自有段前的形态：JSON → base64 字符串。只编码不压缩，理由见 docs/decisions-diagnose.md「探测」 */
 export function encodeProbeBackup(backup: ProbeBackup): string {
     return Buffer.from(JSON.stringify(backup), 'utf8').toString('base64')
 }
@@ -165,7 +165,7 @@ async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<numb
 
 /**
  * 启动末尾的崩溃回退：段里没有备份即无事可做；有则按备份撤掉预声明并清掉备份，返回被撤的模型数。
- * 回退全程持事件流守卫（否则 `fix` 会把预声明又填回来）。见 docs/decisions.md「探测档位」。
+ * 回退全程持事件流守卫（否则 `fix` 会把预声明又填回来）。见 docs/decisions-diagnose.md「探测」。
  */
 export async function restoreProbeBackup(ctx: Context): Promise<number> {
     const section = ownSection(ctx)

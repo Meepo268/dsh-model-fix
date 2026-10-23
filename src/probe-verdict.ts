@@ -2,7 +2,7 @@ import type { LlmFailure } from '@deepseek-ai/dsh-llm/types'
 import type { ProbeOutcome, ProviderBlockReason, VerifyFailureFacts, VerifyProbe } from '@/shared/verify-progress'
 import { isProviderBlocking } from '@/shared/verify-progress'
 
-/** 探测判定层（零 ctx 纯函数）：把宿主失败事实翻译成本插件结论，并给出两级短路的唯一判据（口径见 docs/decisions.md「验证」「探测档位」） */
+/** 探测判定层（零 ctx 纯函数）：把宿主失败事实翻译成本插件结论，并给出两级短路的唯一判据（口径见 docs/decisions-diagnose.md「验证」「探测档位」） */
 
 /** 额度 / 余额耗尽（`ACCOUNT_QUOTA` 是宿主给「账户余额不足」定的字面量） */
 const QUOTA_CODES: ReadonlySet<string> = new Set(['QUOTA', 'ACCOUNT_QUOTA'])

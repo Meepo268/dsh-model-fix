@@ -1,6 +1,6 @@
 # 架构：目录职责、数据流与跨半边界
 
-本文只记「代码长什么样」。宿主契约、设计动机、命令细节各有归属文档，本文不重复。
+宿主契约在 `docs/host/`（按面分片），设计动机另在专题文档。
 
 ## 目录职责
 
@@ -24,14 +24,14 @@
 | `src/host.ts` | settings 写回必经的 `queueTask` 收口（HMR 事务感知） |
 | `src/section.ts` | settings 节读取收口（读不到一律 `undefined`） |
 | `src/writeback.ts` | 写回 `llm-pi-ai` 段的统一外壳（计划 → 写回 → 冲突限次重试） |
-| `src/probe-verdict.ts` | 验证与探测共用的判定层（失败分类、两级短路判据） |
-| `src/probe-plan.ts` | 共用的计划层（入参校验、展开、分组、配额） |
-| `src/probe-report.ts` | 共用的汇报层（逐组结论、全局统计） |
-| `src/probe-engine.ts` | 共用执行引擎（单次请求受理判定、并发、进度帧） |
 | `src/verify.ts` | 「验证模型」执行器（只读） |
 | `src/probe.ts` | 「探测档位」执行器：兜底备份 → 预声明 → 逐档探测 → 收敛写回 |
 | `src/fill.ts` | 探测档位的两次写回（预声明 / 收敛） |
 | `src/probe-backup.ts` | 探测的崩溃兜底：备份与启动回退 |
+| `src/probe-verdict.ts` | 验证与探测共用的判定层（失败分类、两级短路判据） |
+| `src/probe-plan.ts` | 共用的计划层（入参校验、展开、分组、配额） |
+| `src/probe-report.ts` | 共用的汇报层（逐组结论、全局统计） |
+| `src/probe-engine.ts` | 共用执行引擎（单次请求受理判定、并发、进度帧） |
 | `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点（channel 自注册） |
 | `src/rpc-route.ts` | RPC 信封解码与路由分发 |
 | `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
@@ -84,9 +84,9 @@
 | `src/client/floating-buttons.tsx` | 悬浮按钮组容器：中心列左侧直插 DOM + 独立 React 根；管定位 / 布局 / 渲染，导出 `addButton` |
 | `src/client/floating-button.ts` | 悬浮按钮的响应式数据契约与工厂（React 外部存储形态） |
 | `src/client/back-to-chat.tsx` | 「返回对话」按钮条目：自持 layout 依赖与配置 / 语言订阅，出响应式数据交容器渲染 |
-| `src/client/float-card.tsx` | 悬浮按钮组里的卡片入口条目：图标取插件图标，点击打开与【模型优化】chip 同一张配置卡 |
-| `src/client/card-panel.tsx` | 配置卡弹层面板：输入框 chip 与悬浮按钮共用的那张卡（宿主 Modal 的 headless 形态） |
-| `src/client/classic-setting.tsx` | 「经典设置」入口：以 `priority: -1` 遮蔽宿主 `settings.launcher` 席位上的账号入口，渲染 1:1 复刻 `dsh-v0.2.0-rc.2` 外壳回退按钮的经典设置触发器 |
+| `src/client/float-card.tsx` | 悬浮按钮组里的卡片入口条目：图标取插件图标，点击打开与「模型优化」chip 同一张配置卡 |
+| `src/client/card-panel.tsx` | 配置卡弹层面板：输入框 chip 与悬浮按钮共用（宿主 Modal 的 headless 形态） |
+| `src/client/classic-setting.tsx` | 「经典设置」入口：以 `priority: -1` 遮蔽 `settings.launcher` 上的账号入口，渲染 1:1 复刻宿主 `dsh-v0.2.0-rc.2` 外壳回退按钮的触发器 |
 
 ### 构建与静态资源
 
@@ -95,13 +95,13 @@
 | `tsconfig.json` | TS 编译与 `paths` 别名 |
 | `tsdown.config.ts` | 双配置构建（Node 半 + 浏览器半）+ `alias` / `define` / banner-intro-footer |
 | `tsdown.test.config.ts` | 测试专用单对象配置 |
-| `eslint.config.ts` | ESLint 10 扁平配置（含跨半纯度四条自定义规则） |
-| `scripts/build-cache.mjs` | 重建随包缓存：拉 models.dev 全量数据并跑运行期同一个构建器（jiti 直跑 TS，逻辑不复制） |
+| `eslint.config.ts` | ESLint 扁平配置（含跨半纯度四条自定义规则） |
 | `scripts/build-externals.mjs` | 两半外置宿主包清单（tsdown 与 eslint 共用的单一来源）：`NODE_EXTERNALS` / `CLIENT_EXTERNALS` |
+| `scripts/build-cache.mjs` | 重建随包缓存：拉 models.dev 全量数据并跑运行期同一个构建器（jiti 直跑 TS，逻辑不复制） |
 | `scripts/check-version.mjs` | pre-commit 钩子：README 钉死的 tarball 链接须与 `package.json` 的 version 同号 |
 | `scripts/check-tag.mjs` | pre-push 钩子：一次只许推一个标签，且须为 v + 语义化版本并与 version 同号 |
 | `public/models-cache.json` | 构建期复制进 `lib/` 的目录缓存（首启离线可用；`pnpm build:cache` 重建） |
-| `public/icon.svg` | 插件图标：随构建复制进 `lib/`（包内 `icon` 字段指向它），浏览器半另由构建期内联同一份标记 |
+| `public/icon.svg` | 插件图标：随构建复制进 `lib/`，浏览器半另由构建期内联同一份标记 |
 | `cordis.patch.yml` | 包根静态资源，不经 tsdown；补丁行 `id` 即 settings 命名空间键 |
 | `locale/*.json` | 包根静态资源，不经 tsdown |
 
@@ -115,7 +115,7 @@
 
 ## 跨半边界
 
-- Node 半禁 `@/client` 值导入；浏览器半禁 `@/`（`@/shared/*`、`@/client/*` 除外）与 `@deepseek-ai/*` 的值导入，基线见 `BROWSER_HOST_BASELINE`。
+- Node 半禁 `@/client` 值导入；浏览器半禁 `@/`（`@/shared/*`、`@/client/*` 除外）与基线外 `@deepseek-ai/*` 的值导入，基线见 `eslint.config.ts` 的 `BROWSER_HOST_BASELINE`。
 - `src/shared/` 只被两半 import，禁反向 import 两半。
 - 浏览器半调 Node 半的唯一出口是 `src/client/rpc-carrier.ts`。
 - `import type` 不计入纯度判定（由 `verbatimModuleSyntax` + `consistent-type-imports` 保证）。
@@ -127,11 +127,11 @@
 
 ## 构建与打包
 
-- tsdown 双配置产物为 Node 半 `lib/index.js` 与浏览器半 `lib/client.js`；声明 `dsh.client` 后缺 `lib/client.js` 会让宿主激活期聚合抛错 ⇒ **build 必须先于安装**。
+- tsdown 双配置产物为 Node 半 `lib/index.js` 与浏览器半 `lib/client.js`。
 - 宿主模块排除表单一来源 `scripts/build-externals.mjs`（tsdown 与 eslint 共用），按半各一份、只列该半运行期**实际值导入**的宿主包；浏览器半基座以宿主 `PLATFORM_MODULES`（冻结表）为准，漂移即运行期 require 未命中。
 - 客户端半产物须具名导出 `{ name?, inject?, Config?, apply }`，`apply` 必需；**禁 default export**（宿主 `unwrapExports` 的 `exports.default ?? exports` 会吃掉 `inject`）。
 - 浏览器半运行期宿主依赖只有 `react`、`react/jsx-runtime`、`react-dom/client` 与 `@deepseek-ai/dsh-client-ui-primitives`（其余宿主导入构建期擦除）。
-- 宿主类型面一律 type-only 导入 devDep（构建期擦除），导入清单与理由的权威登记在 `host-api.md`「宿主类型导入清单」。
+- 宿主类型面一律 type-only 导入 devDep（构建期擦除），导入清单与理由见 `host/imports.md`。
 - 代码合规归 lint，编译配置只管编译；跨半纯度由 `eslint.config.ts` 的四条自定义规则判定。
 - 产物不带 sourcemap；`__PLUGIN_VERSION__` 由 tsdown `define` 内联 `package.json` version。
 
@@ -145,4 +145,4 @@
 ## settings 键位
 
 - 命名空间键 = `cordis.patch.yml` 的 `id` = `src/shared/constants.ts` 的 `PLUGIN_NS`，两半写回共用同一字面量。
-- `API_NS`（宿主自带段 `llm-pi-ai`）的读写位序与字面量由 `host-api.md` 登记。
+- `API_NS`（宿主自带段 `llm-pi-ai`）的读写位序与字面量由 `host/literals.md` 登记。

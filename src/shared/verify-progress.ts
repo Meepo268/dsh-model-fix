@@ -97,7 +97,7 @@ export interface VerifyProviderReport {
     probed: number
 }
 
-/** 一个「提供方 / 模型」下的某推理级别被判为**不被支持**。只收明确判为不支持的；超时、限流、额度耗尽、不可达都只是没验成，不在此列（判据见 docs/decisions.md「验证」）。 */
+/** 一个「提供方 / 模型」下的某推理级别被判为**不被支持**。只收明确判为不支持的；超时、限流、额度耗尽、不可达都只是没验成，不在此列（判据见 docs/decisions-diagnose.md「验证」）。 */
 export interface UnsupportedEffort {
     provider: string
     model: string

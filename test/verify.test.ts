@@ -28,7 +28,7 @@ const FINISH_STOP = { type: 'finish', reason: { kind: 'stop' } }
 const finishError = (code: string, status?: number): StreamChunk =>
     ({ type: 'finish', reason: { kind: 'error', failure: failure(code, status) } }) as unknown as StreamChunk
 
-/** 宿主归一出的中止终帧（`signal?.aborted || code === 'ABORTED'` → `aborted`，见 docs/host-api.md） */
+/** 宿主归一出的中止终帧（`signal?.aborted || code === 'ABORTED'` → `aborted`，见 docs/host/） */
 const FINISH_ABORTED = { type: 'finish', reason: { kind: 'aborted', failure: failure('ABORTED') } } as unknown as StreamChunk
 
 /** 失败事实（`VerifyFailureFacts`）桩：只给 code 与 message，status 恒缺（pi-ai 路径即如此） */

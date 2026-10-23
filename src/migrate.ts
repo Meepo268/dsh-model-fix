@@ -74,7 +74,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * 启动时配置迁移：
  * - 有当前版本快照 → 规范化校验（不一致即重写自愈），并两阶段清理旧快照
  * - 无当前版本 → 取段内 ≥ 最低支持版本中最高可解析快照：高版本降级解析、低版本走升级链；均不可解析视为全新用户，写默认快照
- * - 写回带 `SETTINGS_CONFLICT` 限次重试，且**重读描述并重算 op**、绝不回放（见 docs/decisions.md「写回端点」）
+ * - 写回带 `SETTINGS_CONFLICT` 限次重试，且**重读描述并重算 op**、绝不回放（见 docs/decisions-config.md「写回端点」）
  */
 export async function migrateConfig(ctx: Context): Promise<void> {
     // 轮询等待 describe() 含本 NS；超时/卸载即放弃，按当前生效配置继续

@@ -51,7 +51,7 @@ export interface IndexEntry {
     image?: boolean
 }
 
-/** 按 provider 分组的内存索引（供 lookup 复用）：`ids` 存归一后的匹配键（三级匹配在归一空间进行，键须先归一），`byId` 是归一键到条目的直查表（同组内归一后重复保留首个）。口径见 docs/decisions.md「参数来源」 */
+/** 按 provider 分组的内存索引（供 lookup 复用）：`ids` 存归一后的匹配键（三级匹配在归一空间进行，键须先归一），`byId` 是归一键到条目的直查表（同组内归一后重复保留首个）。口径见 docs/decisions-config.md「参数来源」 */
 export interface ProviderGroup {
     ids: string[]
     byId: Map<string, IndexEntry>

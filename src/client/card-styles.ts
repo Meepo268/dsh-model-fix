@@ -1,13 +1,13 @@
 import { PLUGIN_NAME } from '@/shared/constants'
 
-/** 卡片样式层：内嵌样式表 + 幂等注入 + 两处展示数值；色值只用 --dsw-alias-* 令牌，字面量仅作令牌缺失时的浅色守卫。 */
+/** 卡片样式层：内嵌样式表 + 幂等注入 + 两处展示数值。 */
 
 /** 说明气泡宽度上限（px），按瓦片列宽收窄以免宿主 Tooltip 的半视口默认值盖住开关区 */
 export const TIP_MAX_WIDTH = 300
 
 const STYLE_ID = 'dsh-model-fix-card-css'
 
-/** 内嵌样式表（dsh-mf- 前缀防撞）。取值逐条照官方同类组件：外层卡＝宿主「设置 → 插件 → 内置插件」的插件卡，内层瓦片＝「插件列表」的插件行卡；基准取旧版宿主管感，仅瓦片底色与折叠钮焦点环两处例外照现行值，逐条出处见 docs/ui-fusion.md。官方源码引用但主题未定义的令牌（label-error、bg-layer-4）禁止照抄 */
+/** 内嵌样式表（dsh-mf- 前缀防撞）。取值基准与「禁止照抄的令牌」见 docs/ui-fusion.md「色值与取值基准」。 */
 const STYLE_TEXT = [
     // 外壳逐字照官方插件卡 .card（不写 max-width，宽度由所在 section 约束，官方同样不写）
     '.dsh-mf-card{list-style:none;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:16px;background:var(--dsw-alias-bg-layer-3,#fff);transition:border-color .16s, background .16s}',

@@ -133,7 +133,7 @@ function indexFromCatalog(catalog: Catalog): IndexedCatalog {
             if (record.contextWindow !== undefined) entry.contextWindow = record.contextWindow
             if (record.maxTokens !== undefined) entry.maxTokens = record.maxTokens
             if (record.image) entry.image = true
-            // 匹配键必须归一：目录 id 保留原始大小写，匹配只在小写空间进行（口径见 docs/decisions.md「参数来源」）
+            // 匹配键必须归一：目录 id 保留原始大小写，匹配只在小写空间进行（口径见 docs/decisions-config.md「参数来源」）
             const key = normalizeId(id)
             ids.push(key)
             if (!byId.has(key)) byId.set(key, entry)

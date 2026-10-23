@@ -1,6 +1,6 @@
 /** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报；
  * 验证与探测档位的进度各开一条 `connection.fetch` exact 路由。
- * 路由自注册而非宿主 `connection.rpc.handle`（后者在 connection 服务 ctx 上求值 `owner.webServer`，而 connection 不再注入它必抛，详见 docs/decisions.md「写回端点」） */
+ * 路由自注册而非宿主 `connection.rpc.handle` 的原因见 docs/decisions-config.md「写回端点」 */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/dsh-client-connection'

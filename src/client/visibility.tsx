@@ -1,5 +1,5 @@
 /** 「UI 与行为」组（`behavior`）的执行面：把四个可隐匿部件按开关做**真正的挂载 / 卸载**。
- * 必须是装卸而非组件内显隐：宿主 tab 头按**注册账本**画出，组件返回 `null` 只会让内容空掉、tab 头照旧，撤销注册才是让部件从宿主账本里消失的唯一途径（见 docs/decisions.md「宿主与卡片」）。
+ * 必须是装卸而非组件内显隐：宿主 tab 头按**注册账本**画出，组件返回 `null` 只会让内容空掉、tab 头照旧，撤销注册才是让部件从宿主账本里消失的唯一途径（见 docs/decisions-ui.md「卡片与编排」）。
  * 编排单位是部件：`conversation.input.left` 贡献两条（模型优化 / 跟随状态灯），list 席位按 `id` 记账、id 不同可并存 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

@@ -1,6 +1,6 @@
 # 工作流：命令、工具链陷阱与测试规范
 
-本文记「怎么跑、怎么验」。代码结构与跨半纪律见 [`architecture.md`](architecture.md)，宿主行为依据见 [`host-api.md`](host-api.md)，本文不重复。
+代码结构见 `architecture.md`，测试涉及的宿主面见 `docs/host/`。
 
 ## 命令
 

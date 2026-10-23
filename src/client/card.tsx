@@ -1,7 +1,7 @@
 /** 模型参数填充卡片（浏览器半）：复刻官方插件卡的可折叠卡片。六处挂载点（四个席位 + 输入框 / 悬浮按钮两处弹层）共用同一外壳，差异只有折叠态策略与是否允许折叠。
  * 本文件只做**卡片外壳的编排**：草稿与保存、三个写回动作、四层二次确认、瓦片与 footer 渲染；诊断两条链在 `card-verify.ts` / `card-probe.ts`，弹层外壳在 `diagnose-dialog.tsx`，记录区文案层在 `card-records.ts`。
  * 展开体为六张瓦片（顺序由 TILE_ORDER 单一分发），瓦片手风琴：默认收起、同时只开一个。编辑只改本地草稿，「保存」才经 settings scope 原子写当前版本快照键（efforts 取写入当刻实时值，卡片不拥有该字段）。
- * 样式数值见 `card-styles.ts`。行为细节见 docs/decisions.md「宿主与卡片」 */
+ * 样式数值见 `card-styles.ts`。行为细节见 docs/decisions-ui.md「卡片与编排」 */
 
 import { useLayoutEffect, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 // primitives 由宿主模块表注入

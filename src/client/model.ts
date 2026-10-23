@@ -53,7 +53,7 @@ export function followingActive(flags: Flags, hostEnabled: boolean | undefined):
     return groupValue(flags, 'userExperience', 'followParent') && !hostEnabled
 }
 
-/** 组总控的当前显示值：组内全为开才显示开，部分选中显示关，点击即整组补全为开（口径见 docs/decisions.md「宿主与卡片」） */
+/** 组总控的当前显示值：组内全为开才显示开，部分选中显示关，点击即整组补全为开（口径见 docs/decisions-ui.md「卡片与编排」） */
 export function masterValue(flags: Flags, group: Group): boolean {
     return GROUP_KEYS[group].every((key) => groupValue(flags, group, key))
 }

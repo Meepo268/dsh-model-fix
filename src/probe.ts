@@ -1,7 +1,7 @@
 /**
  * 「探测档位」的 Node 半执行器：把候选档位**临时预声明**进模型配置 → 逐档各发一次最小请求 →
  * 按结论**收敛**成最终档位表并写回。全过程只由用户主动发起，在途全程持有事件流守卫。
- * 设计裁决见 docs/decisions.md「探测档位」。
+ * 设计裁决见 docs/decisions-diagnose.md「探测」。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -49,7 +49,7 @@ const runProbeGroup: GroupRunner = async (
         // 中止没有结论：不入明细也不发帧，不能进补全与剔除的输入
         if (verdict.outcome === 'aborted') continue
         if (verdict.outcome === 'usable') usable.add(probe.model)
-        // 判「档位不被支持」：宿主判「参数不正确」且该模型已有更低档跑通（无基线，拿已跑通档顶替，见 docs/decisions.md「探测档位」）
+        // 判「档位不被支持」：宿主判「参数不正确」且该模型已有更低档跑通（无基线，拿已跑通档顶替，见 docs/decisions-diagnose.md「探测」）
         const outcome = probe.effort !== undefined && usable.has(probe.model) && isEffortRejection(verdict.failure)
             ? 'unsupported-effort'
             : verdict.outcome
@@ -67,7 +67,7 @@ const runProbeGroup: GroupRunner = async (
             blockedBy = blockReason
             skipped = group.probes.length - index - 1
         } else if (shouldSkipModelTail(outcome, verdict.failure) || outcome === 'rate-limit') {
-            // 限流是本功能自有的追加判据（超时不算），见 docs/decisions.md「探测档位」
+            // 限流是本功能自有的追加判据（超时不算），见 docs/decisions-diagnose.md「探测」
             skipped = sameModelTail(group.probes, index)
         }
         if (skipped > 0) index += skipped
@@ -190,7 +190,7 @@ function count(target: Map<string, number>, key: string): void {
 /**
  * 跑一轮探测档位：预声明 → 逐档探测 → 收敛写回 → 发终帧。
  * 两个开关随载荷走（与模型清单同为浏览器半的声明，入参校验一处收口）。
- * 事件流守卫**全程持有**（预声明到收敛不放开），否则中途改配置会触发 `fix` 还原预声明、后续请求被宿主拒。见 docs/decisions.md「探测档位」。
+ * 事件流守卫**全程持有**（预声明到收敛不放开），否则中途改配置会触发 `fix` 还原预声明、后续请求被宿主拒。见 docs/decisions-diagnose.md「探测」。
  */
 export async function probeAndFill(
     ctx: Context,
@@ -231,7 +231,7 @@ export async function probeAndFill(
             }
             await convergeProbeEfforts(ctx, restore, preexisting)
         }
-        // 收敛已落盘即撤掉兜底备份；撤不掉只告警，不报成失败（见 docs/decisions.md「探测档位」）
+        // 收敛已落盘即撤掉兜底备份；撤不掉只告警，不报成失败（见 docs/decisions-diagnose.md「探测」）
         await clearProbeBackup(ctx).catch((error: unknown) => {
             ctx.logger.warn(`${PLUGIN_NAME}: 探测兜底备份清理失败（下次启动会回退本轮补全）：${errorText(error)}`)
         })

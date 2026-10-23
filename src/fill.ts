@@ -1,5 +1,5 @@
 /** 探测档位的两步写回：把候选档位临时预声明进模型配置，探测跑完再按结论收敛成最终形态。
- * 裁决见 docs/decisions.md「探测档位」。`targetKey` 用 JSON.stringify([provider, model]) 序列化（模型 id 可含 '/'，字符串拼接会歧义） */
+ * 裁决见 docs/decisions-diagnose.md「探测」。`targetKey` 用 JSON.stringify([provider, model]) 序列化（模型 id 可含 '/'，字符串拼接会歧义） */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import { EFFORT_LEVELS } from '@/shared/constants'

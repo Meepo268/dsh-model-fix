@@ -45,7 +45,7 @@ export function planResetModels(config: PluginConfig, providers: Record<string, 
     return { modelOps, changed }
 }
 
-/** 重置全部推理级别（仅剔除 `reasoningEfforts`，配置段与其余字段原样保留，见 docs/decisions.md「写回端点」）；
+/** 重置全部推理级别（仅剔除 `reasoningEfforts`，配置段与其余字段原样保留，见 docs/decisions-config.md「写回端点」）；
  * 全程持事件流守卫，写回触发的事件被入口拦下不会反向填充；返回受影响模型数，写失败先告警再抛出 */
 export async function resetModels(ctx: Context): Promise<number> {
     const { changed } = await guardedWritebackApi(ctx, {

@@ -1,5 +1,5 @@
 /** 浏览器半入口（dsh.client 声明的 web 侧 cordis 插件）。宿主 settings 面为 ctx.configForms，经 makeScope 包装后供卡片与记忆监听消费。
- * 六个席位一律经 `ctx.slots.inject` 注册：向未声明的 slot 直接 register 会抛 `slot "..." is not declared`，且该抛错发生在 fiber 启动期、连累同一 fiber 里后续的全部注册（见 docs/decisions.md「宿主与卡片」）。
+ * 六个席位一律经 `ctx.slots.inject` 注册的原因见 docs/decisions-ui.md「卡片与编排」。
  * 其中两席（插件详情页 / 组件实例页）在此直接注册；另三个 slot 承载的四个部件受「UI 与行为」组支配，由 visibility.tsx 编排挂载与卸载；末席 `settings.launcher` 由 classic-setting.tsx 遮蔽宿主账号入口 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -57,7 +57,7 @@ export function apply(ctx: ClientContext): void {
     })
 }
 
-/** 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。`ctx` 是子 fiber 的 ctx（`apply` 里那个 `ctx.inject` 的 child）：注册一律挂它，子 fiber 卸载即级联撤销；挂父 ctx 则卸载不清理、重建时重复注册（理由见 docs/decisions.md「宿主与卡片」）。 */
+/** 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。`ctx` 是子 fiber 的 ctx：注册一律挂它，子 fiber 卸载即级联撤销（理由见 docs/decisions-ui.md「卡片与编排」）。 */
 function boot(
     ctx: ClientContext,
     scope: DecodedScope<Flags>,
