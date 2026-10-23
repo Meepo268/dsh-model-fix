@@ -42,7 +42,7 @@ const STYLE_TEXT = [
     '.dsh-mf-itemToggle{position:absolute;inset:0;padding:0;border:none;border-radius:14px;background:none;cursor:pointer}',
     // 整行折叠钮照官方 .cardContent:focus-visible 补环；offset -2px 画行内缘，不被瓦片 overflow:hidden 裁剪
     '.dsh-mf-itemToggle:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,rgb(65,118,230)));outline-offset:-2px}',
-    // 标题偏离官方省略号截断（用户裁定）：两列窄栅格里 nowrap+ellipsis 会砍掉组名，改为 overflow-wrap:anywhere 换行
+    // 标题偏离官方省略号截断（用户裁定）：窄栅格里 nowrap+ellipsis 会砍掉组名，改 overflow-wrap:anywhere 换行
     '.dsh-mf-itemTitle{min-width:0;overflow-wrap:anywhere;font-size:14px;line-height:20px;font-weight:600}',
     '.dsh-mf-itemTrailing{position:relative;z-index:1;display:inline-flex;flex:none;align-items:center;gap:7px;pointer-events:none;color:var(--dsw-alias-label-tertiary,#81858c)}',
     '.dsh-mf-itemSwitch{pointer-events:auto}',
@@ -109,12 +109,12 @@ const STYLE_TEXT = [
     '.dsh-mf-confirmDanger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger,rgba(236,19,19,.05))}',
     // 验证弹层逐条照官方 models 页候选框（fetchDialog / candidate* 类）；宿主滚动条变量无浅色真值，按官方原样透传
     '.dsh-mf-verifyDialog{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);max-width:520px}',
-    // 宿主 .body 无 gap 且 flex 内 margin 不折叠（紧挨两段 margin 直接相加），故正文各段 margin 归零、段距统一收在本容器 gap:12px 一处
+    // 宿主 .body 无 gap 且 flex 内 margin 不折叠，故正文各段 margin 归零、段距统一收在本容器 gap:12px 一处
     '.dsh-mf-verifyBody{display:flex;flex-direction:column;gap:12px}',
-    // 选项卡条照官方插件视图选项卡（.tabs/.tab），下划线指示条压在分隔线上；面板只取官方 min-width:0（不取其 padding-top:2px，段距由 verifyBody 的 gap 给）
+    // 选项卡条照官方插件视图选项卡（.tabs/.tab），下划线指示条压在分隔线上；面板只取官方 min-width:0（段距由 verifyBody 的 gap 给）
     '.dsh-mf-verifyTabs{border-bottom:.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));align-items:flex-end;gap:22px;margin-top:2px;display:flex}',
     '.dsh-mf-verifyTabsRow{display:flex;align-items:center}',
-    // margin-left:auto 放在组上（放单个键上会把行间空白均分到键间）
+    // margin-left:auto 放组上：放单个键上会把行间空白均分到键间
     '.dsh-mf-verifyTools{display:flex;gap:8px;margin-left:auto}',
     '.dsh-mf-verifyTab{color:var(--dsw-alias-label-tertiary,#81858c);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}',
     '.dsh-mf-verifyTab:hover,.dsh-mf-verifyTab[data-active="true"]{color:var(--dsw-alias-label-primary,#0f1115)}',
@@ -125,7 +125,7 @@ const STYLE_TEXT = [
     '.dsh-mf-verifyList{display:flex;flex-direction:column;max-height:240px;margin:0;padding:0;list-style:none;overflow-y:auto}',
     // 验证弹层比宿主默认 380px 宽一档（模型 id 带斜杠，窄框会折行与开关挤在一起）；本插件 <style> 后于宿主样式表注入，同优先级下覆盖宿主 .dialog 的 width
     '.dsh-mf-verifyDialog{width:min(560px,100%)}',
-    // 提供方分组头（官方候选框无分组，此处自加一行标题标明归属）：排布照官方 candidateToolbar，纵向内边距与候选行同档
+    // 提供方分组头（官方候选框无分组，此处自加一行标题）：排布照官方 candidateToolbar，纵向内边距与候选行同档
     '.dsh-mf-verifyGroup{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-tertiary,#81858c)}',
     '.dsh-mf-verifyGroupAll{margin-left:auto}',
     '.dsh-mf-verifyRow{border-radius:var(--dsw-radius-md,12px)}',
@@ -142,17 +142,16 @@ const STYLE_TEXT = [
     // warn 语义键：卡片 footer 触发键与弹层确认键共用，仅换 warn 令牌描边/字色；hover 用 10% 稀释（宿主无 warn 悬停底令牌）；叠加 .dsh-mf-discard 时靠 :not(:disabled) 特异性压过默认
     '.dsh-mf-warn:not(:disabled){border-color:var(--dsw-alias-state-warn-label,#dd8629);color:var(--dsw-alias-state-warn-label,#dd8629)}',
     '.dsh-mf-warn:hover:not(:disabled){background:color-mix(in srgb, var(--dsw-alias-state-warn-label,#dd8629) 10%, transparent)}',
-    // 弹层面板：宽度与 flex 参与复刻宿主 SettingsRoot.module.css `.panel`；高度由内容撑开、640px 封顶（min 保留窄视口收敛，calc 分支给顶栏留与 .root padding 同的上下气），超封顶在包裹层滚动
+    // 弹层面板：宽度与 flex 参与复刻宿主 SettingsRoot.module.css `.panel`；高度由内容撑开、640px 封顶，超封顶在包裹层滚动
     // flex:none：Modal .root 是 align-items:center 的 flex 容器，不加则按内容高度参与对齐、面板不居中
-    // Modal 走 headless（卡片直接作 children，宿主标题栏/关闭钮/content/body 一律不渲染），故 .dialog 的 padding:0 0 24px 与 gap:20px 在此清空（原为 chrome 而设）
+    // Modal 走 headless（宿主标题栏/关闭钮/content/body 一律不渲染），故 .dialog 的 padding 与 gap 在此清空（原为 chrome 而设）
     // 底色/圆角/阴影取 .panel 令牌：bg-layer-2 与 .card 的 bg-layer-3 分层，容器本身可见，点中容器即不再误落到遮罩
     '.dsh-mf-composerDialog{flex:none;display:flex;flex-direction:column;width:800px;max-height:min(640px,calc(100vh - 2 * max(24px,var(--dsh-frame-overlay-top,24px))));max-width:calc(100vw - 48px);padding:0;gap:0;overflow:hidden;border-radius:var(--dsw-radius-panel);background:var(--dsw-alias-bg-layer-2);box-shadow:var(--dsw-elevation-prominent);--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2)}',
     // 滚动容器是包裹层：面板顶到 max-height 时，卡片溢出在此滚动
     '.dsh-mf-composerBody{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}',
-    // 面板内的卡片去掉自身描边与底色，透出面板的 --dsw-alias-bg-layer-2，
-    // 与设置面板的内容列同观感（那边 .nav/.content 亦无 own fill，面板底色透出）
+    // 面板内的卡片去掉自身描边与底色，透出面板的 --dsw-alias-bg-layer-2（与设置面板的内容列同观感）
     '.dsh-mf-composerBody>.dsh-mf-card{border-color:transparent;background:transparent}',
-    // 输入框工具行 chip（conversation.input.left）：几何复刻宿主 PlanModeControl `.chip`（对称 padding 0 8px、min-width 34px）；配色按语义分档，各态见下方逐条注释
+    // 输入框工具行 chip：几何复刻宿主 PlanModeControl `.chip`（对称 padding 0 8px、min-width 34px）；配色按语义分档
     '.dsh-mf-composerChip{display:inline-flex;align-items:center;gap:4px;min-width:34px;height:28px;padding:0 8px;border:none;border-radius:var(--dsw-radius-sm);font-size:13px;font-weight:500;line-height:20px;cursor:pointer}',
     '.dsh-mf-composerChip:focus-visible{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline:none}',
     '.dsh-mf-composerChip:disabled{cursor:default;opacity:.6}',

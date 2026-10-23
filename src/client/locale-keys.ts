@@ -4,10 +4,8 @@
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { Group, RowKey } from '@/client/model'
 
-/** 卡片词典命名空间 */
 export const CARD_NS = 'settings.modelFix'
 
-/** 卡片文案键集合 */
 export type CardKey =
     | 'title'
     | 'tabLabel'

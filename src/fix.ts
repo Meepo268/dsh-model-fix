@@ -29,7 +29,7 @@ interface FillPlan {
 
 /** 纯计划函数（零 ctx、可单测）：遍历提供方算出模型参数 op 与路由 compat op；`excludes` 命中者在入口整条跳过；`efforts` 记忆不在本文件处理。
  * `looseMatch` 开启时把尽量匹配开关传给 lookup（歧义/无命中的兜底合成，见 lookup.ts） */
-export function planFill(
+function planFill(
     cfg: PluginConfig,
     providers: Record<string, unknown>,
     indexed: IndexedCatalog,

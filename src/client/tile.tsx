@@ -23,9 +23,7 @@ const PILL_THRESHOLD = 5
 
 /** 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），排在组内真键之前——它是回入口。不绑任何配置键，故不进 `GROUP_KEYS`，组总控、草稿、脏检测都看不见它 */
 interface LockedRow {
-    /** 行标签文案键 */
     label: CardKey
-    /** 说明气泡文案键 */
     tip: CardKey
 }
 

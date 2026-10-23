@@ -34,7 +34,6 @@ export function parseClientRequest(value: unknown): { rpcId: string; method: str
     return { rpcId, method, payload }
 }
 
-/** 构造服务端响应信封 */
 export function serverResponse(rpcId: string, result: ConnectionRpcResult<unknown>): Record<string, unknown> {
     return { type: 'server-response', rpcId, result }
 }

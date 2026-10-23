@@ -2,12 +2,9 @@
 
 import type { ReactNode } from 'react'
 
-/** 一枚按钮的可变属性 */
-export interface FloatingButtonState {
+interface FloatingButtonState {
     icon: ReactNode
-    /** 提示文案 */
     title: string
-    /** 是否渲染 */
     active: boolean
     onClick: () => void
 }

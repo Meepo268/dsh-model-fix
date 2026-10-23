@@ -29,7 +29,7 @@ const STYLE_TEXT = [
 ].join('\n')
 
 /** 调用顺序 = 渲染顺序 */
-export interface FloatingButtonGroup {
+interface FloatingButtonGroup {
     addButton(button: FloatingButton): void
 }
 

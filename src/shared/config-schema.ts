@@ -1,12 +1,5 @@
-/**
- * 当前版本（v8）配置形态的完整定义与解析/物化（跨半共享、零 Node 依赖）：
- * 版本常量、键前缀、最低支持版本、旧快照上限、各组键名清单、默认值、解析函数、存储物化函数的单一入口，
- * 浏览器半 `decodeSection` 与 Node 半 `resolveConfig`/`migrateConfig`/`upgradeConfig` 共用。
- *
- * 解析约定：整项缺失落默认；非对象、字段非布尔判非法（返回 undefined）；
- * excludes 缺失落空数组、非数组或元素非字符串判非法；efforts 宽松解析（结构不符回落 {}）；
- * 产物只含当前 schema 的已知键，缺省容器均为新对象/新数组。
- */
+/** 当前版本（v8）配置形态的完整定义与解析/物化（跨半共享、零 Node 依赖）：版本常量、键前缀、最低支持版本、各组键名清单、默认值、解析函数、存储物化函数的单一入口，浏览器半 `decodeSection` 与 Node 半 `resolveConfig`/`migrateConfig`/`upgradeConfig` 共用。
+ * 解析约定：整项缺失落默认；非对象、字段非布尔判非法（返回 undefined）；excludes 缺失落空数组、非数组或元素非字符串判非法；efforts 宽松解析（结构不符回落 {}）；产物只含当前 schema 的已知键。 */
 
 import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, PluginConfig, PluginConfigSnapshot, UserExperienceRules } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
@@ -39,10 +32,7 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
     looseMatch: false,
 }
 
-/**
- * behavior 组默认值（整组缺失或字段缺失落此）
- * 全开是唯一与「装本插件但看不见任何 UI」相容的缺省；缺段的老快照落此即保持既有观感（见 docs/versioning.md）。
- */
+/** behavior 组默认值（整组缺失或字段缺失落此）。全开是唯一与「装本插件但看不见任何 UI」相容的缺省（见 docs/versioning.md）。 */
 const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showInModels: true,
     showInBuiltinPlugins: true,
@@ -70,7 +60,6 @@ export const FIELD_KEYS = ['reasoning', 'context', 'image'] as const
 /** 兼容性规则键（compat 组的行）；新增 compat 键在此追加 */
 export const COMPAT_KEYS = ['disableDeveloper', 'disableStore'] as const
 
-/** 用户体验组的行键；新增行键在此追加 */
 export const USER_EXPERIENCE_KEYS = [
     'rememberEfforts',
     'defaultHigh',

@@ -19,13 +19,9 @@ import type { DecodedScope } from '@/client/scope'
 import { createFloatingButton } from '@/client/floating-button'
 import type { FloatingButton } from '@/client/floating-button'
 
-/** 宿主会话页签条的稳定锚点 */
 const CONVERSATION_TABS_SELECTOR = '[data-conversation-tabs]'
-/** 宿主页签按钮 */
 const CONVERSATION_TAB_SELECTOR = 'button[role="tab"]'
-/** 宿主 per-session conversation store 的 localStorage key 前缀 */
 const CONVERSATION_STORE_KEY = 'dsh.conversation'
-/** 宿主 view id：对话页签 */
 const CHAT_VIEW_ID = 'chat'
 
 /** 子智能体目录投影的最小面（宿主 subagent 包的类型面会把 Node 侧 session 增补带进来，故复制契约） */

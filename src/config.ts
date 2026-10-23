@@ -25,7 +25,6 @@ export function setConfigSource(current: () => PluginConfig): void {
     configSource = current
 }
 
-/** 当前生效配置 */
 export function getConfig(): PluginConfig {
     return configSource()
 }

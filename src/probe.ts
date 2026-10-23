@@ -177,14 +177,12 @@ function finalLevels(
     return EFFORT_LEVELS.filter((level) => kept.has(level))
 }
 
-/** 往「模型 → 集合」里加一项 */
 function collect(target: Map<string, Set<string>>, key: string, value: string): void {
     const set = target.get(key)
     if (set === undefined) target.set(key, new Set([value]))
     else set.add(value)
 }
 
-/** 往「模型 → 条数」里加一 */
 function count(target: Map<string, number>, key: string): void {
     target.set(key, (target.get(key) ?? 0) + 1)
 }

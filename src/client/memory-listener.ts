@@ -57,7 +57,6 @@ export function applyEffortMemoryListener(ctx: ClientContext, scope: DecodedScop
             }
             const tracked = new Map<SessionId, Tracked>()
 
-            /** 处理一次投影变化 */
             function handleProjection(id: SessionId, entry: Tracked, next: ModelSelection | null): void {
                 // 守卫：跳过本次自动设置反向触发的投影变化（避免重复保存）
                 if (entry.pendingAutoSet !== null) {

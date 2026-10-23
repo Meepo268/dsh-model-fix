@@ -12,10 +12,8 @@ import { descriptorOf, sectionOf } from '@/section'
 import { upgradeConfig } from '@/upgrade'
 import { errorText, isSettingsConflict } from '@/shared/errors'
 
-/**
- * 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。
- * 旧版本「升上来」交给 `src/upgrade.ts` 的冻结台阶链（选迁移源时调它）；落盘口都在 `CURRENT_KEY`，物化用 `toStored`。
- */
+/** 自有配置段（`version-N` 快照映射）的当前版本侧：启动迁移、旧快照清理与 onChange 自愈。
+ * 旧版本「升上来」交给 `src/upgrade.ts` 的冻结台阶链（选迁移源时调它）；落盘口都在 `CURRENT_KEY`，物化用 `toStored`。 */
 
 /** 全新用户的规范默认快照（与升级链对空输入的结果一致，由 test 守护） */
 export const DEFAULT_STORED: PluginConfigSnapshot = toStored(DEFAULT_CONFIG)
@@ -34,11 +32,7 @@ function collectVersions(section: VersionedSection | undefined): number[] {
     return [...versions].sort((a, b) => a - b)
 }
 
-/**
- * 两阶段清理旧快照（versions 升序）：低于 MIN_SUPPORTED_VERSION 的不读不处理；
- * 低于当前版本且超出 MAX_OLD_SNAPSHOTS 上限的从最低起淘汰；等于或高于当前版本的始终保留（高版本供回退后无损读取）。
- * 参数默认取当前常量，测试可覆写。
- */
+/** 两阶段清理旧快照（versions 升序）：低于 MIN_SUPPORTED_VERSION 的不读不处理；低于当前版本且超出 MAX_OLD_SNAPSHOTS 上限的从最低起淘汰；等于或高于当前版本的始终保留（高版本供回退后无损读取）。参数默认取当前常量，测试可覆写。 */
 export function pruneOps(
     versions: number[],
     configVersion: number = CONFIG_VERSION,

@@ -1,6 +1,4 @@
-/** 跨半共享的类型声明与纯类型守卫（零 Node 依赖、零 schemastery、零非基线 `@deepseek-ai/*`）。两半均直连本层（统一经 `@/shared/types` 别名导入）。
- * Node 专属类型（`ModelEntry` / `CacheRecord` / 冻结历史 v7 / `isCapacity` 等）留在 `src/types.ts`。
- * 宿主类型面一律 type-only 导入 devDep 的宿主包（构建期擦除），不在本仓另行声明 */
+/** 跨半共享的类型声明与纯类型守卫（零 Node 依赖、零 schemastery、零非基线 `@deepseek-ai/*`）。Node 专属类型留在 `src/types.ts`；宿主类型面一律 type-only 导入 devDep，不在本仓另行声明 */
 
 /** 判断是否为普通数据对象（非数组、非 null、非类实例） */
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -16,7 +14,6 @@ export function providersOf(user: unknown): Record<string, unknown> | undefined 
     return isPlainObject(providers) ? providers : undefined
 }
 
-/** 按字段分别控制的规则开关 */
 export interface FieldRules {
     reasoning: boolean
     /** 上下文窗口与输出上限，二者一体受此开关控制 */
@@ -27,9 +24,9 @@ export interface FieldRules {
 
 /** 兼容性规则：每条对应宿主 provider 路由 compat 下的一个字段。组内新增键向后兼容，不递增 CONFIG_VERSION（见 docs/versioning.md） */
 export interface CompatRules {
-    /** 为 true 时给该 provider 路由写 `compat.supportsDeveloperRole: false`（禁用 developer 角色，退回旧版 system 角色）；为 false 时移除该字段（而非保留不管）；仅作用于 `api === 'openai-completions'` 的路由，只写路由级 */
+    /** 为 true 时给该 provider 路由写 `compat.supportsDeveloperRole: false`（禁用 developer 角色，退回旧版 system 角色）；为 false 时移除该字段。仅作用于 `api === 'openai-completions'` 的路由，只写路由级 */
     disableDeveloper: boolean
-    /** 为 true 时给该 provider 路由写 `compat.supportsStore: false`，使请求体不含 `store` 键；为 false 时移除该字段。宿主在该字段为 true 时仍发 `store: false`，故本开关去掉的是键本身而非取值——不识 `store` 的端点（LiteLLM 一类）拒的是键。与 disableDeveloper 同协议、同为把宿主乐观默认翻成保守，仅作用于 `api === 'openai-completions'` 的路由，只写路由级 */
+    /** 为 true 时给该 provider 路由写 `compat.supportsStore: false`，使请求体不含 `store` 键；为 false 时移除该字段。不识 `store` 的端点（LiteLLM 一类）拒的是键本身而非取值。与 disableDeveloper 同协议、同为把宿主乐观默认翻成保守，只写路由级 */
     disableStore: boolean
 }
 
@@ -41,13 +38,13 @@ export interface UserExperienceRules {
     defaultHigh: boolean
     /** 模型/提供方被删除时随之忘记该模型的推理级别记忆：开启时按宿主全量模型列表剪枝（`src/memory.ts`，列表里不再存在的条目删除、目录读失败的保留）。默认 true，口径见 docs/decisions.md「推理级别记忆」 */
     forgetRemoved: boolean
-    /** 子智能体跟随父 Agent：为 true 时，宿主「允许 Agent 为子智能体选择模型」关闭着的组合里，委派出去的子 Agent 每次请求整条沿用父 Agent 当前生效的提供方 + 模型 + 推理级别（而非建子那一刻的快照）。默认 false */
+    /** 子智能体跟随父 Agent：宿主「允许 Agent 为子智能体选择模型」关闭着的组合里，委派出去的子 Agent 每次请求整条沿用父 Agent 当前生效的提供方 + 模型 + 推理级别。默认 false */
     followParent: boolean
-    /** 让 AI 自主调节推理档位：为 true 时向宿主注入两枚工具（查询当前模型可用档位 / 设置档位，与 UI 模型选择器同一入口）及一段系统提示词，由 AI 按任务难度自行决定何时切换、切到哪个档位；为 false 时卸载全部注入。默认 false */
+    /** 让 AI 自主调节推理档位：向宿主注入两枚工具（查询可用档位 / 设置档位，与 UI 模型选择器同一入口）及一段系统提示词，由 AI 按任务难度自行决定何时切换、切到哪个档位；为 false 时卸载全部注入。默认 false */
     selfTune: boolean
-    /** 隐藏官方 API：为 true 时，名单内（见 `src/official-filter.ts`）未配置密钥的官方提供方在 UI 模型选择列表里不显示（拦截 `ctx.llm.listModels` 返回空，宿主把模型数为 0 的组滤掉）。判定与「设置→模型」小红点同口径。默认 true */
+    /** 隐藏官方 API：名单内（见 `src/official-filter.ts`）未配置密钥的官方提供方在 UI 模型选择列表里不显示。判定与「设置→模型」小红点同口径。默认 true */
     hideOfficial: boolean
-    /** 本地化推理级别名：为 true 时把推理档位显示名换成中文——档位名由宿主适配器按档位 id 现算并随模型信息下发，本插件在 Node 半遮蔽 `ctx.llm.resolveModelInfo` 换名（见 `src/effort-name.ts`），UI 菜单与 AI 的 list-models 工具同受影响。只换显示名，档位 id 与 `defaultEffort` 原样保留（它们是发往模型的线上值）。默认 true */
+    /** 本地化推理级别名：把推理档位显示名换成中文——档位名由宿主适配器按档位 id 现算，本插件在 Node 半遮蔽 `ctx.llm.resolveModelInfo` 换名（见 `src/effort-name.ts`），UI 菜单与 AI 的 list-models 工具同受影响。只换显示名，档位 id 与 `defaultEffort` 原样保留。默认 true */
     localizeEfforts: boolean
     /** 同时显示原档位名：为 true 时，本地化推理级别开启后把中文与英文原档位一起显示（`中文名 · 原档位`，如 `最大 · Max`）；关闭则只显示中文。默认 true */
     showOriginalEfforts: boolean
@@ -76,7 +73,6 @@ export interface BehaviorRules {
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */
 export type EffortMemory = Record<string, Record<string, string>>
 
-/** 当前运行时配置（仅对象写法） */
 export interface PluginConfig {
     /** 开启后以 models.dev 最新数据为准更新已有配置 */
     allowUpdate: FieldRules
@@ -84,7 +80,7 @@ export interface PluginConfig {
     autoFill: FieldRules
     /** 兼容性规则，作用于 provider 路由的 compat（与模型参数填充无关，不受 allowUpdate/autoFill 影响） */
     compat: CompatRules
-    /** 排除的提供方 id：命中的提供方本插件不做任何操作（填充、覆盖、compat 增删、强制更新一律跳过），等效于对该提供方关闭插件。语义是预防性的：只影响本值生效之后的行为，此前已写入的模型参数与路由 compat 一律保留、不撤销（插件无字段来源记录，无从区分插件写入与用户手写） */
+    /** 排除的提供方 id：命中的提供方本插件不做任何操作（填充、覆盖、compat 增删、强制更新一律跳过）。语义是预防性的：只影响本值生效之后的行为，此前已写入的模型参数与路由 compat 一律保留 */
     excludes: string[]
     /** 每模型推理级别记忆：provider → model → 级别。运行时记忆而非用户配置，结构非法时解析侧宽松回落 {}（不让记忆坏值连累配置自愈重写丢配置） */
     efforts: EffortMemory

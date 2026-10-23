@@ -1,7 +1,7 @@
 /** 本地化推理级别的 Node 半：开关开时把 `resolveModelInfo` 返回里的档位显示名换中文，可选追加原名（`showOriginalEfforts`）。
- * 遮 `resolveModelInfo` 一处即全链覆盖（UI 菜单/触发器标题/subagent list-models 都取这个名字，与 official-filter 同形态）。
+ * 遮 `resolveModelInfo` 一处即全链覆盖（UI 菜单 / 触发器标题 / subagent list-models 都取这个名字）。
  * 语言三路回退：宿主 settings `locale.preference` → 浏览器半 RPC 上报 → `en`。
- * 只换 `efforts[].name`：`id` 与 `defaultEffort` 原样（后者是档位 id，宿主校验它落在 `efforts[].id` 集合内，翻译即破坏校验与线上值，见 docs/decisions.md「宿主与卡片」） */
+ * 只换 `efforts[].name`：`id` 与 `defaultEffort` 原样（它们是发往模型的线上值，宿主校验 `defaultEffort` 落在 `efforts[].id` 集合内）。 */
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 // ctx.settings 服务面声明合并（type-only；settings 是宿主基础服务，装载即在）

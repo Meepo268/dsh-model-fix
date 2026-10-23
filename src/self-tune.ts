@@ -1,8 +1,6 @@
 /**
- * 推理档位自调（Node 半）：按 `userExperience.selfTune` 开关向宿主注入两枚工具与一段系统提示词，
- * 让 AI 按任务难度自主调节当前会话的推理档位。
- * 设置走 UI 同款入口 `sessionController.selectModel`（宿主校验并落事件），查询走 `llm.resolveModelInfo`；
- * 档位值一律用 `efforts[].id` 的实际值。工具失败原样透传宿主文案，不分类不改写。理由见 docs/decisions.md「档位自调」。
+ * 推理档位自调（Node 半）：按 `userExperience.selfTune` 开关向宿主注入两枚工具与一段系统提示词，让 AI 按任务难度自主调节当前会话的推理档位。
+ * 设置走 UI 同款入口 `sessionController.selectModel`，查询走 `llm.resolveModelInfo`；档位值一律用 `efforts[].id` 的实际值。理由见 docs/decisions.md「档位自调」。
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -10,10 +8,7 @@ import { getConfig } from '@/config'
 import { errorText } from '@/shared/errors'
 import { PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
 
-/**
- * 本模块用到的宿主契约（工具注册、系统提示词、会话控制器与投影服务的只读面）**均按契约复制，不引宿主包类型**：
- * `dsh-tools` 的类型面会把包根类型拉进 typecheck 程序、顶掉浏览器半的 `ISessions` 增补（同 `src/subagent.ts` 的裁决，见 docs/host-api.md）。
- */
+/** 本模块用到的宿主契约（工具注册、系统提示词、会话控制器与投影服务的只读面）**均按契约复制，不引宿主包类型**：`dsh-tools` 的类型面会把包根类型拉进 typecheck 程序、顶掉浏览器半的 `ISessions` 增补（同 `src/subagent.ts` 的裁决，见 docs/host-api.md）。 */
 
 /** 宿主 `Agent` 的只读面（工具执行上下文里的调用方；同 `src/subagent.ts` 的 `SubagentHost` 裁决） */
 interface ToolAgent {

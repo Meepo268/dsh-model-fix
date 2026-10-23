@@ -178,7 +178,6 @@ async function withConfig(selfTune: boolean, body: () => Promise<void> | void): 
     }
 }
 
-/** exec 桩 */
 function execOf(agent: AgentStub | undefined): { signal: AbortSignal; agent?: AgentStub } {
     return { signal: new AbortController().signal, ...(agent === undefined ? {} : { agent }) }
 }

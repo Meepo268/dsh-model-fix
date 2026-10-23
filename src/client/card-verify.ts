@@ -12,7 +12,7 @@ import type { CardBusy } from '@/client/card-notice'
 import { terminalLabelsOf, verifyLineOf } from '@/client/card-records'
 
 /** hook 入参：busy 属于卡片层，验证自身零持有 */
-export interface VerifyRunOptions {
+interface VerifyRunOptions {
     t: TranslateNS<'settings.modelFix'>
     /** 卡片的全局占用态：发起前置位、收尾清空，与其余写操作互斥 */
     busy: CardBusy

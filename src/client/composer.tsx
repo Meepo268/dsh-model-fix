@@ -1,7 +1,7 @@
 /** 输入框工具行（conversation.input.left）的两枚 chip，各占一个席位条目：
  * · 「模型优化」（`ComposerEntry`）—— 常驻弱化态入口，点开弹层面板（宿主 Modal 的 headless 形态）
  * · 「跟随」状态灯（`FollowLamp`）—— 随 `followingActive(flags, hostEnabled)` 在亮绿/浅灰间切换；点击即 toggle 开关，写入失败时保持原态 + 琥珀色 + 宿主 Tooltip 提示原因
- * 宿主 list 席位按 `id` 记账（`id` 不同可并存），故两枚 chip 各注册一条、各受自己的 `behavior` 开关支配。渲染点只有一个（`InputBar` 一次画出全部条目）。配色/几何语义见 card-styles.ts */
+ * 宿主 list 席位按 `id` 记账（`id` 不同可并存），故两枚 chip 各注册一条、各受自己的 `behavior` 开关支配。配色/几何语义见 card-styles.ts */
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -20,7 +20,7 @@ type ChipState = 'muted' | 'off' | 'on' | 'fail'
 /** 宿主 subagent-model-selection-settings 段名（字面量与 host-api.md 登记一致） */
 export const HOST_MODEL_SELECTION_NS = 'subagent-model-selection-settings'
 
-/** decode：只读 enabled 一个布尔值。段读不到（CLI/TUI 组合、或宿主未装配那段）、非对象、enabled 不是 true → 一律视为「未开启」。不碰 allowedModels 与 current()——不在浏览器半复刻宿主那段「enabled + 空授权表抛错」的逻辑（Node 半 subagent.ts 里有 try/catch 兜底） */
+/** decode：只读 enabled 一个布尔值。段读不到（CLI/TUI 组合、或宿主未装配那段）、非对象、enabled 不是 true → 一律视为「未开启」。不碰 allowedModels 与 current()——不在浏览器半复刻宿主那段「enabled + 空授权表抛错」的逻辑（Node 半 `src/subagent.ts` 里有 try/catch 兜底） */
 export function decodeHostModelSelection(raw: unknown): HostModelSelectionView {
     return { enabled: raw !== null && typeof raw === 'object' && (raw as { enabled?: unknown }).enabled === true }
 }
@@ -31,7 +31,7 @@ export interface ComposerProps {
     hostModelScope: DecodedScope<HostModelSelectionView>
     /** 宿主 llm-pi-ai 命名空间：只给弹层内的 Card 消费（与其余席同一份） */
     providersScope: DecodedScope<readonly unknown[]>
-    /** 卡片入参（复用 Card 的 RpcCarrier 部分，不包含 t/scope/providersScope——这三个由插槽 t 与闭包 scope/providersScope 提供） */
+    /** 卡片入参（复用 Card 的 RpcCarrier 部分，t/scope/providersScope 由插槽 t 与闭包 scope 提供） */
     cardProps: Omit<CardProps, 't' | 'scope' | 'providersScope'>
 }
 

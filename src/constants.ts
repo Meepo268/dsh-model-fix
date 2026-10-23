@@ -9,9 +9,8 @@ export { MAX_ATTEMPTS }
 export const CAPACITY_UNLIMITED = 99_999_999
 
 export const API_URL = 'https://models.dev/api.json'
-/** 拉取超时（毫秒） */
 export const FETCH_MS = 10_000
-/** 拉取与缓存写入失败后的固定重试间隔（毫秒） */
+/** 拉取与缓存写入失败后的固定重试间隔 */
 export const RETRY_DELAY_MS = 5_000
 /** 事件驱动刷新的最小间隔（毫秒）：距上次成功拉取不足该时长时，事件只填充不重新拉取 */
 export const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -19,7 +18,7 @@ export const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
 /** 缓存文件路径（基于模块路径定位，public/ 经构建平铺复制到 lib/ 根；网络拉取成功后覆盖） */
 export const CACHE_FILE = join(dirname(fileURLToPath(import.meta.url)), 'models-cache.json')
 
-/** 推理级别取值集合，与 harness 的 ModelThinkingLevel 一致（有序表在跨半共享层，两半同源） */
+/** 推理级别取值集合（有序表在跨半共享层，两半同源） */
 export const LEVELS: ReadonlySet<string> = new Set(EFFORT_LEVELS)
 
 /** compat 组开关共同管辖的协议：只作用于 OpenAI Chat Completions 风格路由；宿主只在 `openai-completions` offer 这两个字段，其余协议的写入被宿主按协议 gate 静默跳过 */

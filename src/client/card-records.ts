@@ -7,7 +7,7 @@ import { isProviderBlocking } from '@/shared/verify-progress'
 import type { ProbeOutcome, VerifyProbedFrame } from '@/shared/verify-progress'
 
 /** 宿主 TerminalBlock 展示文案（该包无语言回退，经 t() 提供）；宿主 0.2.1-alpha.2 起新增必填字段 commandLine 而 devDep 未跟上，并入期望类型以避开 excess-property，见 docs/host-api.md */
-export type TerminalLabels = TerminalBlockLabels & { commandLine: (line: number) => string }
+type TerminalLabels = TerminalBlockLabels & { commandLine: (line: number) => string }
 
 export function terminalLabelsOf(t: TranslateNS<'settings.modelFix'>): TerminalLabels {
     return {

@@ -57,8 +57,7 @@ export function apply(ctx: ClientContext): void {
     })
 }
 
-/** 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。
- * `ctx` 是子 fiber 的 ctx（`apply` 里那个 `ctx.inject` 的 child）：注册一律挂它，子 fiber 卸载即级联撤销；挂父 ctx 则卸载不清理、重建时重复注册（理由见 docs/decisions.md「宿主与卡片」） */
+/** 编排体：词典注册、调用面接线、席位注册、记忆监听子 fiber。`ctx` 是子 fiber 的 ctx（`apply` 里那个 `ctx.inject` 的 child）：注册一律挂它，子 fiber 卸载即级联撤销；挂父 ctx 则卸载不清理、重建时重复注册（理由见 docs/decisions.md「宿主与卡片」）。 */
 function boot(
     ctx: ClientContext,
     scope: DecodedScope<Flags>,

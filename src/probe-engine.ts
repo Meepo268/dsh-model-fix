@@ -1,7 +1,4 @@
-/**
- * 最小请求的执行引擎：验证（每模型一次不带档位的请求）与探测档位（逐档请求）共用。
- * 设计裁决见 docs/decisions.md「验证」与「探测档位」。
- */
+/** 最小请求的执行引擎：验证（每模型一次不带档位的请求）与探测档位（逐档请求）共用。设计裁决见 docs/decisions.md「验证」与「探测档位」。 */
 
 import type { LlmRuntime, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 // LlmFailure 定义在 types 子路径（包根只 import 未再导出）；仅取类型，擦除后不落运行期依赖
@@ -15,10 +12,8 @@ import { classifyFailure, type ProbeVerdict } from '@/probe-verdict'
 const PROBE_PROMPT = 'Just say OK'
 /** 单次探测的等待上限（毫秒）：超时视为本次没跑成，防个别端点把整批拖死 */
 const PROBE_TIMEOUT_MS = 30_000
-/**
- * 软超时后的宽限（毫秒）：软超时只发中止信号、等适配器收尾并回报真实失败事实，宽限期满即硬兜底。
- * 兜底与「读流」赛跑，适配器即使忽略 `signal`，probeOnce 也必然返回（见 docs/decisions.md「验证」）。
- */
+/** 软超时后的宽限（毫秒）：软超时只发中止信号、等适配器收尾并回报真实失败事实，宽限期满即硬兜底。
+ * 兜底与「读流」赛跑，适配器即使忽略 `signal`，probeOnce 也必然返回（见 docs/decisions.md「验证」）。 */
 const PROBE_TIMEOUT_GRACE_MS = 3_000
 /** 同时在跑的**提供方**数（单提供方并发恒为 1，由分组串行保证） */
 const PROBE_PROVIDER_CONCURRENCY = 5
@@ -28,14 +23,10 @@ function failureFacts(failure: LlmFailure): VerifyFailureFacts {
     return { code: failure.code, status: failure.status, message: failure.message }
 }
 
-/**
- * 发一次探测并判定：收到首个 `block-start` 即判「受支持」；否则读到终止块、据其失败事实分类。
- * 中止（外部或上游）没有结论，单列 `'aborted'`；我方超时归 `'timeout'`。
- * 到点必然返回，不依赖适配器配合：宽限期满即不再调用 `next()`。见 docs/decisions.md「验证」。
- *
+/** 发一次探测并判定：收到首个 `block-start` 即判「受支持」；否则读到终止块、据其失败事实分类。
+ * 中止（外部或上游）没有结论，单列 `'aborted'`；我方超时归 `'timeout'`。到点必然返回，不依赖适配器配合（见 docs/decisions.md「验证」）。
  * @param timeoutMs 软超时（毫秒）：到点只发中止信号、不判结论；仅测试传更小的值
- * @param graceMs 软超时后的宽限（毫秒）：期满即硬兜底返回；仅测试为缩短等待而传
- */
+ * @param graceMs 宽限（毫秒）：期满即硬兜底返回；仅测试为缩短等待而传 */
 export async function probeOnce(
     llm: Pick<LlmRuntime, 'stream'>,
     probe: Pick<VerifyProbe, 'provider' | 'model' | 'effort'>,
@@ -62,7 +53,7 @@ export async function probeOnce(
         signal: AbortSignal.any([signal, controller.signal]),
     })[Symbol.asyncIterator]()
     try {
-        // 只认 block-start（证明适配器已开始产出内容块）：额度耗尽的 key 也会先来一条 usage（实测踩过，见 docs/decisions.md「验证」）
+        // 只认 block-start（证明适配器已开始产出内容块）：额度耗尽的 key 也会先来一条 usage
         while (true) {
             const step = await Promise.race([iterator.next(), giveUp])
             if (step === 'give-up') {
@@ -130,7 +121,6 @@ export type GroupRunner = (
     emitProbe: ProbeEmitter,
 ) => Promise<ProviderProbeOutcome>
 
-/** 一轮请求的可选控制项；不传即静默跑完 */
 export interface ProbeRunOptions {
     /** 外部中止：客户端断开或用户点停止 / 关窗。已中止即不再发新请求 */
     signal?: AbortSignal

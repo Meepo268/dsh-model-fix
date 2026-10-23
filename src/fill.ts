@@ -53,7 +53,7 @@ function declaredLevelsOf(value: unknown): readonly string[] {
     return EFFORT_LEVELS.filter((level) => keys.has(level))
 }
 
-/** 按档位表物化 `reasoningEfforts` 取值：七档内键由 `levels` 决定（已有键保留原取值——用户 wire 拼写属配置，如 `xhigh:'ultra'`、off 的 `none`/`off`；新补档取档位名本身，off 无既有拼写时取 null），不在 levels 里的剔除；七档外键原样保留（手改残留，宿主忽略，静默删除违背自定义字段保留纪律） */
+/** 按档位表物化 `reasoningEfforts` 取值：七档内键由 `levels` 决定（已有键保留原取值——用户 wire 拼写属配置，如 `xhigh:'ultra'`、off 的 `none`/`off`；新补档取档位名本身，off 无既有拼写时取 null），不在 levels 里的剔除；七档外键原样保留（手改残留，宿主忽略） */
 function effortsValueOf(levels: readonly string[], existing?: Record<string, unknown>): Record<string, string | null> {
     const value: Record<string, string | null> = {}
     if (existing !== undefined) {
@@ -69,9 +69,9 @@ function effortsValueOf(levels: readonly string[], existing?: Record<string, unk
 }
 
 /** 档位表改写计划（纯函数、可单测）：按 provider/model 整段设成 `levels`，其余字段原样保留；仅某 provider 至少改写一个模型时才整段重建（零变更零 op）。
- * 范围只由 `entries` 决定（发跑时冻结的候选清单，预声明与收敛覆盖同一批目标）；遍历当次现读的 `providers`，entries 里已删目标自然不命中、不产 op（而非写出失败）。
- * 目标档位表为空或只剩 off 即整个 `reasoningEfforts` 键删掉（两者等同未声明）：路径 op 不支持数组下标中间段，只能整段 set，空壳留着会反复触发写入判定；空壳字段一律走 `stripEmptyFields`，不另写判据。
- * 两套口径各按各的基线：`modelOps` 按当前值与目标表比对（只有真要改才产 op，收敛阶段与预声明一致时零写入）；`models`/`added`/`removed` 按 `baseline`（探测档位传的是预声明之前的档位表，统计对齐用户视角——临时预声明的档位被收回时既不算新增也不算删除，故「七档全可用」时收敛零写入但统计仍报「补了 7 个」） */
+ * 范围只由 `entries` 决定（发跑时冻结的候选清单，预声明与收敛覆盖同一批目标）；遍历当次现读的 `providers`，entries 里已删目标自然不命中、不产 op。
+ * 目标档位表为空或只剩 off 即整个 `reasoningEfforts` 键删掉（两者等同未声明）：路径 op 不支持数组下标中间段，只能整段 set，空壳留着会反复触发写入判定。
+ * 两套口径各按各的基线：`modelOps` 按当前值与目标表比对（只有真要改才产 op）；`models`/`added`/`removed` 按 `baseline`（探测档位传预声明之前的档位表，统计对齐用户视角——临时预声明的档位被收回时既不算新增也不算删除） */
 export function planEffortApply(
     providers: Record<string, unknown>,
     entries: readonly EffortApply[],
@@ -148,8 +148,8 @@ export async function declareProbeEfforts(
         return planEffortApply(
             providers,
             targets.map((target) => {
-                // 按 EFFORT_LEVELS 排序写入（不按「原有在前」）：键序是用户会看见的，预声明也不能让档位表显得杂乱；收敛按同一口径比对，键序不一致会误判成有变更
-                // off 不补：未声明 off 的模型不替它猜——"能通"不等于"能关"
+                // 按 EFFORT_LEVELS 排序写入（不按「原有在前」）：键序是用户会看见的，收敛按同一口径比对，键序不一致会误判成有变更
+                // off 不补：未声明 off 的模型不替它猜——「能通」不等于「能关」
                 const pre = preexisting.get(targetKey(target.provider, target.model)) ?? []
                 const merged = new Set([...pre, ...EFFORT_LEVELS.filter((level) => level !== 'off')])
                 return { ...target, levels: EFFORT_LEVELS.filter((level) => merged.has(level)) }

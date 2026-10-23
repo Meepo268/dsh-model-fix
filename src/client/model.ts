@@ -1,19 +1,14 @@
-/** 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（五组布尔 + excludes 列表）。
- * 跨半共享的常量、类型、解析函数单一来源在 `src/shared/`（经 client 纯度门禁放行，不引 Node 专属值）。
- * 本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生、验证与探测候选的拍取与目标收敛 */
+/** 浏览器半纯映射层：`tikaflow-model-fix` 版本快照段 <-> 卡片配置（五组布尔 + excludes 列表）。跨半共享的常量、类型、解析函数单一来源在 `src/shared/`；本文件只保留 UI 层：组的行键表与渲染顺序、快照↔配置的 UI 派生、验证与探测候选的拍取与目标收敛。 */
 
 import type { PluginConfig } from '@/shared/types'
 import { isPlainObject, providersOf } from '@/shared/types'
 import { EFFORT_LEVELS } from '@/shared/constants'
 import { CONFIG_VERSION, DEFAULT_CONFIG, FIELD_KEYS, COMPAT_KEYS, USER_EXPERIENCE_KEYS, BEHAVIOR_KEYS, parseSnapshot, versionKey } from '@/shared/config-schema'
 
-/** 版本快照键 */
 export const VERSION_KEY = versionKey(CONFIG_VERSION)
 
-/** 瓦片对应的配置组：两个填充列 + 兼容性组 + UI 可见性组 + 用户体验组 */
 export type Group = 'autoFill' | 'allowUpdate' | 'compat' | 'behavior' | 'userExperience'
 
-/** 各组行键表（渲染顺序与总控共用） */
 export const GROUP_KEYS: Record<Group, readonly RowKey[]> = {
     autoFill: FIELD_KEYS,
     allowUpdate: FIELD_KEYS,
@@ -48,13 +43,12 @@ function rowsOf(flags: Flags, group: Group): Record<string, boolean> {
     return flags[group] as unknown as Record<string, boolean>
 }
 
-/** 单格取值 */
 export function groupValue(flags: Flags, group: Group, key: RowKey): boolean {
     return rowsOf(flags, group)[key] === true
 }
 
-/** 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启（宿主那段开启时路由由模型自挑，跟随会推翻其合法选择，此时「跟随中」灯呈灰态）。
- * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启（缺席 ≠ 显式开启，与 Node 半 `subagent.ts` 的 try/catch 口径一致） */
+/** 跟随**实际生效**的判据：插件开关开着且宿主「允许 Agent 为子智能体选择模型」那段设置未开启（宿主那段开启时路由由模型自挑，跟随会推翻其合法选择）。
+ * `hostEnabled` 由浏览器半读宿主 `subagent-model-selection-settings` 段得出；段读不到记 `undefined`＝视为未开启（与 Node 半 `subagent.ts` 的 try/catch 口径一致） */
 export function followingActive(flags: Flags, hostEnabled: boolean | undefined): boolean {
     return groupValue(flags, 'userExperience', 'followParent') && !hostEnabled
 }
@@ -78,7 +72,7 @@ export function toggleCell(flags: Flags, group: Group, key: RowKey): Flags {
     return { ...flags, [group]: rows } as Flags
 }
 
-/** 排除列表逐项比较（顺序敏感）：草稿只由已存值经增删派生，顺序不会自行漂移，故无需排序——插入顺序是用户意图的一部分 */
+/** 排除列表逐项比较（顺序敏感）：草稿只由已存值经增删派生，顺序不会自行漂移；插入顺序是用户意图的一部分 */
 function sameIdList(a: readonly string[], b: readonly string[]): boolean {
     if (a.length !== b.length) return false
     return a.every((id, index) => id === b[index])
@@ -94,7 +88,7 @@ export function isDirty(draft: Flags, saved: Flags): boolean {
     return !sameIdList(draft.excludes, saved.excludes)
 }
 
-/** 从 `llm-pi-ai` 的 user 层取提供方 id（与 Node 半 fix 遍历的 `descriptor.user.providers` 同一事实源，故「命中」判定与本插件真实会跳过的集合零漂移）；非纯对象、无 providers 或 providers 非纯对象一律视为空 */
+/** 从 `llm-pi-ai` 的 user 层取提供方 id（与 Node 半 fix 遍历的 `descriptor.user.providers` 同一事实源，故「命中」判定与本插件真实会跳过的集合零漂移）；非纯对象、无 providers 一律视为空 */
 export function providerIdsOf(user: unknown): string[] {
     return Object.keys(providersOf(user) ?? {})
 }

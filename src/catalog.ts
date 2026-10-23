@@ -13,12 +13,10 @@ const EMPTY_INDEX: IndexedCatalog = { catalog: {}, groups: new Map(), endpoints:
 
 let indexedCache: IndexedCatalog | undefined
 
-/** 当前目录（未初始化时返回空兜底） */
 export function getCatalog(): IndexedCatalog {
     return indexedCache ?? EMPTY_INDEX
 }
 
-/** 整体替换内存索引 */
 export function setCatalog(indexed: IndexedCatalog): void {
     indexedCache = indexed
 }

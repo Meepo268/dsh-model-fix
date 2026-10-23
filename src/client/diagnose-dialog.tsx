@@ -49,7 +49,7 @@ interface DiagnoseDialogProps {
     picked: ReadonlySet<string>
     onTogglePick: (key: string) => void
     onToggleGroup: (models: readonly VerifyCandidate[]) => void
-    /** 选项卡行右侧小键（数组序渲染） */
+    /** 数组序渲染 */
     tools?: readonly DiagnoseTool[]
     /** 插槽：渲染在整个选项卡容器（页签条 + 两面板）之下（探测的开关组用） */
     extras?: React.ReactNode

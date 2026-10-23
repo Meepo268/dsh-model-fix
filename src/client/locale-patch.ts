@@ -1,6 +1,6 @@
 /** 宿主词典运行时 patch：开关开时把宿主 model 命名空间 zh 词典里的 `effort.providerDefault` 词条从 'Default' 改成 '默认'（`showOriginalEfforts` 开着则改成 '默认 · Default'）。
- * Default 是宿主 ModelSelect.tsx 自己合成的伪菜单项，取的是浏览器半 locale 服务的词条、不是数据层，Node 半遮蔽 `resolveModelInfo` 碰不到；宿主 LocaleRuntime 的 `register` 禁止同 ns+locale 重复注册，故只能直接 mutate 已注册词典对象里的词条值，再手动调 publish bump revision 让缓存失效、outlet 重渲染（宿主私接面见 docs/host-api.md）。
- * 三态与 Node 半 `localizeEffortNames` 同一形态（见 docs/decisions.md「宿主与卡片」）。卸载时恢复原状、再 publish 一次 */
+ * Default 是宿主 ModelSelect.tsx 自合成的伪菜单项，取的是浏览器半 locale 服务的词条、不是数据层，Node 半遮蔽碰不到；宿主 `register` 禁止同 ns+locale 重复注册，故只能直接 mutate 已注册词典对象再手动 `publish` bump revision（私接面见 docs/host-api.md）。
+ * 三态与 Node 半 `localizeEffortNames` 同一形态。卸载时恢复原状、再 publish 一次 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // ctx.locale 服务面（LocaleRuntime）——这里故意不 import 它的类型，避免触发 private 守卫

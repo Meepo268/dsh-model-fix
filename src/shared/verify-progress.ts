@@ -1,8 +1,4 @@
-/**
- * 「验证模型」与「探测档位」共用的跨半契约：探测明细、逐提供方汇报、进度帧。
- * 放共享层是供浏览器半解析结果与帧（浏览器半不能反向 import Node 半）。
- * 只有类型与纯谓词，零 Node 依赖；两个功能共用同一份形状，分岔只在 Node 半的执行器。
- */
+/** 「验证模型」与「探测档位」共用的跨半契约：探测明细、逐提供方汇报、进度帧。放共享层是供浏览器半解析结果与帧（浏览器半不能反向 import Node 半）；只有类型与纯谓词，零 Node 依赖。 */
 
 import { isPlainObject } from '@/shared/types'
 
@@ -51,10 +47,7 @@ export interface VerifyFailureFacts {
     message: string
 }
 
-/**
- * 单条探测明细：一个「提供方 / 模型 / 推理级别」及其结论，调用方可据此做后续操作，不必再回解析统计值。
- * 只含实际发出的探测；被短路掉的从未发出——哪几条没跑由逐提供方的 `planned` 与 `probed` 之差给出（短路以整组为单位）。
- */
+/** 单条探测明细：一个「提供方 / 模型 / 推理级别」及其结论。只含实际发出的探测；被短路掉的从未发出——哪几条没跑由逐提供方的 `planned` 与 `probed` 之差给出（短路以整组为单位）。 */
 export interface VerifyProbeResult {
     provider: string
     model: string
@@ -79,7 +72,6 @@ export interface ProviderProbeOutcome {
     tested: number
 }
 
-/** 单个提供方的验证结论（逐提供方可见） */
 export interface VerifyProviderReport {
     provider: string
     /** 端点可达：全程未出现传输层失败 */
@@ -105,31 +97,22 @@ export interface VerifyProviderReport {
     probed: number
 }
 
-/**
- * 一个「提供方 / 模型」下的某推理级别被判为**不被支持**。
- * 只收明确判为不支持的；超时、限流、额度耗尽、不可达都只是没验成，不在此列（判据见 docs/decisions.md「验证」）。
- */
+/** 一个「提供方 / 模型」下的某推理级别被判为**不被支持**。只收明确判为不支持的；超时、限流、额度耗尽、不可达都只是没验成，不在此列（判据见 docs/decisions.md「验证」）。 */
 export interface UnsupportedEffort {
     provider: string
     model: string
     effort: string
 }
 
-/**
- * 一个「提供方 / 模型」下的某推理级别被判为**确实可用**（收到 `block-start`）；探测档位据此写回配置。
- * 只收带档位的条目：不带档位的请求验的是模型本身。
- */
+/** 一个「提供方 / 模型」下的某推理级别被判为**确实可用**（收到 `block-start`）；探测档位据此写回配置。只收带档位的条目：不带档位的请求验的是模型本身。 */
 export interface UsableEffort {
     provider: string
     model: string
     effort: string
 }
 
-/**
- * 探测档位「收敛写回」的结果（相对本轮开始前的配置）：浏览器半直接拿去显示。
- * 三个数字都以本轮开始前的档位表为基线，而非临时预声明表（预声明只为让请求出得去，不是用户配置的一部分）。
- */
-export interface ProbeFillResult {
+/** 探测档位「收敛写回」的结果（相对本轮开始前的配置）：三个数字都以本轮开始前的档位表为基线，而非临时预声明表（预声明只为让请求出得去，不是用户配置的一部分）。 */
+interface ProbeFillResult {
     /** 实际改写了档位表的模型数 */
     models: number
     /** 新增的档位条数（原来没声明、这轮验出能用） */
@@ -171,17 +154,11 @@ export interface VerifySummary {
     probed: number
 }
 
-/**
- * 一次验证运行的进度帧判别联合：先唯一一条 `opened`，随后每完成一条探测发一条 `probed`，最后唯一一条终帧（`done` 或 `failed`）。
- * 中途被中止（停止 / 关窗 / 断连）时**不发终帧**——消费方据「流结束却无终帧」得知这轮没跑完。
- */
+/** 一次验证运行的进度帧判别联合：先唯一一条 `opened`，随后每完成一条探测发一条 `probed`，最后唯一一条终帧（`done` 或 `failed`）。中途被中止（停止 / 关窗 / 断连）时**不发终帧**——消费方据「流结束却无终帧」得知这轮没跑完。 */
 export type VerifyProgressFrame =
     /** 开流即发的第一条：让 UI 知道总共几项 */
     | { type: 'opened'; total: number }
-    /**
-     * 一条探测出结果。`total` 是计划条目数，`done` 是已了结的条目数（被短路未发出的计入），故 `done ≤ total`。
-     * `skipped` 在该结论短路了后续请求时出现，值为未发出的条数；`effort` 缺省即不带档位的模型级结论。
-     */
+    /** 一条探测出结果。`total` 是计划条目数，`done` 是已了结的条目数（被短路未发出的计入），故 `done ≤ total`；`skipped` 在该结论短路了后续请求时出现，值为未发出的条数；`effort` 缺省即不带档位的模型级结论 */
     | {
         type: 'probed'
         provider: string
@@ -211,10 +188,7 @@ export function encodeProgressFrame(frame: VerifyProgressFrame): string {
     return `${DATA_PREFIX}${JSON.stringify(frame)}\n\n`
 }
 
-/**
- * 解析一条 `data: ` 行；SSE 注释帧（`: …` 心跳）与非法 JSON 返回 undefined，调用方跳过即可。
- * 逐字段做形状校验（而非 `JSON.parse` 了事）：这条流的 `done.summary` 直接驱动卡片统计。
- */
+/** 解析一条 `data: ` 行；SSE 注释帧（心跳）与非法 JSON 返回 undefined，调用方跳过即可。逐字段做形状校验（而非 `JSON.parse` 了事）：这条流的 `done.summary` 直接驱动卡片统计。 */
 export function decodeProgressFrame(line: string): VerifyProgressFrame | undefined {
     if (!line.startsWith(DATA_PREFIX)) return undefined
     try {
