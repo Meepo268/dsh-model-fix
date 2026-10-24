@@ -48,5 +48,6 @@
 - Node 半 `export const inject = ['settings','llm','credentials']`；`configForms` 只作子 fiber 标记（不进父级 inject）；`connection` / `webServer` 在 `src/rpc.ts` 子 fiber 内声明。
 - **子 fiber 卸载不清理父 ctx 上的注册**（`_unload` 只清自身 disposables）：一次性注册（`locale.register`、slot 注册）必须挂会随重建而卸载的那个 fiber，否则第二次注册抛 `already has locale`。取服务不受限（属性读沿父链上溯）。
 - **遮蔽 `ctx.llm` 上的方法在 HMR 重载后会套第二层**：重载整函数重跑，服务属性不随 fiber 卸载复原 ⇒ 遮蔽层各带一枚 `Symbol.for` 品牌标记作幂等（`official-filter` 遮 `listModels`、`effort-name` 遮 `resolveModelInfo`）；卸载一律不动服务上的属性——链式遮蔽下动属性会抹掉别人的遮蔽。
+- **`pluginPackages` 是宿主私有服务面**（CLI 启动链注册、早于一切插件装载）：`packageOf(specifier, parentURL)` 定位包并读其 `package.json`，`parentURL` 取 `ctx.baseUrl ?? import.meta.url`。本仓只用它读宿主版本，改名即降级为「版本未知」。
 - **宿主 `ObservableSnapshot.subscribe` 一律不推首值** ⇒ 所有订阅后必须手动补跑一次（含 `ctx.locale.subscribe`、`sessions.retainInfo.subscribe`）。
 - 浏览器半样式经模块级幂等 `<style>` 注入并带 `data-plugin` 标记供宿主 HMR 认领；`ctx.locale.register` 重复注册抛错，disposer 必须经 `ctx.effect` 挂。

@@ -42,7 +42,7 @@
 
 - **`TerminalBlockLabels` 自 `0.2.1-alpha.2` 起新增必填 `commandLine`**；devDep 停在 `0.1.7-rc.2` 编译面看不到，故 `terminalLabelsOf` 以 `TerminalBlockLabels & { commandLine }` 声明（避开 excess-property 报错、保住其余字段必填），多余字段在 `0.1.7-rc.2` 上被静默忽略。
 
-## 按契约复制、不引宿主包的四处
+## 按契约复制、不引宿主包的五处
 
 冲突根源一致：`@deepseek-ai/dsh-session` 包根对 `Context.sessions` 的声明合并与 `@deepseek-ai/dsh-api-session-controller/client` 冲突，会把浏览器半 `ctx.sessions` 的 `ISessions` 退化成 Node 侧 `SessionStore`。下列宿主包只要出现在 `src/` 的 type-only 导入里就触发（`test/` 未触发但不可依赖）。
 
@@ -51,6 +51,7 @@
 | `src/subagent.ts` | `dsh-agent`、`dsh-tool-subagent/model-selection-settings` | `SubagentHost` / `HostSelectionService` / `SubagentRequestListener` |
 | `src/client/back-to-chat.tsx` | `dsh-client-ui-workspace`、`dsh-subagent` | `UiWorkspaceNav`（只取 `openSession(sessionId: SessionId)`） |
 | `src/self-tune.ts` | `dsh-tools`、`dsh-system-prompt` | `HostToolsService` / `HostSystemPromptService` / `HostSessionController` / `HostSessionProjections` |
+| `src/host-version.ts` | `dsh-app-boot` 的 `pluginPackages` 服务面 | `HostPluginPackages`（只取 `packageOf` 的 `version`）；该包只服务 CLI 启动、传递依赖大，故不装 devDep |
 | `src/client/classic-setting.tsx` | `dsh-client-ui-layout` | `selectPanel` 最小面 |
 
 ⇒ `package.json` 不列这些包。升宿主时若该合并冲突已解，可改回直接导入并删本地复制。

@@ -9,6 +9,7 @@ import { errorText } from '@/shared/errors'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
 import { getConfig } from '@/config'
+import { hostHidesOfficialNow } from '@/host-version'
 
 /** 要按密钥配置情况隐藏的官方提供方名单（后续扩充只改这里） */
 const HIDDEN_OFFICIAL_PROVIDERS: readonly string[] = ['deepseek-official']
@@ -66,8 +67,10 @@ interface HiddenLayer {
 
 /** 装上官方提供方过滤：把 `ctx.llm` 的 `listModels` 遮成「命中隐藏即返回空清单」的一层。
  * 链式遮蔽是特性（卸载不动服务上的属性——后装插件记住的 original 正是我们的 wrapped，动属性会抹掉别人的遮蔽）；
- * wrapped 捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫；HMR 重载整函数重跑，靠品牌标记幂等。理由见 docs/decisions-ui.md「卡片与编排」 */
+ * wrapped 捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫；HMR 重载整函数重跑，靠品牌标记幂等。理由见 docs/decisions-ui.md「卡片与编排」。
+ * 宿主已自带同一行为时直接返回，不装遮蔽层 */
 export function installOfficialFilter(ctx: Context): void {
+    if (hostHidesOfficialNow(ctx)) return
     const llm = ctx.llm
     const original = llm.listModels
     if (HIDDEN_LAYER in original) return

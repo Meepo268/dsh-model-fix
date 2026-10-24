@@ -22,6 +22,8 @@ UI 数值的唯一出处是 `src/client/card-styles.ts`；宿主契约见 `docs/
 - **名单只放 `deepseek-official`**：`deepseek-account` 段无 `apiKeyEnv`，判定会回退同名常量误隐藏可用账号组。
 - **不挂任何事件、判定逐次现算**：遮蔽处是全部消费者共用，缓存会让「刚翻转开关 / 刚配密钥」与旧结论不一致。
 - **卸载只清状态位，不 `delete` 属性、不写回原函数**：遮蔽是链式的，动属性会抹掉别人的遮蔽。
+- **宿主自 `0.2.1-alpha.2` 起自带同一行为 ⇒ 本层不装**：宿主 `discoverModels` 在 `MISSING_CREDENTIAL` 时返回空清单，目录滤空组即消失。判据 `hostHidesOfficialSince`；**版本未知按不空转处理**。
+- **空转期 Pill 追加「DSH 已自带」尾注**：只改释义文案，开关语义与可见性不变。
 
 ## 本地化推理级别
 

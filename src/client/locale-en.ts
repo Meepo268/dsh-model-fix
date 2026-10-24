@@ -42,6 +42,7 @@ export const en: Record<CardKey, string> = {
     tipFollowParent: 'Takes effect while the host setting "Allow agents to pick a model for subagents" is off: a subagent follows the parent agent\'s provider, model and reasoning level in real time.',
     tipSelfTuneEffort: 'When enabled, the AI decides on its own when to switch and which effort to use, by task difficulty.',
     tipHideOfficial: 'When the official API has no API key configured, it does not show up in model selection.',
+    tipHideOfficialHostBuiltIn: 'DSH already does this',
     tipLocalizeEfforts: 'Reasoning efforts show Chinese names; display only — the effort value sent to the model is unchanged.',
     tipShowOriginalEfforts: 'When localized reasoning effort is enabled, also show the original English effort name for easy cross-reference.',
     tipLooseMatch: 'When exact matching fails, similar entries are collected and parameters are filled from them — it does its best to produce a set of values, but accuracy is not guaranteed.',

@@ -46,6 +46,7 @@ export type CardKey =
     | 'tipFollowParent'
     | 'tipSelfTuneEffort'
     | 'tipHideOfficial'
+    | 'tipHideOfficialHostBuiltIn'
     | 'tipLocalizeEfforts'
     | 'tipShowOriginalEfforts'
     | 'tipLooseMatch'

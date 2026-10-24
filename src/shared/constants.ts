@@ -48,6 +48,9 @@ export const ENDPOINT_RESTORE_MODELS = 'restoreModels'
 /** 浏览器半启动时上报探测语言的 endpoint 名（Node 侧没有 locale 服务） */
 export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
 
+/** 宿主自此版本起自带「未配置密钥的官方提供方自动隐藏」；≥ 此值时本插件的「隐藏官方API」空转 */
+export const HOST_AUTO_HIDE_SINCE = '0.2.1-alpha.2'
+
 /** settings 写回冲突与语言上报共用的重试次数（跨半共享）。值变更须同步两端 */
 export const MAX_ATTEMPTS = 3
 

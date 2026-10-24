@@ -42,6 +42,7 @@ export const zh: Record<CardKey, string> = {
     tipFollowParent: '未开启「允许 Agent 为子智能体选择模型」时生效：子智能体的提供方、模型与推理级别照实时跟随父智能体。',
     tipSelfTuneEffort: '开启后 AI 可根据任务难度自行决定切换时机与档位。',
     tipHideOfficial: '当官方API未配置密钥时，在模型选择时不显示',
+    tipHideOfficialHostBuiltIn: 'DSH 已自带',
     tipLocalizeEfforts: '推理级别显示中文名称（关、高 等）；仅换显示名，发给模型的档位值不变。',
     tipShowOriginalEfforts: '当本地化推理级别开启时，同时显示原档位名，方便对照每个中文具体对应哪个档位。',
     tipLooseMatch: '在精确匹配失败时，收集相似条目合成参数填充，尽量给出一组参数，但不保证准确。',

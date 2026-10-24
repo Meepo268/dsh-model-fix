@@ -35,7 +35,8 @@
 | `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点（channel 自注册） |
 | `src/rpc-route.ts` | RPC 信封解码与路由分发 |
 | `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
-| `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单 |
+| `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单；宿主已自带时整层不装 |
+| `src/host-version.ts` | 宿主版本判据（Node 半）：经 `pluginPackages` 读宿主版本 |
 | `src/effort-name.ts` | 档位名本地化：遮蔽 `resolveModelInfo`，按开关 + 界面语言换显示名 |
 | `src/subagent.ts` | 「跟随父智能体」：`agent/request` 瀑布最外层改写路由 |
 | `src/self-tune.ts` | 「自主调节档位」：装/卸两枚工具与一段系统提示词 |
@@ -52,6 +53,7 @@
 | `src/shared/errors.ts` | `errorText` 与 `isSettingsConflict`（两半写回重试共用） |
 | `src/shared/config-schema.ts` | 当前版本 schema、默认值、键清单、解析与存储物化 |
 | `src/shared/types.ts` | 跨半类型声明与纯类型守卫（含各规则组行键表） |
+| `src/shared/version.ts` | 宿主版本比较与「宿主是否已自带隐藏」判据 |
 | `src/shared/verify-progress.ts` | 探测/验证的进度帧契约与逐字段解码 |
 
 ### 浏览器半（`src/client/`）
@@ -77,6 +79,7 @@
 | `src/client/memory-listener.ts` | 记忆存取监听（换模型恢复、换级别写回 + 自动设置） |
 | `src/client/rpc-carrier.ts` | 浏览器半调 Node 半的唯一出口 |
 | `src/client/effort-name.ts` | 浏览器界面语言上报（补 Node 侧探测盲区） |
+| `src/client/host-version.ts` | 宿主版本判据（浏览器半）：读 `__DSH_BOOT__.release.version` |
 | `src/client/locale-patch.ts` | 宿主 model NS 词典的 Default 词条本地化 |
 | `src/client/locale-keys.ts` | 卡片文案键契约（键并入宿主 `LocaleNamespaceMap`） |
 | `src/client/locale-zh.ts` `src/client/locale-en.ts` | 卡片词典（中 / 英） |

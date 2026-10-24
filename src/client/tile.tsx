@@ -7,6 +7,7 @@ import type { Flags, Group, RowKey } from '@/client/model'
 import type { CardKey } from '@/client/locale-keys'
 import { COLUMN_KEYS, HINT_KEYS, ROW_KEYS, TIP_KEYS } from '@/client/locale-keys'
 import { TIP_MAX_WIDTH } from '@/client/card-styles'
+import { hostHidesOfficialNow } from '@/client/host-version'
 
 /** 卡片的瓦片层：展开体里六张瓦片的两种形态——布尔矩阵配置组瓦片（官方「插件列表」项卡同款）与「排除提供方」的动态集合瓦片，渲染顺序由 model.ts 的 TILE_ORDER 单一分发。
  * 瓦片只管自己的 summary 与展开体结构，外加「排除提供方」那一份纯 UI 暂态（输入文本与校验反馈不属于配置）；展开态、启用态与全部写回回调都由卡片经 props 传入，故这里既不发请求也不碰 Connection。样式数值不在本文件，见 card-styles.ts */
@@ -20,6 +21,16 @@ type TileTranslate = TranslateNS<'settings.modelFix'>
 
 /** Pill 组阈值：组内行数（真键 + 恒定展示行）≥ 5 时改用 Pill 胶囊布局，< 5 保持 Switch 行 */
 const PILL_THRESHOLD = 5
+
+/** 宿主是否已自带隐藏：页面生命周期内不变，模块级求值一次 */
+const HOST_HIDES_OFFICIAL = hostHidesOfficialNow()
+
+/** 行释义文案；宿主已自带隐藏时给「隐藏官方API」追加尾注 */
+function tipOf(key: RowKey, t: TileTranslate): string {
+    const tip = t(TIP_KEYS[key])
+    if (key !== 'hideOfficial' || !HOST_HIDES_OFFICIAL) return tip
+    return `${tip} · ${t('tipHideOfficialHostBuiltIn')}`
+}
 
 /** 组内一条**恒定不可改**的展示行：只出现在「UI 与行为」组（插件管理那一条），排在组内真键之前——它是回入口。不绑任何配置键，故不进 `GROUP_KEYS`，组总控、草稿、脏检测都看不见它 */
 interface LockedRow {
@@ -86,7 +97,7 @@ export function GroupTile(props: {
                                 </Tooltip>
                             ))}
                             {GROUP_KEYS[group].map((key) => {
-                                const tip = t(TIP_KEYS[key])
+                                const tip = tipOf(key, t)
                                 const rowLabel = t(ROW_KEYS[key])
                                 const active = groupValue(props.flags, group, key)
                                 return (
@@ -121,7 +132,7 @@ export function GroupTile(props: {
                                 </div>
                             ))}
                             {GROUP_KEYS[group].map((key) => {
-                                const tip = t(TIP_KEYS[key])
+                                const tip = tipOf(key, t)
                                 return (
                                     <div key={key} className="dsh-mf-itemRow">
                                         <span className="dsh-mf-itemLabelGroup">

@@ -51,5 +51,6 @@
 
 ### 功能专属
 
-- 「隐藏官方API」三条：`llm.listModels` 仍是原型方法；`buildModelCatalog` 仍滤空组；`credentials.describe` 与 `credentialRef` / `isCredentialRefName` 签名未变（已核 `0.2.1-alpha.3`）。
+- 「隐藏官方API」四条：`llm.listModels` 仍是原型方法；`buildModelCatalog` 仍滤空组；`credentials.describe` 与 `credentialRef` / `isCredentialRefName` 签名未变（已核 `0.2.1-alpha.3`）；宿主自 `0.2.1-alpha.2` 起 `discoverModels` 在 `MISSING_CREDENTIAL` 时返回 `[]`（本层据此空转）。
+- 宿主版本读取面两条：`pluginPackages.packageOf(specifier, parentURL)` 仍返回带 `version` 的包；`__DSH_BOOT__.release.version` 仍是版本号字符串。任一改形 ⇒ 降级为「版本未知」⇒ 不空转。
 - 「本地化推理级别」三条：远程方法仍装成可配置访问器；「方法先于依赖方装载」的同步窗口仍在；档位显示名仍由适配器按 id 现算（宿主若自带本地化词条或渲染插槽，本层可撤）。
