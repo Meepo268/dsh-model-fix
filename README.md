@@ -82,21 +82,43 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.0/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.1/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.0/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.1/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
 
-> 使用这种方式安装需要现场构建插件，不推荐。
+> [!WARNING]
+> 仓库里不含构建产物（`lib/` 被 `.gitignore` 排除），发行包也不带构建脚本，所以从 Git 地址安装得不到可用插件：
+>
+> - 直接 `dsh plugin add github:…` 装到的包没有 `lib/`，加载即失败；
+> - 若安装器尝试现场构建，pnpm 11 默认禁止依赖执行构建脚本，会报 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`。
+>
+> 确需按 Git 使用的，请先自行 `pnpm install && pnpm build`，再把构建好的目录装进 profile。
 
-```bash
-dsh plugin --profile web add github:TikaFlow/dsh-model-fix
+### 安装后自检（约 10 秒）
+
+三种方式装到的文件完全相同，装完请确认插件目录是「干净包」形态 —— 这决定 DSH 能否正常启动：
+
+```powershell
+$d = "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-model-fix"
+"条数 = " + (Get-ChildItem $d -Force).Count            # 期望 6
+"lib\index.js = " + (Test-Path "$d\lib\index.js")       # 期望 True
+"node_modules 存在? " + (Test-Path "$d\node_modules")   # 期望 False
+```
+
+若第三项是 `True`，说明安装器在包内跑过一次 `pnpm install`，把开发依赖也装了进去。DSH 启动时会遍历 profile 的依赖闭包，撞上包内 `node_modules` 里的 pnpm 符号链接就报
+`DesktopHostFatalError: EPERM … realpath … \node_modules\.pnpm\react-dom@…\node_modules\scheduler`，整个 Host 起不来。
+
+修复不必重装，删掉那棵目录即可：
+
+```powershell
+Remove-Item "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-model-fix\node_modules" -Recurse -Force
 ```
 
 ## 版本说明
