@@ -27,6 +27,8 @@
 
 发布链（`.github/workflows/release.yml`）不重复这两道校验，只跑 install / lint / typecheck / test / pack，故钩子是这两条纪律的唯一闸门。release notes 取 `release_notes/<tag>.md`，缺失则留空。
 
+发布产物纪律：`package.json` 不保留 `prepare`（构建只由 `pack:release` 前置的 `pnpm build` 触发）。安装端一旦在包内跑 `install`，devDependencies 会落进插件目录，DSH 启动遍历 profile 依赖闭包时 `realpath` 撞上 pnpm 符号链接即 `EPERM` 崩溃；README 的「安装后自检」是这条的手工闸门。
+
 ## 测试规范
 
 `test/` 只收不依赖 DSH 运行时的纯函数与零 ctx 编排：
