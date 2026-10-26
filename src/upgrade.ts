@@ -62,6 +62,7 @@ const V8_LOCALIZE_EFFORTS_DEFAULT = true
 const V8_SHOW_ORIGINAL_EFFORTS_DEFAULT = true
 const V8_DISABLE_STORE_DEFAULT = true
 const V8_LOOSE_MATCH_DEFAULT = false
+const V8_NAME_FALLBACK_DEFAULT = true
 const V8_BEHAVIOR_DEFAULT = true
 const V8_SHOW_IN_FLOAT_DEFAULT = true
 const V8_CLASSIC_SETTING_DEFAULT = true
@@ -125,6 +126,7 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
             localizeEfforts: V8_LOCALIZE_EFFORTS_DEFAULT,
             showOriginalEfforts: V8_SHOW_ORIGINAL_EFFORTS_DEFAULT,
             looseMatch: V8_LOOSE_MATCH_DEFAULT,
+            nameFallback: V8_NAME_FALLBACK_DEFAULT,
         },
     }
 }

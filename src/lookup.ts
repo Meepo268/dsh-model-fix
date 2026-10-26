@@ -133,6 +133,157 @@ export function lookup(
     if (fuzzy.length > 1) return synthesize(fuzzy)
 }
 
+// ---------- 兜底匹配：命名空间前缀 / 显示名（只在三级级联全未命中时启用，见 docs/decisions-config.md「参数来源」） ----------
+
+/** 前导命名空间前缀（`cn:` / `us:`…）。只剥开头且冒号后还有内容；`kenari/hy3:free` 的冒号在**末段**
+ * （模型自带的 tag），这里不剥——剥错会把两个不同模型认成同一个 */
+const NAMESPACE_PREFIX = /^[a-z0-9][a-z0-9_-]*:/
+
+/** 剥前导命名空间前缀；无前缀原样返回 */
+export function stripNamespace(id: string): string {
+    const stripped = id.replace(NAMESPACE_PREFIX, '')
+    return stripped === '' ? id : stripped
+}
+
+/** 显示名归一成 id 形态：小写、非 id 字符压成 `-`，保留 `.` 与数字（版本号要留住） */
+export function normalizeName(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** 兜底聚合的支持度门槛：剥前缀（id 证据较强）过半即可；显示名（弱证据）要六成 */
+const PREFIX_SUPPORT = 0.5
+const NAME_SUPPORT = 0.6
+
+/** 收集某几种写法在目录里命中的全部条目（跨提供方，同一提供方只取首个命中） */
+function entriesFor(indexed: IndexedCatalog, forms: readonly string[]): IndexEntry[] {
+    const entries: IndexEntry[] = []
+    for (const form of forms) {
+        for (const group of indexed.groups.values()) {
+            const hit = matchId(form, group.ids)
+            if (hit === undefined) continue
+            const entry = group.byId.get(hit)
+            if (entry) entries.push(entry)
+        }
+    }
+    return entries
+}
+
+/** 多数声明：缺席（无值/空）不算反对票；并列第一或得票不到 `support` 一律留空 */
+function pickString(values: readonly (string | undefined)[], support: number): string | undefined {
+    const counts = new Map<string, number>()
+    let declared = 0
+    for (const value of values) {
+        if (value === undefined || value === '') continue
+        counts.set(value, (counts.get(value) ?? 0) + 1)
+        declared += 1
+    }
+    if (declared === 0) return
+    let best: string | undefined
+    let bestCount = 0
+    let tied = false
+    for (const [value, count] of counts) {
+        if (count > bestCount) {
+            best = value
+            bestCount = count
+            tied = false
+        } else if (count === bestCount) tied = true
+    }
+    if (best === undefined || tied || bestCount / declared < support) return
+    return best
+}
+
+/** 容量同理；并列时取较小（宁小勿大） */
+function pickNumber(values: readonly (number | undefined)[], support: number): number | undefined {
+    const counts = new Map<number, number>()
+    let declared = 0
+    for (const value of values) {
+        if (value === undefined || value <= 0) continue
+        counts.set(value, (counts.get(value) ?? 0) + 1)
+        declared += 1
+    }
+    if (declared === 0) return
+    let best: number | undefined
+    let bestCount = 0
+    let tied = false
+    let tiedMin: number | undefined
+    for (const [value, count] of counts) {
+        if (count > bestCount) {
+            best = value
+            bestCount = count
+            tied = false
+            tiedMin = value
+        } else if (count === bestCount) {
+            tied = true
+            tiedMin = tiedMin === undefined ? value : Math.min(tiedMin, value)
+        }
+    }
+    if (best === undefined || bestCount / declared < support) return
+    return tied ? tiedMin : best
+}
+
+/**
+ * 逐维聚合：域不明（跨提供方同名）时，四个维度各自投票——缺席不算反对票，
+ * 某取值在有声明者中过 `support` 才采纳，凑不出任何一维就判无匹配。
+ */
+function aggregate(entries: readonly IndexEntry[], support: number): IndexEntry | undefined {
+    if (entries.length === 0) return
+    const efforts = pickString(
+        entries.map((entry) =>
+            entry.efforts.length === 0 ? undefined : [...entry.efforts].map(levelOf).sort().join(','),
+        ),
+        support,
+    )
+    const contextWindow = pickNumber(
+        entries.map((entry) => entry.contextWindow),
+        support,
+    )
+    const maxTokens = pickNumber(
+        entries.map((entry) => entry.maxTokens),
+        support,
+    )
+    const image = pickString(
+        entries.map((entry) => (entry.image === true ? '1' : undefined)),
+        support,
+    )
+    if (efforts === undefined && contextWindow === undefined && maxTokens === undefined && image === undefined) return
+    return {
+        id: entries[0].id,
+        efforts: efforts === undefined ? [] : efforts.split(','),
+        ...(contextWindow === undefined ? {} : { contextWindow }),
+        ...(maxTokens === undefined ? {} : { maxTokens }),
+        ...(image === '1' ? { image: true } : {}),
+    }
+}
+
+/**
+ * 兜底一：剥掉命名空间前缀，拿剥后的 id 去目录里逐维聚合。
+ * 前缀是网关加的分组记号（`cn:deepseek-v4-pro`），剥掉后就是普通 id；但此时域（对应哪家提供方）
+ * 仍不明，`lookup` 的全局阶段遇到第二个提供方就放弃，故这里改为「多数声明」：
+ * 镜像之间的分歧集中在「某家少填一维」，缺席不该否掉别家的声明。无前缀时返回 undefined。
+ */
+export function lookupStripped(indexed: IndexedCatalog, modelId: string): IndexEntry | undefined {
+    const stripped = stripNamespace(modelId)
+    if (stripped === modelId) return
+    return aggregate(entriesFor(indexed, [stripped]), PREFIX_SUPPORT)
+}
+
+/**
+ * 兜底二：显示名归一后去目录里找（含去首段厂商标识）；
+ * 显示名是弱证据（各家写法不一、可能撞名），故门槛抬到六成，且并列第一即弃。
+ */
+export function lookupByName(indexed: IndexedCatalog, name: string): IndexEntry | undefined {
+    const normalized = normalizeName(name)
+    if (normalized === '') return
+    const forms = [normalized]
+    // 显示名常以厂商标识开头（`Xiaomi MiMo-V2.6-Pro`）：去掉首段再试一次
+    const cut = normalized.indexOf('-')
+    if (cut > 0) {
+        const tail = normalized.slice(cut + 1)
+        if (tail !== '' && !forms.includes(tail)) forms.push(tail)
+    }
+    return aggregate(entriesFor(indexed, forms), NAME_SUPPORT)
+}
+
 /** 转换为 reasoningEfforts 映射：key 为可选等级，value 为原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效）。
  * 目录条目与上游声明（档位名列表）共用本函数，保证两侧写出的形状完全一致 */
 export function toReasoningEffortsFromList(efforts: readonly string[] | undefined): Record<string, string | null> | undefined {

@@ -30,6 +30,7 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
     localizeEfforts: true,
     showOriginalEfforts: true,
     looseMatch: false,
+    nameFallback: true,
 }
 
 /** behavior 组默认值（整组缺失或字段缺失落此）。全开是唯一与「装本插件但看不见任何 UI」相容的缺省（见 docs/versioning.md）。 */
@@ -72,6 +73,7 @@ export const USER_EXPERIENCE_KEYS = [
     'localizeEfforts',
     'showOriginalEfforts',
     'looseMatch',
+    'nameFallback',
 ] as const
 
 /** UI 可见性组的行键；新增席位可见性开关在此追加 */

@@ -1,5 +1,5 @@
 // lookup.ts 纯函数测试：模型 id 匹配（精确/词干/前缀三级）、端点/提供方/全局三级级联与推理级别转换
-import { lookup, normalizeId, toReasoningEfforts } from '@/lookup'
+import { lookup, lookupByName, lookupStripped, normalizeId, normalizeName, stripNamespace, toReasoningEfforts } from '@/lookup'
 import type { IndexedCatalog, IndexEntry } from '@/types'
 import { check, stable } from '@test/helper'
 
@@ -188,4 +188,45 @@ export function run(): void {
     check('无条目 -> undefined', toReasoningEfforts(undefined) === undefined)
     check('空档位 -> undefined', toReasoningEfforts(entry('m', [])) === undefined)
     check('仅剩 off -> 视为无匹配', toReasoningEfforts(entry('m', ['none'])) === undefined && toReasoningEfforts(entry('m', ['off'])) === undefined)
+
+    // ---------- 兜底匹配：剥命名空间前缀 / 显示名 / 同参镜像折叠 ----------
+    check('stripNamespace 只剥前导命名空间前缀', stripNamespace('cn:deepseek-v4-pro') === 'deepseek-v4-pro' && stripNamespace('us:glm-5.3') === 'glm-5.3', stripNamespace('cn:deepseek-v4-pro'))
+    check('stripNamespace 不动末段冒号（模型自带 tag）', stripNamespace('kenari/hy3:free') === 'kenari/hy3:free' && stripNamespace('glm-5.3:fast') === 'glm-5.3:fast')
+    check('stripNamespace 空后缀/无冒号原样返回', stripNamespace('deepseek-v4-pro') === 'deepseek-v4-pro' && stripNamespace('cn:') === 'cn:')
+    check('normalizeName 归一为 id 形态', normalizeName('Deepseek-V4-Pro') === 'deepseek-v4-pro' && normalizeName('Hy4 preview') === 'hy4-preview' && normalizeName('  MiMo V2.6  ') === 'mimo-v2.6', normalizeName('  MiMo V2.6  '))
+
+    const prefixed = indexed({ deepseek: [entry('deepseek-v4-pro', ['low', 'high'], { contextWindow: 1_048_576 })] })
+    check('lookup 本身不认前缀（兜底才认）', lookup(prefixed, 'wk', undefined, 'cn:deepseek-v4-pro') === undefined)
+    check('兜底剥前缀命中', lookupStripped(prefixed, 'cn:deepseek-v4-pro')?.contextWindow === 1_048_576)
+    check('兜底无前缀不做事', lookupStripped(prefixed, 'deepseek-v4-pro') === undefined)
+    check('兜底同参镜像折叠为一票', lookupStripped(indexed({
+        a: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        b: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        c: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+    }), 'cn:deepseek-v4-pro')?.id === 'deepseek-v4-pro')
+    check('兜底过六成多数票采纳', lookupStripped(indexed({
+        a: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        b: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        c: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        d: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        e: [entry('deepseek-v4-pro', ['high'], { contextWindow: 200_000 })],
+    }), 'cn:deepseek-v4-pro')?.contextWindow === 1_048_576)
+    check('兜底逐维投票：并列取较小（宁小勿大）', lookupStripped(indexed({
+        a: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        b: [entry('deepseek-v4-pro', ['high'], { contextWindow: 200_000 })],
+    }), 'cn:deepseek-v4-pro')?.contextWindow === 200_000)
+    check('兜底缺席不算反对票', lookupStripped(indexed({
+        a: [entry('deepseek-v4-pro', ['high'], { contextWindow: 1_048_576 })],
+        b: [{ id: 'deepseek-v4-pro', efforts: [] }],
+    }), 'cn:deepseek-v4-pro')?.contextWindow === 1_048_576)
+    check('兜底显示名命中（含去首段厂商标识）', lookupByName(indexed({ xiaomi: [entry('mimo-v2.6-pro', ['high'])] }), 'Xiaomi MiMo-V2.6-Pro')?.id === 'mimo-v2.6-pro')
+    check('兜底显示名并列第一时该维留空', (() => {
+        const hit = lookupByName(indexed({
+            a: [entry('glm-5', ['high'], { contextWindow: 1_048_576 })],
+            b: [entry('glm-5', ['high'], { contextWindow: 200_000 })],
+        }), 'GLM 5')
+        return hit?.id === 'glm-5' && hit.contextWindow === undefined && hit.efforts.join(',') === 'high'
+    })())
+    check('兜底显示名无候选返回 undefined', lookupByName(prefixed, 'No Such Model') === undefined)
+    check('兜底显示名为空返回 undefined', lookupByName(prefixed, '  -  ') === undefined)
 }

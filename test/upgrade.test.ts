@@ -8,7 +8,7 @@ export function run(): void {
     const COMPAT = { disableDeveloper: true, disableStore: true }
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
-    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false }
+    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true }
     const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }
     const WRITTEN: Record<string, Record<string, string>> = {}
     const SOURCES: Record<string, Record<string, string>> = {}
@@ -33,7 +33,7 @@ export function run(): void {
         written: WRITTEN,
         sources: SOURCES,
         behavior: BEHAVIOR,
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
     }), upgradeConfig(v7Stored, 7))
     // v7 输入 compat 非布尔 → schema 整体回 V7_BASE（任意组非法都整段回退，避免带着坏值继续升级），efforts 仍宽松保留
     check('v7 输入 compat 非布尔整段回 v7 默认再补 disableStore', stable(upgradeConfig({ ...v7Stored, compat: 'x' }, 7)) === stable({
@@ -75,7 +75,7 @@ export function run(): void {
         written: WRITTEN,
         sources: SOURCES,
         behavior: BEHAVIOR,
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
     }), upgradeConfig({ ...v7Stored, efforts: 'bad' }, 7))
 
     // ---------- 守卫：低于最低支持版本（MIN_SUPPORTED_VERSION = 7）的输入由最低一级台阶拒绝 ----------

@@ -83,7 +83,8 @@ export function planFill(
                     contextWindow?: unknown
                     maxTokens?: unknown
                 }
-                // 参数来源（见 src/source.ts）：pin 决定认哪一侧，缺省走「上游声明 > 目录」
+                // 参数来源（见 src/source.ts）：pin 决定认哪一侧，缺省走「上游声明 > 目录」；
+                // 显示名只用于兜底匹配（nameFallback 开时才试）
                 const { entry, declared, pin } = resolveSource(
                     cfg,
                     indexed,
@@ -91,6 +92,7 @@ export function planFill(
                     providerId,
                     typeof baseURL === 'string' ? baseURL : undefined,
                     modelId,
+                    typeof model.name === 'string' ? model.name : undefined,
                 )
                 // 人工指定过来源的模型按用户意图整体生效：不再受指纹冻结（选来源就是要它落下来），但仍记新指纹
                 const pinned = pin !== ''

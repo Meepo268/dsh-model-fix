@@ -50,6 +50,8 @@ export interface UserExperienceRules {
     showOriginalEfforts: boolean
     /** 尽量匹配：精确匹配失败（无命中/歧义）时收集候选合成参数填充（合成口径见 `src/lookup.ts`）。默认 false，见 docs/decisions-config.md「参数来源」 */
     looseMatch: boolean
+    /** 显示名兜底：id 三级匹配与前缀剥离都没命中时，用模型的显示名归一后去目录里找；仍要求「去重后只剩一组参数」才采纳。默认 true，见 docs/decisions-config.md「参数来源」 */
+    nameFallback: boolean
 }
 
 /** UI 可见性规则：控制各 UI 部件在宿主各处的挂载。不改变插件行为，只决定 UI 在不在——关闭即卸载对应席位的注册，功能本体照常运行 */

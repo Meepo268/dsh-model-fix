@@ -35,6 +35,7 @@ export type CardKey =
     | 'rowLocalizeEfforts'
     | 'rowShowOriginalEfforts'
     | 'rowLooseMatch'
+    | 'rowNameFallback'
     | 'tipReasoning'
     | 'tipContext'
     | 'tipImage'
@@ -50,6 +51,7 @@ export type CardKey =
     | 'tipLocalizeEfforts'
     | 'tipShowOriginalEfforts'
     | 'tipLooseMatch'
+    | 'tipNameFallback'
     | 'excludePlaceholder'
     | 'excludeAdd'
     | 'excludeInvalid'
@@ -230,6 +232,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     localizeEfforts: 'rowLocalizeEfforts',
     showOriginalEfforts: 'rowShowOriginalEfforts',
     looseMatch: 'rowLooseMatch',
+    nameFallback: 'rowNameFallback',
 }
 
 /** 配置组（瓦片）标题键映射 */
@@ -273,4 +276,5 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     localizeEfforts: 'tipLocalizeEfforts',
     showOriginalEfforts: 'tipShowOriginalEfforts',
     looseMatch: 'tipLooseMatch',
+    nameFallback: 'tipNameFallback',
 }

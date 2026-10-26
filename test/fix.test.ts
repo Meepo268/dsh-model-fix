@@ -498,7 +498,7 @@ export async function run(): Promise<void> {
         const ctx = makeStubCtx({
             api: { providers: { testprovider: { models: [{ id: 'model-x' }] } } },
         })
-        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true } }))
+        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true, nameFallback: true } }))
         setCatalog(AMBIGUOUS_CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]

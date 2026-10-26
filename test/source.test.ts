@@ -19,7 +19,7 @@ function indexedOf(): IndexedCatalog {
     }
 }
 
-function cfgWith(sources: Record<string, Record<string, string>>, loose = false): PluginConfig {
+function cfgWith(sources: Record<string, Record<string, string>>, loose = false, nameFallback = true): PluginConfig {
     return {
         allowUpdate: { reasoning: false, context: false, image: false },
         autoFill: { reasoning: true, context: true, image: true },
@@ -29,7 +29,7 @@ function cfgWith(sources: Record<string, Record<string, string>>, loose = false)
         written: {},
         sources,
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: loose },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: loose, nameFallback },
     }
 }
 
@@ -76,7 +76,13 @@ export function run(): void {
     const missing = resolveSource(cfgWith({}), indexed, undefined, 'gw', undefined, 'no-such-model')
     check('目录查不到时 entry 为空', missing.entry === undefined && stable(missing.pin) === '""')
 
-    // 已知边界（Step 2 补前缀归一后再改这条）：带命名空间前缀的 id 目前不命中目录，声明侧仍按原样键取到
+    // 命名空间前缀：声明按原样键命中；目录侧靠兜底剥前缀命中同一条目
     const namespaced = resolveSource(cfgWith({}), indexed, new Map([['gw', new Map([['cn:deepseek-v4-pro', { contextWindow: 1_000_000 }]])]]), 'gw', undefined, 'cn:deepseek-v4-pro')
-    check('前缀 id：声明按原样键命中、目录侧暂无匹配（前缀归一在 Step 2）', namespaced.declared?.contextWindow === 1_000_000 && namespaced.entry === undefined, namespaced)
+    check('前缀 id：声明按原样键命中、目录侧靠剥前缀兜底', namespaced.declared?.contextWindow === 1_000_000 && namespaced.entry?.contextWindow === 1_048_576, namespaced)
+
+    // 显示名兜底：id 匹配不上时用显示名（含去首段厂商标识），仍要求唯一一组参数
+    const byName = resolveSource(cfgWith({}), indexed, undefined, 'gw', undefined, 'unknown-id', 'DeepSeek-V4-Pro')
+    check('显示名兜底命中同一目录条目', byName.entry?.contextWindow === 1_048_576, byName)
+    const nameOff = resolveSource(cfgWith({}, false, false), indexed, undefined, 'gw', undefined, 'unknown-id', 'DeepSeek-V4-Pro')
+    check('nameFallback 关时显示名不兜底', nameOff.entry === undefined, nameOff)
 }
