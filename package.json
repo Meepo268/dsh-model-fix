@@ -31,7 +31,7 @@
     "all": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "hook:git": "nit install && nit check",
     "pack:release": "pnpm pack --out=\"dist/%s.tgz\"",
-    "prepare": "pnpm build"
+    "prepare": "tsdown"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
