@@ -27,6 +27,7 @@ import { run as runSubagent } from '@test/subagent.test'
 import { run as runStamp } from '@test/stamp.test'
 import { run as runUpstream } from '@test/upstream.test'
 import { run as runSource } from '@test/source.test'
+import { run as runSourceView } from '@test/source-view.test'
 import { run as runVerify } from '@test/verify.test'
 import { section, summary } from '@test/helper'
 
@@ -84,6 +85,8 @@ section('stamp.test.ts')
 runStamp()
 section('source.test.ts')
 runSource()
+section('source-view.test.ts')
+runSourceView()
 section('upstream.test.ts')
 await runUpstream()
 section('subagent.test.ts')

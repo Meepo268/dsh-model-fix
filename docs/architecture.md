@@ -16,7 +16,7 @@
 | `src/lookup.ts` | 模型 id 匹配（端点 → 提供方 → 全局三级级联）与档位转换 |
 | `src/upstream.ts` | 上游声明：`GET {baseURL}/models` 回包解析（纯函数）+ 按 URL 缓存/去重的抓取（best-effort） |
 | `src/stamp.ts` | 参数指纹：四字段指纹采集/序列化、来源等级与 `mayReplace` 覆盖判定、按字段合并写入 |
-| `src/source.ts` | 参数来源解析：pin（自动 / 只认上游 / 指定目录条目）与声明/目录两路的取用 |
+| `src/source.ts` | 参数来源解析：pin（自动 / 只认上游 / 指定目录条目）与声明/目录两路的取用；弹层快照 `buildSourceSnapshot` |
 | `src/compat.ts` | 路由 compat 纯写入计划 |
 | `src/fix.ts` | 填充与写回：纯计划 `planFill` 出 op，`fix` 只做编排 |
 | `src/memory.ts` | 推理级别记忆失效清理：存活清单 → 纯 `planPruneMemory` → 只写 `efforts` 键 |
@@ -58,6 +58,7 @@
 | `src/shared/types.ts` | 跨半类型声明与纯类型守卫（含各规则组行键表） |
 | `src/shared/version.ts` | 宿主版本比较与「宿主是否已自带隐藏」判据 |
 | `src/shared/verify-progress.ts` | 探测/验证的进度帧契约与逐字段解码 |
+| `src/shared/source-view.ts` | 「参数来源」视图契约（快照/行/候选形状）与容量短写、候选摘要等纯函数 |
 
 ### 浏览器半（`src/client/`）
 
@@ -85,6 +86,8 @@
 | `src/client/host-version.ts` | 宿主版本判据（浏览器半）：读 `__DSH_BOOT__.release.version` |
 | `src/client/locale-patch.ts` | 宿主 model NS 词典的 Default 词条本地化 |
 | `src/client/locale-keys.ts` | 卡片文案键契约（键并入宿主 `LocaleNamespaceMap`） |
+| `src/client/sources-dialog.tsx` | 「参数来源」弹层：搜索、只看本提供方、可滚列表，逐模型写 pin |
+| `src/client/source-seat.tsx` | 提供方卡片里的「参数来源」入口（`settings.models.provider-card` 席位） |
 | `src/client/locale-zh.ts` `src/client/locale-en.ts` | 卡片词典（中 / 英） |
 | `src/client/visibility.tsx` | 「UI 与行为」组：三个 slot 上四个部件的挂载 / 卸载 |
 | `src/client/floating-buttons.tsx` | 悬浮按钮组容器：中心列左侧直插 DOM + 独立 React 根；管定位 / 布局 / 渲染，导出 `addButton` |

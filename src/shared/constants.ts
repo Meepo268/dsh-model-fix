@@ -47,6 +47,10 @@ export const ENDPOINT_RESET_MODELS = 'resetModels'
 export const ENDPOINT_RESTORE_MODELS = 'restoreModels'
 /** 浏览器半启动时上报探测语言的 endpoint 名（Node 侧没有 locale 服务） */
 export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
+/** 「参数来源」弹层读取整份快照的 endpoint 名（只读） */
+export const ENDPOINT_SOURCES = 'sources'
+/** 写一个模型的参数来源 pin 的 endpoint 名（空串 = 回到自动） */
+export const ENDPOINT_SET_SOURCE = 'setSource'
 
 /** 宿主自此版本起自带「未配置密钥的官方提供方自动隐藏」；≥ 此值时本插件的「隐藏官方API」空转 */
 export const HOST_AUTO_HIDE_SINCE = '0.2.1-alpha.2'
