@@ -24,6 +24,9 @@ import { run as runRpcRoute } from '@test/rpc-route.test'
 import { run as runRpc } from '@test/rpc.test'
 import { run as runSelfTune } from '@test/self-tune.test'
 import { run as runSubagent } from '@test/subagent.test'
+import { run as runStamp } from '@test/stamp.test'
+import { run as runUpstream } from '@test/upstream.test'
+import { run as runSource } from '@test/source.test'
 import { run as runVerify } from '@test/verify.test'
 import { section, summary } from '@test/helper'
 
@@ -77,6 +80,12 @@ section('self-tune.test.ts')
 await runSelfTune()
 section('fix.test.ts')
 await runFix()
+section('stamp.test.ts')
+runStamp()
+section('source.test.ts')
+runSource()
+section('upstream.test.ts')
+await runUpstream()
 section('subagent.test.ts')
 await runSubagent()
 summary()

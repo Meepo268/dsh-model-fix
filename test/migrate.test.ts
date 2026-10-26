@@ -19,6 +19,8 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {},
+        sources: {},
         behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
     })) === stable({
@@ -28,15 +30,19 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {},
+        sources: {},
         behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
-    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }))
+    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, written: {}, sources: {}, behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }))
     check('DEFAULT_STORED 即 toStored(默认配置)', stable(DEFAULT_STORED) === stable(toStored({
         autoFill: { reasoning: true, context: true, image: true },
         allowUpdate: { reasoning: false, context: false, image: false },
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
+        written: {},
+        sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
         userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     })), DEFAULT_STORED)
@@ -56,6 +62,8 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {},
+        sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
         userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
     }), resolveConfig(healed))
@@ -70,6 +78,8 @@ export function run(): void {
         compat: COMPAT,
         excludes: EXCLUDES,
         efforts: EFFORTS,
+        written: {},
+        sources: {},
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), resolveConfig({ 'version-7': toStored(resolveConfig(v9Valid)) }))

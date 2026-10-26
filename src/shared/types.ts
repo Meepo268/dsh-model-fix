@@ -73,6 +73,19 @@ export interface BehaviorRules {
 /** 每模型推理级别记忆：provider id → model id → harness ModelThinkingLevel 字符串 */
 export type EffortMemory = Record<string, Record<string, string>>
 
+/** 上次由插件写入的参数指纹：provider id → model id → 四字段（档位/上下文/输出/模态）指纹串。
+ * 用来把「插件自己写的值」与「用户手改的值」分开：指纹对不上即视为手改，`allowUpdate` 不再覆盖。
+ * 运行时状态而非用户配置，结构非法时解析侧宽松回落 {}（见 `src/stamp.ts` 与 docs/decisions-config.md「参数来源」） */
+export type WrittenMap = Record<string, Record<string, string>>
+
+/** 每模型参数来源 pin：provider id → model id → 来源值。
+ * 来源值：`''` / 缺省 = 自动（上游声明 > models.dev 目录）；`upstream` = 只认上游声明；`<provider>/<modelId>` = 只认该目录条目。
+ * 与 `efforts` / `written` 同为 map 形态、同样宽松解析，但它**是用户意图**（见 `src/source.ts`） */
+export type SourceMap = Record<string, Record<string, string>>
+
+/** 「参数来源」的「只认上游声明」取值；其余非空取值一律是 `<provider>/<modelId>` 候选键 */
+export const SOURCE_UPSTREAM = 'upstream'
+
 export interface PluginConfig {
     /** 开启后以 models.dev 最新数据为准更新已有配置 */
     allowUpdate: FieldRules
@@ -84,6 +97,10 @@ export interface PluginConfig {
     excludes: string[]
     /** 每模型推理级别记忆：provider → model → 级别。运行时记忆而非用户配置，结构非法时解析侧宽松回落 {}（不让记忆坏值连累配置自愈重写丢配置） */
     efforts: EffortMemory
+    /** 上次插件写入的参数指纹：provider → model → 指纹串。与 `efforts` 同性质（运行时状态、宽松解析），用来区分「插件写的」与「手改的」，见 `src/stamp.ts` */
+    written: WrittenMap
+    /** 每模型参数来源 pin：provider → model → 来源值。用户意图（哪家提供方的参数），见 `src/source.ts` */
+    sources: SourceMap
     /** UI 可见性规则（只管各 UI 部件挂不挂载，不改插件行为） */
     behavior: BehaviorRules
     /** 用户体验规则（前端行为开关，不支持按提供方排除） */
@@ -98,6 +115,8 @@ export interface PluginConfigSnapshot {
     compat: CompatRules
     excludes: string[]
     efforts: EffortMemory
+    written: WrittenMap
+    sources: SourceMap
     behavior: BehaviorRules
     userExperience: UserExperienceRules
 }

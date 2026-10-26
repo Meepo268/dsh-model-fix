@@ -14,6 +14,9 @@
 | `src/upgrade.ts` | 冻结的升级台阶链（v7 → 当前版） |
 | `src/catalog.ts` | models.dev 目录拉取、缓存读写与分组 / 端点索引 |
 | `src/lookup.ts` | 模型 id 匹配（端点 → 提供方 → 全局三级级联）与档位转换 |
+| `src/upstream.ts` | 上游声明：`GET {baseURL}/models` 回包解析（纯函数）+ 按 URL 缓存/去重的抓取（best-effort） |
+| `src/stamp.ts` | 参数指纹：四字段指纹采集/序列化、来源等级与 `mayReplace` 覆盖判定、按字段合并写入 |
+| `src/source.ts` | 参数来源解析：pin（自动 / 只认上游 / 指定目录条目）与声明/目录两路的取用 |
 | `src/compat.ts` | 路由 compat 纯写入计划 |
 | `src/fix.ts` | 填充与写回：纯计划 `planFill` 出 op，`fix` 只做编排 |
 | `src/memory.ts` | 推理级别记忆失效清理：存活清单 → 纯 `planPruneMemory` → 只写 `efforts` 键 |

@@ -133,11 +133,12 @@ export function lookup(
     if (fuzzy.length > 1) return synthesize(fuzzy)
 }
 
-/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效） */
-export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string, string | null> | undefined {
-    if (!entry) return
+/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效）。
+ * 目录条目与上游声明（档位名列表）共用本函数，保证两侧写出的形状完全一致 */
+export function toReasoningEffortsFromList(efforts: readonly string[] | undefined): Record<string, string | null> | undefined {
+    if (!efforts) return
     const mapped: Record<string, string | null> = {}
-    for (const effort of entry.efforts) {
+    for (const effort of efforts) {
         if (effort !== 'none' && !LEVELS.has(effort)) continue
         const level = effort === 'none' || effort === 'off' ? 'off' : effort
         mapped[level] = level === 'off' ? effort : level
@@ -146,6 +147,11 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
     // 空或只剩 off：无可选档位，等同无匹配，不填充（与 stripEmptyFields 的空壳判据同口径）
     if (keys.length === 0 || (keys.length === 1 && keys[0] === 'off')) return
     return mapped
+}
+
+/** 目录条目 -> reasoningEfforts 映射（无条目即 undefined） */
+export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string, string | null> | undefined {
+    return toReasoningEffortsFromList(entry?.efforts)
 }
 
 // ---------- 合成：跨提供方同名条目的保守合并与尽量匹配的候选合成（纯函数，见 docs/decisions-config.md「参数来源」） ----------

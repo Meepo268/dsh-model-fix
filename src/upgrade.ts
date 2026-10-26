@@ -105,6 +105,9 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
         compat: { ...parsed.compat, disableStore: V8_DISABLE_STORE_DEFAULT },
         excludes: [...parsed.excludes],
         efforts,
+        // 旧版本没有指纹与来源 pin：落空表即「全部按手改处理」，升级后不会突然覆盖用户现值
+        written: {},
+        sources: {},
         behavior: {
             showInModels: V8_BEHAVIOR_DEFAULT,
             showInBuiltinPlugins: V8_BEHAVIOR_DEFAULT,
