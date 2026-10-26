@@ -9,6 +9,7 @@ import { collectCandidates, lookup, lookupByName, lookupStripped, normalizeId } 
 import { formatEfforts } from '@/shared/source-view'
 import { SOURCE_UPSTREAM, isPlainObject, type PluginConfig } from '@/shared/types'
 import type { IndexedCatalog, IndexEntry } from '@/types'
+import { declarationOf } from '@/upstream'
 import type { Declaration, DeclarationMap } from '@/upstream'
 import type {
     SourceCandidateView,
@@ -51,7 +52,7 @@ export function resolveSource(
 ): ResolvedSource {
     const raw = cfg.sources[providerId]?.[modelId]
     const pin = typeof raw === 'string' ? raw.trim() : ''
-    const declaredAuto = declarations?.get(providerId)?.get(modelId)
+    const declaredAuto = declarationOf(declarations, providerId, modelId)
     if (pin === SOURCE_UPSTREAM) return { pin, entry: undefined, declared: declaredAuto }
     if (pin !== '') {
         const pinned = entryBySourceKey(indexed, pin)

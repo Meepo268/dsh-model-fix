@@ -85,4 +85,11 @@ export function run(): void {
     check('显示名兜底命中同一目录条目', byName.entry?.contextWindow === 1_048_576, byName)
     const nameOff = resolveSource(cfgWith({}, false, false), indexed, undefined, 'gw', undefined, 'unknown-id', 'DeepSeek-V4-Pro')
     check('nameFallback 关时显示名不兜底', nameOff.entry === undefined, nameOff)
+
+    // 声明侧的名字形态：网关常按剥掉前缀的 id 自报（`deepseek-v4-pro` 对应配置里的 `cn:deepseek-v4-pro`）
+    const bareDeclarations = new Map([['gw', new Map([['deepseek-v4-pro', { contextWindow: 1_000_000 }]])]])
+    const prefixedModel = resolveSource(cfgWith({}), indexed, bareDeclarations, 'gw', undefined, 'cn:deepseek-v4-pro')
+    check('配置 id 带前缀、声明 id 不带前缀：仍取到声明', prefixedModel.declared?.contextWindow === 1_000_000, prefixedModel)
+    const pinnedToUpstream = resolveSource(cfgWith({ gw: { 'cn:deepseek-v4-pro': SOURCE_UPSTREAM } }), indexed, bareDeclarations, 'gw', undefined, 'cn:deepseek-v4-pro')
+    check('pin=upstream 时同样按剥前缀后的声明命中', pinnedToUpstream.declared?.contextWindow === 1_000_000, pinnedToUpstream)
 }

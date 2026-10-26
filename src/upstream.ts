@@ -11,6 +11,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { FETCH_MS, LEVELS } from '@/constants'
+import { stripNamespace } from '@/lookup'
 import { isCapacity } from '@/types'
 import { isPlainObject } from '@/shared/types'
 
@@ -132,6 +133,15 @@ export function modelsUrl(baseURL: string): string {
     return `${baseURL.replace(/\/+$/, '')}/models`
 }
 
+/** 备用端点：`baseURL` 没带版本段时再试一次 `/v1/models`。
+ * 常见形态：`https://gw`（列表在 `/v1/models`）、`https://gw/api`（在 `/api/v1/models`）；
+ * 已带 `/v1`、`/v2`、`/v1beta` 的地址不再叠一层。 */
+export function altModelsUrl(baseURL: string): string | undefined {
+    const base = baseURL.replace(/\/+$/, '')
+    if (/\/v\d+[a-z]*$/i.test(base)) return undefined
+    return `${base}/v1/models`
+}
+
 /** 抓取缓存：按 baseURL 记（同一地址多路由共享一份回包） */
 interface CacheSlot {
     readonly at: number
@@ -171,13 +181,54 @@ async function resolveKey(ctx: Context, profile: Record<string, unknown>): Promi
     }
 }
 
-/** 抓一个端点的声明；失败抛错由调用方吞掉（best-effort） */
-async function fetchOne(url: string, key: string | undefined): Promise<Map<string, Declaration>> {
-    const headers: Record<string, string> = { accept: 'application/json' }
-    if (key !== undefined && key !== '') headers.authorization = `Bearer ${key}`
-    const response = await fetch(url, { headers, signal: AbortSignal.timeout(FETCH_MS) })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return parseDeclarations(await response.json())
+/** 带状态码的抓取错误：只有「路径不对」才值得换备用路径重试，401/超时再打一次也没用 */
+class HttpError extends Error {
+    constructor(readonly status: number) {
+        super(`HTTP ${status}`)
+    }
+}
+
+/** 抓一个端点的声明；主路径 404/405（很多网关把列表放在 `/v1/models`）时换备用路径再试一次，
+ * 其余失败直接抛，由调用方吞掉并回落目录 */
+async function fetchOne(url: string, alt: string | undefined, key: string | undefined): Promise<Map<string, Declaration>> {
+    const request = async (target: string): Promise<Map<string, Declaration>> => {
+        const headers: Record<string, string> = { accept: 'application/json' }
+        if (key !== undefined && key !== '') headers.authorization = `Bearer ${key}`
+        const response = await fetch(target, { headers, signal: AbortSignal.timeout(FETCH_MS) })
+        if (!response.ok) throw new HttpError(response.status)
+        return parseDeclarations(await response.json())
+    }
+    try {
+        return await request(url)
+    } catch (error) {
+        const missing = error instanceof HttpError && (error.status === 404 || error.status === 405)
+        if (!missing || alt === undefined) throw error
+        return await request(alt)
+    }
+}
+
+/**
+ * 按模型 id 取上游声明：先原样精确，再剥前导命名空间后精确，最后在「剥完前缀同形」的声明里取唯一一条。
+ * 网关自报的 id 经常与它接受调用的 id 不同形（`cn:deepseek-v4-pro` vs `deepseek-v4-pro`），
+ * 只按原样键查会漏掉整份声明；仍要求唯一命中——两份不同声明对不上时宁可回落目录。
+ */
+export function declarationOf(
+    declarations: DeclarationMap | undefined,
+    providerId: string,
+    modelId: string,
+): Declaration | undefined {
+    const table = declarations?.get(providerId)
+    if (table === undefined) return undefined
+    const exact = table.get(modelId)
+    if (exact !== undefined) return exact
+    const wanted = stripNamespace(modelId).toLowerCase()
+    const stripped = table.get(stripNamespace(modelId))
+    if (stripped !== undefined) return stripped
+    const hits: Declaration[] = []
+    for (const [id, declaration] of table) {
+        if (stripNamespace(id).toLowerCase() === wanted) hits.push(declaration)
+    }
+    return hits.length === 1 ? hits[0] : undefined
 }
 
 /**
@@ -196,7 +247,7 @@ async function fetchFromEndpoints(
     /** url → 声明（空表 = 本批已知失败，直接回落目录）；同批多个提供方共享 */
     const loaded = new Map<string, Map<string, Declaration>>()
     /** 参与抓取的提供方（先扫一遍再抓，密钥与地址的顺序差异才不影响结果） */
-    const targets: { providerId: string; url: string }[] = []
+    const targets: { providerId: string; url: string; alt: string | undefined }[] = []
     /** url → 该地址下第一条声明了 apiKeyEnv 的提供方（回包与路由无关，谁有密钥都一样） */
     const keys = new Map<string, string>()
     for (const [providerId, profile] of Object.entries(providers)) {
@@ -204,11 +255,11 @@ async function fetchFromEndpoints(
         const baseURL = profile.baseURL
         if (typeof baseURL !== 'string' || !/^https?:\/\//i.test(baseURL)) continue
         const url = modelsUrl(baseURL)
-        targets.push({ providerId, url })
+        targets.push({ providerId, url, alt: altModelsUrl(baseURL) })
         if (typeof profile.apiKeyEnv === 'string' && !keys.has(url)) keys.set(url, profile.apiKeyEnv)
     }
     const jobs: Promise<void>[] = []
-    for (const { url } of targets) {
+    for (const { url, alt } of targets) {
         if (loaded.has(url)) continue
         const slot = cache.get(url)
         if (slot && now - slot.at < slot.ttl) {
@@ -223,7 +274,7 @@ async function fetchFromEndpoints(
         }
         const job = (async (): Promise<Map<string, Declaration>> => {
             try {
-                const value = await fetchOne(url, await resolveKey(ctx, { apiKeyEnv: keys.get(url) }))
+                const value = await fetchOne(url, alt, await resolveKey(ctx, { apiKeyEnv: keys.get(url) }))
                 cache.set(url, { at: Date.now(), value, ttl: UPSTREAM_TTL_MS })
                 return value
             } catch (error) {
