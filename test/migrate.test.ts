@@ -9,7 +9,7 @@ export function run(): void {
     const COMPAT = { disableDeveloper: true, disableStore: true }
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
-    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false }
+    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true }
     const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }
 
     // toStored：运行时配置 -> 当前版本快照（自愈重写与全新用户直写的唯一构造口）
@@ -19,8 +19,10 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {},
+        sources: {},
         behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true, nameFallback: true },
     })) === stable({
         configVersion: 8,
         autoFill: { reasoning: false, context: true, image: false },
@@ -28,17 +30,21 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {},
+        sources: {},
         behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true },
-    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true } }))
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true, nameFallback: true },
+    }), toStored({ autoFill: { reasoning: false, context: true, image: false }, allowUpdate: { reasoning: true, context: false, image: true }, compat: { disableDeveloper: false, disableStore: true }, excludes: ['acme-gateway'], efforts: { 'z-ai': { 'glm-5.2': 'high' } }, written: {}, sources: {}, behavior: { showInModels: false, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: true, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: true, nameFallback: true } }))
     check('DEFAULT_STORED 即 toStored(默认配置)', stable(DEFAULT_STORED) === stable(toStored({
         autoFill: { reasoning: true, context: true, image: true },
         allowUpdate: { reasoning: false, context: false, image: false },
         compat: { disableDeveloper: true, disableStore: true },
         excludes: [],
         efforts: {},
+        written: {},
+        sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
     })), DEFAULT_STORED)
     check('DEFAULT_STORED 的 configVersion 为当前版本', DEFAULT_STORED.configVersion === CONFIG_VERSION, DEFAULT_STORED)
 
@@ -56,8 +62,10 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['x'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: {},
+        sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
     }), resolveConfig(healed))
     // 无任何可用快照时自愈为默认（回退语义：不静默保留坏值；更高版本垃圾快照同样不计）
     const allBroken = { 'version-7': 42, 'version-9': 42 }
@@ -70,6 +78,8 @@ export function run(): void {
         compat: COMPAT,
         excludes: EXCLUDES,
         efforts: EFFORTS,
+        written: {},
+        sources: {},
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), resolveConfig({ 'version-7': toStored(resolveConfig(v9Valid)) }))
@@ -120,7 +130,7 @@ export function run(): void {
     // 规范完整但含多余键 → 物化时 toStored 剥离未知键，比对不一致即重写
     check('当前版本键含多余键被规范化剥离', stable(canonicalizeCurrentOp({ [CURRENT]: { ...DEFAULT_STORED, extra: 'x', unknown: 1 } })) === stable([{ op: 'set', path: [CURRENT], value: DEFAULT_STORED }]), canonicalizeCurrentOp({ [CURRENT]: { ...DEFAULT_STORED, extra: 'x', unknown: 1 } }))
     // 用户改过四组布尔且完整 → 与规范物化结果一致（同值不同键序/引用），零 op（不误伤合法自定义配置）
-    const customFull = { ...DEFAULT_STORED, autoFill: { reasoning: false, context: false, image: false }, allowUpdate: { reasoning: true, context: true, image: true }, compat: { disableDeveloper: false, disableStore: false }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false } }
+    const customFull = { ...DEFAULT_STORED, autoFill: { reasoning: false, context: false, image: false }, allowUpdate: { reasoning: true, context: true, image: true }, compat: { disableDeveloper: false, disableStore: false }, userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true } }
     check('合法自定义完整当前版本键零 op（不误伤）', canonicalizeCurrentOp({ [CURRENT]: customFull }).length === 0, canonicalizeCurrentOp({ [CURRENT]: customFull }))
     // 当前版本键不存在 → 零 op（交给迁移分支）
     check('无当前版本键零 op', canonicalizeCurrentOp({ 'version-5': { ...DEFAULT_STORED, configVersion: 5 } }).length === 0, canonicalizeCurrentOp({ 'version-5': { ...DEFAULT_STORED, configVersion: 5 } }))

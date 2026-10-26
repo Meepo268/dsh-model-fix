@@ -8,8 +8,10 @@ export function run(): void {
     const COMPAT = { disableDeveloper: true, disableStore: true }
     const EXCLUDES: string[] = []
     const EFFORTS: Record<string, Record<string, string>> = {}
-    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false }
+    const USER_EXPERIENCE = { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true }
     const BEHAVIOR = { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true }
+    const WRITTEN: Record<string, Record<string, string>> = {}
+    const SOURCES: Record<string, Record<string, string>> = {}
 
     // ---------- v7 → v8：原样沿用各组字段，补 compat.disableStore 与 userExperience 的 followParent / selfTune / hideOfficial / localizeEfforts / showOriginalEfforts 默认，并补 v8 形态内新增的 behavior 段 ----------
     const v7Stored = {
@@ -28,8 +30,10 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: WRITTEN,
+        sources: SOURCES,
         behavior: BEHAVIOR,
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
     }), upgradeConfig(v7Stored, 7))
     // v7 输入 compat 非布尔 → schema 整体回 V7_BASE（任意组非法都整段回退，避免带着坏值继续升级），efforts 仍宽松保留
     check('v7 输入 compat 非布尔整段回 v7 默认再补 disableStore', stable(upgradeConfig({ ...v7Stored, compat: 'x' }, 7)) === stable({
@@ -39,6 +43,8 @@ export function run(): void {
         compat: COMPAT,
         excludes: EXCLUDES,
         efforts: { 'z-ai': { 'glm-5.2': 'high' } },
+        written: WRITTEN,
+        sources: SOURCES,
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), upgradeConfig({ ...v7Stored, compat: 'x' }, 7))
@@ -50,11 +56,13 @@ export function run(): void {
         compat: COMPAT,
         excludes: EXCLUDES,
         efforts: EFFORTS,
+        written: WRITTEN,
+        sources: SOURCES,
         behavior: BEHAVIOR,
         userExperience: USER_EXPERIENCE,
     }), upgradeConfig('garbage', 7))
     // 升级产物只含当前 schema 的已知键（configVersion + 五组布尔 + excludes + efforts），剥离多余键（schema 未声明的键被忽略）
-    check('升级产物剥离多余键', Object.keys(upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7)).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,configVersion,efforts,excludes,userExperience', upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7))
+    check('升级产物剥离多余键', Object.keys(upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7)).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,configVersion,efforts,excludes,sources,userExperience,written', upgradeConfig({ ...v7Stored, extra: 'ignored' }, 7))
 
     // efforts 宽松保留：坏结构回落 {}，不拖垮整段配置
     check('v7 efforts 坏结构回落空但保留其余字段', stable(upgradeConfig({ ...v7Stored, efforts: 'bad' }, 7)) === stable({
@@ -64,8 +72,10 @@ export function run(): void {
         compat: { disableDeveloper: false, disableStore: true },
         excludes: ['acme-gateway'],
         efforts: {},
+        written: WRITTEN,
+        sources: SOURCES,
         behavior: BEHAVIOR,
-        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+        userExperience: { rememberEfforts: false, defaultHigh: true, forgetRemoved: false, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
     }), upgradeConfig({ ...v7Stored, efforts: 'bad' }, 7))
 
     // ---------- 守卫：低于最低支持版本（MIN_SUPPORTED_VERSION = 7）的输入由最低一级台阶拒绝 ----------

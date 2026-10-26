@@ -9,6 +9,7 @@ import type { PluginConfig } from '@/shared/types'
 import { fix } from '@/fix'
 import { setConfigSource } from '@/config'
 import { setCatalog } from '@/catalog'
+import { fieldStampsOf, serializeStamps } from '@/stamp'
 import { API_NS, PLUGIN_NS } from '@/shared/constants'
 import { CONFIG_VERSION, DEFAULT_CONFIG, versionKey } from '@/shared/config-schema'
 import { check, stable } from '@test/helper'
@@ -41,6 +42,8 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         compat: { ...DEFAULT_CONFIG.compat, ...overrides.compat },
         excludes: overrides.excludes ?? [],
         efforts: overrides.efforts ?? {},
+        written: overrides.written ?? {},
+        sources: overrides.sources ?? {},
         behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
@@ -107,7 +110,7 @@ export async function run(): Promise<void> {
         check('autoFill.reasoning 关：变更计数为 1', changes === 1)
     }
 
-    // ---------- 3. allowUpdate 开启：覆盖已有错误值 ----------
+    // ---------- 3a. allowUpdate 开启，但现值是手改的：冻结，不覆盖 ----------
     {
         resetModules()
         const ctx = makeStubCtx({
@@ -120,8 +123,29 @@ export async function run(): Promise<void> {
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]
-        check('allowUpdate：覆盖已有推理级别', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }))
-        check('allowUpdate：变更计数为 1', changes === 1)
+        check('allowUpdate：手改过的值不动（无指纹即视为手改）', stable(model?.reasoningEfforts) === stable({ low: 'low' }), model)
+        check('allowUpdate：手改冻结时变更计数为 0 且零 mutate', changes === 0 && ctx.mutateCalls.length === 0, ctx.mutateCalls)
+    }
+
+    // ---------- 3b. allowUpdate 开启，现值与指纹一致：同源刷新（目录数据变了就跟着变） ----------
+    {
+        resetModules()
+        const shown = { reasoningEfforts: { low: 'low' } }
+        const stamp = serializeStamps(fieldStampsOf(shown, { r: 'c' }))
+        const ctx = makeStubCtx({
+            api: { providers: { testprovider: { models: [{ id: 'model-a', ...shown }] } } },
+            plugin: { [KEY]: { written: { testprovider: { 'model-a': stamp } } } },
+        })
+        setConfig(cfg({
+            autoFill: { reasoning: true, context: false, image: false },
+            allowUpdate: { reasoning: true, context: false, image: false },
+            written: { testprovider: { 'model-a': stamp } },
+        }))
+        setCatalog(CAT)
+        const changes = await fix(ctx as unknown as Context)
+        const model = modelsOf(ctx, 'testprovider')[0]
+        check('allowUpdate：指纹一致即同源刷新', stable(model?.reasoningEfforts) === stable({ off: 'none', low: 'low', high: 'high' }), model)
+        check('allowUpdate：同源刷新计数为 1', changes === 1)
     }
 
     // ---------- 4. force 单次绕过：allowUpdate 关但 force 开 ----------
@@ -194,10 +218,12 @@ export async function run(): Promise<void> {
         const efforts = (ctx.userOf(PLUGIN_NS)[KEY] as Record<string, unknown> | undefined)?.efforts
         check('记忆不由 fix 重建：已删模型与外部提供方的记忆逐字保留', stable(efforts) === stable(memories), efforts)
         check(
-            '记忆不由 fix 重建：写回只发生一次且落在 llm-pi-ai 段',
-            changes === 1 && ctx.mutateCalls.length === 1 && ctx.mutateCalls[0]?.ns === API_NS,
+            '记忆不由 fix 重建：写回分两笔（模型段 + 指纹段），均不碰记忆',
+            changes === 1 && ctx.mutateCalls.length === 2 && ctx.mutateCalls[0]?.ns === API_NS && ctx.mutateCalls[1]?.ns === PLUGIN_NS,
             ctx.mutateCalls,
         )
+        const written = (ctx.userOf(PLUGIN_NS)[KEY] as Record<string, unknown> | undefined)?.written
+        check('指纹落在自有段 written 表', typeof written === 'object' && written !== null && 'testprovider' in (written as object), written)
     }
 
     // ---------- 8. excludes：记忆与排除项彻底无关（零自有段写回） ----------
@@ -384,7 +410,7 @@ export async function run(): Promise<void> {
         setCatalog(CAT)
         const changes = await fix(ctx as unknown as Context)
         check('冲突重试：重试后成功返回变更数', changes === 1)
-        check('冲突重试：共两次 mutate 调用（首次被拒）', ctx.mutateCalls.length === 2)
+        check('冲突重试：三次 mutate（首次被拒 + 重试成功 + 指纹写回）', ctx.mutateCalls.length === 3, ctx.mutateCalls)
         check('冲突重试：最终文档已填充', modelsOf(ctx, 'testprovider')[0]?.contextWindow === 128000)
     }
 
@@ -472,7 +498,7 @@ export async function run(): Promise<void> {
         const ctx = makeStubCtx({
             api: { providers: { testprovider: { models: [{ id: 'model-x' }] } } },
         })
-        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true } }))
+        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true, nameFallback: true } }))
         setCatalog(AMBIGUOUS_CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]

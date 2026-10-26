@@ -133,11 +133,163 @@ export function lookup(
     if (fuzzy.length > 1) return synthesize(fuzzy)
 }
 
-/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为目录原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效） */
-export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string, string | null> | undefined {
-    if (!entry) return
+// ---------- 兜底匹配：命名空间前缀 / 显示名（只在三级级联全未命中时启用，见 docs/decisions-config.md「参数来源」） ----------
+
+/** 前导命名空间前缀（`cn:` / `us:`…）。只剥开头且冒号后还有内容；`kenari/hy3:free` 的冒号在**末段**
+ * （模型自带的 tag），这里不剥——剥错会把两个不同模型认成同一个 */
+const NAMESPACE_PREFIX = /^[a-z0-9][a-z0-9_-]*:/
+
+/** 剥前导命名空间前缀；无前缀原样返回 */
+export function stripNamespace(id: string): string {
+    const stripped = id.replace(NAMESPACE_PREFIX, '')
+    return stripped === '' ? id : stripped
+}
+
+/** 显示名归一成 id 形态：小写、非 id 字符压成 `-`，保留 `.` 与数字（版本号要留住） */
+export function normalizeName(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** 兜底聚合的支持度门槛：剥前缀（id 证据较强）过半即可；显示名（弱证据）要六成 */
+const PREFIX_SUPPORT = 0.5
+const NAME_SUPPORT = 0.6
+
+/** 收集某几种写法在目录里命中的全部条目（跨提供方，同一提供方只取首个命中） */
+function entriesFor(indexed: IndexedCatalog, forms: readonly string[]): IndexEntry[] {
+    const entries: IndexEntry[] = []
+    for (const form of forms) {
+        for (const group of indexed.groups.values()) {
+            const hit = matchId(form, group.ids)
+            if (hit === undefined) continue
+            const entry = group.byId.get(hit)
+            if (entry) entries.push(entry)
+        }
+    }
+    return entries
+}
+
+/** 多数声明：缺席（无值/空）不算反对票；并列第一或得票不到 `support` 一律留空 */
+function pickString(values: readonly (string | undefined)[], support: number): string | undefined {
+    const counts = new Map<string, number>()
+    let declared = 0
+    for (const value of values) {
+        if (value === undefined || value === '') continue
+        counts.set(value, (counts.get(value) ?? 0) + 1)
+        declared += 1
+    }
+    if (declared === 0) return
+    let best: string | undefined
+    let bestCount = 0
+    let tied = false
+    for (const [value, count] of counts) {
+        if (count > bestCount) {
+            best = value
+            bestCount = count
+            tied = false
+        } else if (count === bestCount) tied = true
+    }
+    if (best === undefined || tied || bestCount / declared < support) return
+    return best
+}
+
+/** 容量同理；并列时取较小（宁小勿大） */
+function pickNumber(values: readonly (number | undefined)[], support: number): number | undefined {
+    const counts = new Map<number, number>()
+    let declared = 0
+    for (const value of values) {
+        if (value === undefined || value <= 0) continue
+        counts.set(value, (counts.get(value) ?? 0) + 1)
+        declared += 1
+    }
+    if (declared === 0) return
+    let best: number | undefined
+    let bestCount = 0
+    let tied = false
+    let tiedMin: number | undefined
+    for (const [value, count] of counts) {
+        if (count > bestCount) {
+            best = value
+            bestCount = count
+            tied = false
+            tiedMin = value
+        } else if (count === bestCount) {
+            tied = true
+            tiedMin = tiedMin === undefined ? value : Math.min(tiedMin, value)
+        }
+    }
+    if (best === undefined || bestCount / declared < support) return
+    return tied ? tiedMin : best
+}
+
+/**
+ * 逐维聚合：域不明（跨提供方同名）时，四个维度各自投票——缺席不算反对票，
+ * 某取值在有声明者中过 `support` 才采纳，凑不出任何一维就判无匹配。
+ */
+function aggregate(entries: readonly IndexEntry[], support: number): IndexEntry | undefined {
+    if (entries.length === 0) return
+    const efforts = pickString(
+        entries.map((entry) =>
+            entry.efforts.length === 0 ? undefined : [...entry.efforts].map(levelOf).sort().join(','),
+        ),
+        support,
+    )
+    const contextWindow = pickNumber(
+        entries.map((entry) => entry.contextWindow),
+        support,
+    )
+    const maxTokens = pickNumber(
+        entries.map((entry) => entry.maxTokens),
+        support,
+    )
+    const image = pickString(
+        entries.map((entry) => (entry.image === true ? '1' : undefined)),
+        support,
+    )
+    if (efforts === undefined && contextWindow === undefined && maxTokens === undefined && image === undefined) return
+    return {
+        id: entries[0].id,
+        efforts: efforts === undefined ? [] : efforts.split(','),
+        ...(contextWindow === undefined ? {} : { contextWindow }),
+        ...(maxTokens === undefined ? {} : { maxTokens }),
+        ...(image === '1' ? { image: true } : {}),
+    }
+}
+
+/**
+ * 兜底一：剥掉命名空间前缀，拿剥后的 id 去目录里逐维聚合。
+ * 前缀是网关加的分组记号（`cn:deepseek-v4-pro`），剥掉后就是普通 id；但此时域（对应哪家提供方）
+ * 仍不明，`lookup` 的全局阶段遇到第二个提供方就放弃，故这里改为「多数声明」：
+ * 镜像之间的分歧集中在「某家少填一维」，缺席不该否掉别家的声明。无前缀时返回 undefined。
+ */
+export function lookupStripped(indexed: IndexedCatalog, modelId: string): IndexEntry | undefined {
+    const stripped = stripNamespace(modelId)
+    if (stripped === modelId) return
+    return aggregate(entriesFor(indexed, [stripped]), PREFIX_SUPPORT)
+}
+
+/**
+ * 兜底二：显示名归一后去目录里找（含去首段厂商标识）；
+ * 显示名是弱证据（各家写法不一、可能撞名），故门槛抬到六成，且并列第一即弃。
+ */
+export function lookupByName(indexed: IndexedCatalog, name: string): IndexEntry | undefined {
+    const normalized = normalizeName(name)
+    if (normalized === '') return
+    const forms = [normalized]
+    // 显示名常以厂商标识开头（`Xiaomi MiMo-V2.6-Pro`）：去掉首段再试一次
+    const cut = normalized.indexOf('-')
+    if (cut > 0) {
+        const tail = normalized.slice(cut + 1)
+        if (tail !== '' && !forms.includes(tail)) forms.push(tail)
+    }
+    return aggregate(entriesFor(indexed, forms), NAME_SUPPORT)
+}
+
+/** 转换为 reasoningEfforts 映射：key 为可选等级，value 为原始拼写（'off'/'none' 均映射到 off 键，保留原值而非 null）；七档之外的值丢弃（宿主只读七档键，写进去了也无效）。
+ * 目录条目与上游声明（档位名列表）共用本函数，保证两侧写出的形状完全一致 */
+export function toReasoningEffortsFromList(efforts: readonly string[] | undefined): Record<string, string | null> | undefined {
+    if (!efforts) return
     const mapped: Record<string, string | null> = {}
-    for (const effort of entry.efforts) {
+    for (const effort of efforts) {
         if (effort !== 'none' && !LEVELS.has(effort)) continue
         const level = effort === 'none' || effort === 'off' ? 'off' : effort
         mapped[level] = level === 'off' ? effort : level
@@ -146,6 +298,11 @@ export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string
     // 空或只剩 off：无可选档位，等同无匹配，不填充（与 stripEmptyFields 的空壳判据同口径）
     if (keys.length === 0 || (keys.length === 1 && keys[0] === 'off')) return
     return mapped
+}
+
+/** 目录条目 -> reasoningEfforts 映射（无条目即 undefined） */
+export function toReasoningEfforts(entry: IndexEntry | undefined): Record<string, string | null> | undefined {
+    return toReasoningEffortsFromList(entry?.efforts)
 }
 
 // ---------- 合成：跨提供方同名条目的保守合并与尽量匹配的候选合成（纯函数，见 docs/decisions-config.md「参数来源」） ----------
@@ -226,4 +383,130 @@ function synthesize(candidates: readonly IndexEntry[]): IndexEntry | undefined {
         maxTokens,
         ...(image ? { image: true } : {}),
     }
+}
+
+// ---------- 参数来源：候选枚举（「参数来源」下拉用，纯函数） ----------
+
+/** 参数来源候选键的拼法：`<provider>/<modelId>`；写进配置的 pin 值与下拉回传值共用这一个拼法 */
+export function sourceKey(provider: string, id: string): string {
+    return `${provider}/${id}`
+}
+
+/** 目录候选（下拉里的一行）：来源键 + 提供方 + 条目本身 + 被折叠的同值来源数 */
+export interface CatalogCandidate {
+    key: string
+    provider: string
+    entry: IndexEntry
+    /** 同 id 形态、同参数的其它来源键（只计数不列出）：`also > 0` 即「另有 N 家同值」 */
+    also: string[]
+}
+
+/** 单模型候选上限：目录里同一模型最多挂在几十家提供方下（实测 83 条），全列会把下拉撑爆 */
+const SOURCE_CANDIDATE_LIMIT = 24
+/** 精确命中的代表条数上限：同值来源折叠后一般只剩几条，其余名额留给同族变体 */
+const SOURCE_EXACT_LIMIT = 8
+
+/** 参数指纹：档位 + 两个容量 + 图片。同指纹的目录条目对填充而言完全等价，下拉里可以折叠成一行 */
+function signatureOf(entry: IndexEntry): string {
+    return [entry.efforts.join(','), entry.contextWindow ?? '', entry.maxTokens ?? '', entry.image === true ? '1' : '0'].join('|')
+}
+
+/** 允许跟在匹配键后的「同模型不同渠道/推理形态」限定词。版本号（`glm-5` 之于 `glm-5.3`）与
+ * `-flash` / `-air` 这类是另一个模型，不在表内——下拉里混进上一代模型比少列一条更糟 */
+const VARIANT_QUALIFIERS: ReadonlySet<string> = new Set(['free', 'free-tier', 'thinking', 'nothinking', 'reasoning', 'noreasoning', 'chat', 'instruct'])
+
+/** 变体距离：末段等于键（渠道加了 `vendor/` 前缀的镜像）记 0；两边只差允许的限定词（`-free`、`:free`、`-thinking`，
+ * 任一方向都算——网关叫 `-free` 而目录叫裸名时同样可选）记差出的长度；`glm-5` 这种版本级父级直接不收 */
+function variantDistance(tail: string, key: string): number | undefined {
+    if (tail === key) return 0
+    const longer = tail.length > key.length ? tail : key
+    const shorter = tail.length > key.length ? key : tail
+    if (!longer.startsWith(shorter)) return
+    const rest = longer.slice(shorter.length)
+    if (rest === '' || !/^[-:]/.test(rest)) return
+    const parts = rest.split(/[-:]/).filter((part) => part !== '')
+    if (parts.length === 0 || parts.some((part) => !VARIANT_QUALIFIERS.has(part))) return
+    return rest.length
+}
+
+/** 收集某模型在目录里的全部候选条目（供人工指定来源）：两轮扫描。
+ * 第一轮按三种匹配键（原 id / 剥命名空间前缀后的 id / 归一显示名）逐提供方取首个三级命中；
+ * 第二轮补「同族变体」：目录 id 的末段等于匹配键（`z-ai/glm-5.3-flash` 只是多一层厂商前缀的镜像），
+ * 或只多出渠道/推理限定词（`glm-5.3-flash` 收 `glm-5.3-flash-free`、`-thinking`；`glm-5` 是上一代模型，不收）。
+ * 变体只进下拉、绝不参与自动匹配。
+ * 同 id 形态且参数指纹相同的来源折叠成一行（`also` 记账）：83 条同值镜像否则会把变体全挤掉，而它们填出来的参数一模一样。
+ * 精确命中占前 8 个名额（同值折叠后一般只剩一两条），剩余名额按「末段长度差」由近及远给同族变体，
+ * 整体截到 `limit` 条。不判歧义也不合成——下拉就是把选择权交还用户 */
+export function collectCandidates(
+    indexed: IndexedCatalog,
+    providerId: string,
+    modelId: string,
+    name?: string,
+    limit = SOURCE_CANDIDATE_LIMIT,
+): CatalogCandidate[] {
+    const keys = [normalizeId(modelId)]
+    const bare = stripNamespace(modelId)
+    if (bare !== modelId) keys.push(normalizeId(bare))
+    const named = name === undefined ? '' : normalizeName(name)
+    if (named !== '' && !keys.includes(named)) keys.push(named)
+    // 变体扫描的包含键：太短的键（`hy3`、`o3`）会把整片目录都收进来，只留 ≥ 4 字符的
+    const variantKeys = keys.filter((key) => key.length >= 4)
+    // 本配置的提供方优先（目录里真有同名组时它的条目最可能是用户想要的）
+    const order = [providerId, ...[...indexed.groups.keys()].filter((provider) => provider !== providerId)]
+    /** 同 id 形态 + 同指纹的条目折叠到同一个代表行，被折叠的来源键记进 `also`。
+     * 折叠键取末段（`zai/glm-5.3-flash` 与 `glm-5.3-flash` 是同一模型，只差渠道前缀） */
+    const foldInto = (bucket: Map<string, CatalogCandidate>, candidate: CatalogCandidate): void => {
+        const id = candidate.entry.id
+        const tail = id.slice(id.lastIndexOf('/') + 1).toLowerCase()
+        const foldKey = `${tail}|${signatureOf(candidate.entry)}`
+        const representative = bucket.get(foldKey)
+        if (representative === undefined) bucket.set(foldKey, candidate)
+        else representative.also.push(candidate.key)
+    }
+    const exactReps = new Map<string, CatalogCandidate>()
+    const exactKeys = new Set<string>()
+    for (const provider of order) {
+        const group = indexed.groups.get(provider)
+        if (!group) continue
+        for (const key of keys) {
+            const hit = matchId(key, group.ids)
+            if (hit === undefined) continue
+            const entry = group.byId.get(hit)
+            if (!entry) continue
+            const candidate = { key: sourceKey(provider, entry.id), provider, entry, also: [] }
+            exactKeys.add(candidate.key)
+            foldInto(exactReps, candidate)
+            break
+        }
+    }
+    /** 同族变体的远近：末段等于匹配键的镜像排最前（同一模型的另一套数），其余按多出的限定词长短由近及远 */
+    const variantRows: Array<{ candidate: CatalogCandidate; distance: number }> = []
+    const variantSeen = new Set<string>()
+    for (const provider of order) {
+        const group = indexed.groups.get(provider)
+        if (!group) continue
+        for (const id of group.ids) {
+            const entry = group.byId.get(id)
+            if (!entry) continue
+            const key = sourceKey(provider, entry.id)
+            if (exactKeys.has(key) || variantSeen.has(key)) continue
+            const tail = id.slice(id.lastIndexOf('/') + 1).toLowerCase()
+            let distance: number | undefined
+            for (const wanted of variantKeys) {
+                const found = variantDistance(tail, wanted)
+                if (found === undefined) continue
+                distance = distance === undefined ? found : Math.min(distance, found)
+            }
+            if (distance === undefined) continue
+            variantSeen.add(key)
+            variantRows.push({ candidate: { key, provider, entry, also: [] }, distance })
+        }
+    }
+    variantRows.sort((left, right) => left.distance - right.distance)
+    const variantReps = new Map<string, CatalogCandidate>()
+    for (const row of variantRows) foldInto(variantReps, row.candidate)
+    // 精确命中占前 8 个名额（同值折叠后一般只剩一两条），剩下的名额按远近给同族变体
+    const exact = [...exactReps.values()].slice(0, Math.min(SOURCE_EXACT_LIMIT, limit))
+    const variants = [...variantReps.values()].slice(0, Math.max(0, limit - exact.length))
+    return [...exact, ...variants]
 }

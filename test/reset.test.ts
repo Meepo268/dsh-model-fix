@@ -10,8 +10,10 @@ const base: PluginConfig = {
     compat: { disableDeveloper: true, disableStore: true },
     excludes: ['acme-gateway'],
     efforts: {},
+    written: {},
+    sources: {},
         behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-    userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false },
+    userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
 }
 
 /** 取 modelOps 中 path 匹配的第一条 set op 的 value（provider 级 models 数组） */

@@ -8,6 +8,7 @@ import { setCatalog } from '@/catalog'
 import { setHmrExecuting } from '@/host'
 import { isIgnoreAll } from '@/guard'
 import { DEFAULT_CONFIG } from '@/shared/config-schema'
+import { setDeclarationSource } from '@/upstream'
 import { isPlainObject } from '@/shared/types'
 
 // 测试桩没有 hmr 注入（ctx.get 一律 undefined）：宣告注入已结算（值缺席），
@@ -38,7 +39,7 @@ export interface StubCtx {
         mutate(ns: string, ops: SettingsPathOp[], revision: number): Promise<void>
     }
     get(name: string): unknown
-    logger: { info(msg: string): void; warn(msg: string): void; error(msg: string): void }
+    logger: { info(msg: string): void; warn(msg: string): void; error(msg: string): void; debug(msg: string): void }
     /** 测试断言入口：取某段的实时段值 */
     userOf(ns: string): Record<string, unknown>
     /** 全部 mutate 调用（含被围栏拒绝的），按调用序；`guard` 为调用当次事件流守卫是否生效 */
@@ -97,14 +98,16 @@ export function makeStubCtx(opts: StubCtxOpts = {}): StubCtx {
             },
         },
         get() { return undefined },
-        logger: { info() {}, warn() {}, error() {} },
+        logger: { info() {}, warn() {}, error() {}, debug() {} },
         userOf(ns) { return sections.get(ns)?.user ?? {} },
         mutateCalls,
     }
 }
 
-/** 重置模块级单例（目录 + 配置源），每个用例前调用 */
+/** 重置模块级单例（目录 + 配置源 + 上游声明来源），每个用例前调用 */
 export function resetModules(): void {
     setConfigSource(() => DEFAULT_CONFIG)
     setCatalog({ catalog: {}, groups: new Map(), endpoints: new Map() })
+    // 默认不联网：fix 的编排用例只关心写回；端点回包由 @test/upstream.test 的注入点单独覆盖
+    setDeclarationSource(async () => new Map())
 }

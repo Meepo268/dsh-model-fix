@@ -35,6 +35,7 @@ export type CardKey =
     | 'rowLocalizeEfforts'
     | 'rowShowOriginalEfforts'
     | 'rowLooseMatch'
+    | 'rowNameFallback'
     | 'tipReasoning'
     | 'tipContext'
     | 'tipImage'
@@ -50,6 +51,7 @@ export type CardKey =
     | 'tipLocalizeEfforts'
     | 'tipShowOriginalEfforts'
     | 'tipLooseMatch'
+    | 'tipNameFallback'
     | 'excludePlaceholder'
     | 'excludeAdd'
     | 'excludeInvalid'
@@ -200,6 +202,32 @@ export type CardKey =
     | 'backToChatCompleted'
     // 经典设置按钮自身的文案
     | 'classicSettingLabel'
+    // 「参数来源」弹层与提供方卡片入口
+    | 'sourceAction'
+    | 'sourceTitle'
+    | 'sourceDesc'
+    | 'sourceAuto'
+    | 'sourceUpstreamOnly'
+    | 'sourceUpstreamLabel'
+    | 'sourceCatalogLabel'
+    | 'sourceNone'
+    | 'sourceNow'
+    | 'sourceCurrent'
+    | 'sourceImage'
+    | 'sourceImageMark'
+    | 'sourceExcluded'
+    | 'sourceEmpty'
+    | 'sourceFailed'
+    | 'sourceNoUpstream'
+    | 'sourceSearch'
+    | 'sourceOnlyProvider'
+    | 'sourceNoMatch'
+    | 'sourceSeat'
+    | 'sourceSeatHint'
+    | 'sourceUnmatched'
+    | 'sourceUnmatchedHint'
+    | 'sourceSeatUnmatched'
+    | 'sourceSeatUnmatchedHint'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
@@ -230,6 +258,7 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     localizeEfforts: 'rowLocalizeEfforts',
     showOriginalEfforts: 'rowShowOriginalEfforts',
     looseMatch: 'rowLooseMatch',
+    nameFallback: 'rowNameFallback',
 }
 
 /** 配置组（瓦片）标题键映射 */
@@ -273,4 +302,5 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     localizeEfforts: 'tipLocalizeEfforts',
     showOriginalEfforts: 'tipShowOriginalEfforts',
     looseMatch: 'tipLooseMatch',
+    nameFallback: 'tipNameFallback',
 }
