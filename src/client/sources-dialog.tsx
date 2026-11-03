@@ -53,6 +53,8 @@ interface SourcesDialogProps {
     sources: () => Promise<ConnectionRpcResult<unknown>>
     /** 写一个模型的来源（空串 = 回到自动） */
     setSource: (provider: string, model: string, source: string) => Promise<ConnectionRpcResult<unknown>>
+    /** 刷新上游声明（清缓存重抓 + 按闸门补填）：不传则本弹层不显示该键（只读快照仍可用） */
+    refreshDeclarations?: () => Promise<ConnectionRpcResult<unknown>>
     /** 从这里进来时只看这个提供方（提供方卡片上的入口）；缺省即看全部 */
     focusProvider?: string
 }
@@ -66,11 +68,14 @@ export function SourcesDialog({
     onClose,
     sources: fetchSources,
     setSource: writeSource,
+    refreshDeclarations,
     focusProvider,
 }: SourcesDialogProps) {
     const [snap, setSnap] = useState<SourceSnapshot | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
+    const [refreshing, setRefreshing] = useState(false)
+    const [refreshed, setRefreshed] = useState<string | null>(null)
     const [query, setQuery] = useState('')
     const [onlyFocus, setOnlyFocus] = useState(true)
     /** 重新取数：弹层打开时、以及每次回写成功后各来一次 */
@@ -91,13 +96,14 @@ export function SourcesDialog({
             setBusy(false)
         }
     }, [fetchSources, t])
-    // 打开即取数（每次打开都重取，配置可能在别处改过）；搜索词与筛选每次打开复位
+    // 打开即取数（每次打开都重取，配置可能在别处改过）；搜索词、筛选与刷新提示每次打开复位
     useEffect(() => {
         if (!open) return
         setSnap(null)
         setError(null)
         setQuery('')
         setOnlyFocus(true)
+        setRefreshed(null)
         void reload()
     }, [open, reload])
     const onChange = async (provider: string, model: string, source: string) => {
@@ -114,6 +120,37 @@ export function SourcesDialog({
             setError(t('sourceFailed', { message: failure instanceof Error ? failure.message : String(failure) }))
         } finally {
             setBusy(false)
+        }
+    }
+    // 刷新上游声明：本次点击的唯一意义是「绕开 6 小时缓存」，故 Node 半先清缓存再重抓；
+    // 抓完按既有闸门补填（不覆盖手改值），随后重取快照让列表反映新声明
+    const onRefresh = async () => {
+        if (refreshDeclarations === undefined) return
+        setRefreshing(true)
+        setRefreshed(null)
+        try {
+            const result = await refreshDeclarations()
+            if (!result.ok) {
+                setError(t('sourceFailed', { message: result.error.message }))
+                return
+            }
+            const value = result.value as { providers?: number; models?: number; changed?: number; throttled?: boolean } | undefined
+            const models = value?.models ?? 0
+            setError(null)
+            if (value?.throttled === true) setRefreshed(t('sourceRefreshThrottled'))
+            else if (models === 0) setRefreshed(t('sourceRefreshNone'))
+            else {
+                setRefreshed(t('sourceRefreshed', {
+                    providers: String(value?.providers ?? 0),
+                    models: String(models),
+                    changed: String(value?.changed ?? 0),
+                }))
+            }
+            await reload()
+        } catch (failure) {
+            setError(t('sourceFailed', { message: failure instanceof Error ? failure.message : String(failure) }))
+        } finally {
+            setRefreshing(false)
         }
     }
     // 提供方过滤 + 搜索：两件都是纯展示层筛选，不改快照本身。
@@ -158,7 +195,18 @@ export function SourcesDialog({
                         {t('sourceOnlyProvider')}
                     </label>
                 )}
+                {refreshDeclarations === undefined ? null : (
+                    <Button
+                        variant="outline"
+                        title={t('sourceRefreshHint')}
+                        disabled={busy || refreshing}
+                        onClick={() => { void onRefresh() }}
+                    >
+                        {refreshing ? t('sourceRefreshBusy') : t('sourceRefresh')}
+                    </Button>
+                )}
             </div>
+            {refreshed === null ? null : <p className="dsh-mf-sourceHint">{refreshed}</p>}
             <div className="dsh-mf-sourceBody">
                 {snap === null
                     ? (busy ? null : <p className="dsh-mf-sourceEmpty">{t('sourceEmpty')}</p>)

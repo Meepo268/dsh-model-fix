@@ -1,4 +1,5 @@
-/** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报；
+/** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报
+ * + sources / setSource 「参数来源」读写 + refreshDeclarations 手动刷新上游声明；
  * 验证与探测档位的进度各开一条 `connection.fetch` exact 路由。
  * 路由自注册而非宿主 `connection.rpc.handle` 的原因见 docs/decisions-config.md「写回端点」 */
 
@@ -9,7 +10,8 @@ import type {} from '@deepseek-ai/dsh-llm'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import {
-    API_NS, ENDPOINT_FORCE_UPDATE, ENDPOINT_REPORT_LOCALE,
+    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_FORCE_UPDATE, ENDPOINT_REFRESH_DECLARATIONS,
+    ENDPOINT_REPORT_LOCALE,
     ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
     ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
     PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE,
@@ -31,7 +33,7 @@ import { descriptorOf } from '@/section'
 import { buildSourceSnapshot } from '@/source'
 import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
 import { providersOf } from '@/shared/types'
-import { fetchDeclarations } from '@/upstream'
+import { fetchDeclarations, clearUpstreamCache, summarizeDeclarations } from '@/upstream'
 import { verifyModels } from '@/verify'
 import { createChannelRoute } from '@/rpc-route'
 import type { EndpointHandler } from '@/rpc-route'
@@ -131,7 +133,34 @@ async function handleSetSource(ctx: Context, payload: unknown): Promise<Connecti
     }
 }
 
-/** 注册一个 channel（三个写回端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
+/** 上次手动刷新上游声明的时刻（模块级单例：插件实例只有一个；卸载重建最坏也只是让用户多等一个节流窗口） */
+let lastRefreshAt = 0
+
+/** 「刷新上游声明」：清声明缓存 → 当场重抓一次 → 按既有闸门补一轮填充。返回声明规模与本轮变更模型数。
+ * 关键取舍：填充走 `fix(ctx)`（force=false），刷新不是「覆盖手改值」的授权——指纹与「允许更新」开关照旧生效 */
+async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    const now = Date.now()
+    if (now - lastRefreshAt < DECLARATION_REFRESH_THROTTLE_MS) {
+        return { ok: true, value: { providers: 0, models: 0, changed: 0, throttled: true } }
+    }
+    lastRefreshAt = now
+    startIgnoreAll()
+    try {
+        const providers = providersOf(descriptorOf(ctx, API_NS)?.user) ?? {}
+        // 不清缓存则 fetchDeclarations 直接回 6 小时内的旧值，这次点击等于什么都没做
+        clearUpstreamCache()
+        const declarations = await fetchDeclarations(ctx, providers)
+        const changed = await fix(ctx)
+        return { ok: true, value: { ...summarizeDeclarations(declarations), changed, throttled: false } }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/refresh-declarations-failed', message: errorText(error), details: {} } }
+    } finally {
+        endIgnoreAll()
+    }
+}
+
+/** 注册一个 channel（四个写回端点 + 两条「参数来源」+ 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer；无 webServer 的 profile（如 headless）下子 fiber 不启动，其余功能不受影响
     ctx.inject(['connection', 'webServer'], (rpcCtx) => {
@@ -148,6 +177,7 @@ export function installRpc(ctx: Context): void {
                     case ENDPOINT_REPORT_LOCALE: return handleReportLocale(payload)
                     case ENDPOINT_SOURCES: return handleSources(ctx)
                     case ENDPOINT_SET_SOURCE: return handleSetSource(ctx, payload)
+                    case ENDPOINT_REFRESH_DECLARATIONS: return handleRefreshDeclarations(ctx)
                     default:
                         return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }
                 }

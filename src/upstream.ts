@@ -162,9 +162,28 @@ export function setDeclarationSource(next: DeclarationLoader | undefined): void 
     if (next === undefined) cache.clear()
 }
 
-/** 清空抓取缓存（测试与「强制更新」用） */
+/** 清空抓取缓存（「刷新上游声明」端点与测试用）：下一次 `fetchDeclarations` 必然重打端点 */
 export function clearUpstreamCache(): void {
     cache.clear()
+}
+
+/** 声明规模：`providers` = 至少声明了一个模型的提供方数，`models` = 声明条数合计（刷新结果的一行汇报用） */
+export interface DeclarationSummary {
+    providers: number
+    models: number
+}
+
+/** 汇总一份声明表的规模（纯函数）：解析失败/端点不可达时得到 `{ providers: 0, models: 0 }` */
+export function summarizeDeclarations(declarations: DeclarationMap | undefined): DeclarationSummary {
+    if (declarations === undefined) return { providers: 0, models: 0 }
+    let providers = 0
+    let models = 0
+    for (const declared of declarations.values()) {
+        if (declared.size === 0) continue
+        providers++
+        models += declared.size
+    }
+    return { providers, models }
 }
 
 /** 解析提供方密钥：`apiKeyEnv` 是凭据**引用名**，经 `ctx.credentials` 现解析；未配置或解析失败返回 undefined。

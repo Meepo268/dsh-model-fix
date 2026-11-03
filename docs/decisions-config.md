@@ -49,3 +49,4 @@
 - **恢复是整批回退，不受 `excludes` 约束**：共有 model 回退 + 被删 model 复活（备份原序追加末尾）；被整删的 provider 不复活；启动后新增原样保留。备份只在 `apply` 最顶部捕获一次（晚于写回捕到的是填充过的内容）；备份缺失或当前无 `providers` 段显式抛错。
 - **三个写回端点各带等待上限（`WRITEBACK_MS`）**：上限只中止等待、不声称写回未发生（客户端中断传不到 handler，Node 半照跑完）；不与卡片卸载联动。
 - **`sources` / `setSource`（参数来源两端点）走同一条 channel**：`sources` 只读（读配置 + 目录 + 上游声明后出快照），`setSource` 只写自有段的 `sources` 表一行、写完不自己再跑一轮填充——由 `settings/document-updated` 的既有接线触发。两端点共用 `WRITEBACK_MS` 作等待上限。
+- **`refreshDeclarations`（刷新上游声明）语义 = 只绕缓存，不绕闸门**：先 `clearUpstreamCache()` 再当场重抓，随后走 `fix(ctx)`（**`force=false`**）——刷新不是「覆盖手改值」的授权，指纹冻结与 `allowUpdate` 开关照旧生效。它是声明 6 小时 TTL 的唯一手动出口：TTL 到期本身不产生抓取，必须有一次触发（启动 / 保存模型配置 / 本端点），故没有这个键就只能等下一次事件。等待上限单列 `DECLARATION_REFRESH_MS`（25 秒，抓取本身最长 10 秒 + 一轮填充），连点由 `DECLARATION_REFRESH_THROTTLE_MS`（10 秒）挡掉并回 `throttled: true`。卡片动作区与「参数来源」弹层共用同一端点，两处都复用同一节流。

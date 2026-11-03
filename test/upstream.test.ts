@@ -9,6 +9,7 @@ import {
     modelsUrl,
     parseDeclarations,
     setDeclarationSource,
+    summarizeDeclarations,
     UPSTREAM_FAIL_TTL_MS,
     UPSTREAM_TTL_MS,
 } from '@/upstream'
@@ -194,6 +195,18 @@ export async function run(): Promise<void> {
     } finally {
         restoreFetch()
     }
+
+    // summarizeDeclarations：「刷新上游声明」的一行汇报（提供方数按「至少声明了一个模型」计）
+    check('summarize 空表', summarizeDeclarations(new Map()).models === 0 && summarizeDeclarations(new Map()).providers === 0)
+    check('summarize undefined（端点全失败）', summarizeDeclarations(undefined).models === 0 && summarizeDeclarations(undefined).providers === 0)
+    const SUMMARY_TABLE: DeclarationMap = new Map([
+        ['a', new Map([['m1', { contextWindow: 1 }], ['m2', { maxTokens: 2 }]])],
+        ['b', new Map([['n1', { image: true }]])],
+        ['c', new Map()],
+    ])
+    const summary = summarizeDeclarations(SUMMARY_TABLE)
+    check('summarize 合计条数', summary.models === 3, summary)
+    check('summarize 只算有声明的提供方', summary.providers === 2, summary)
 
     // declarationOf：网关自报的 id 与调用 id 不同形时仍能对上（宁缺不错配）
     const DECLARED_TABLE: DeclarationMap = new Map([['p', new Map([

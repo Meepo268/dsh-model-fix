@@ -22,6 +22,7 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 
 - 添加了第三方模型，但是不知道推理级别、上下文窗口等参数？【自动填充】按 models.dev 数据补全模型参数（推理级别、上下文窗口、最大输出、图片模态），已有配置不受影响
 - 第三方模型参数更新了，却不知道怎么填？【允许更新】自动更新模型参数（已有配置也会更新）
+- 上游网关的模型列表变了，得等几小时或重启才能刷新？【刷新上游声明】卡片与「参数来源」弹层都能一键清缓存、当场重抓各提供方 `/models`，随后只补没被手改的字段
 - 手动给模型添加推理级别后，发现请求报错？【禁用`developer`角色】系统提示词改用旧版兼容的`system`角色
 - 请求体带 `store` 参数导致报错？【禁用`store`参数】请求体里不再带 `store` 键，兼容不认该参数的端点（如 LiteLLM 代理）
 - 某个提供方的模型不想被插件接管？【排除提供方】本插件完全不动（填充、更新、兼容性写入、强制更新、重置推理级别等功能跳过），基本等效于对它关闭插件
@@ -82,13 +83,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.1/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.0/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.1/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.0/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）

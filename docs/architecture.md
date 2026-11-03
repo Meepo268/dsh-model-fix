@@ -35,7 +35,7 @@
 | `src/probe-plan.ts` | 共用的计划层（入参校验、展开、分组、配额） |
 | `src/probe-report.ts` | 共用的汇报层（逐组结论、全局统计） |
 | `src/probe-engine.ts` | 共用执行引擎（单次请求受理判定、并发、进度帧） |
-| `src/rpc.ts` | 三个写回端点 + 两条 SSE 进度流端点（channel 自注册） |
+| `src/rpc.ts` | 四个写回端点（含 `refreshDeclarations`）+ 两条「参数来源」端点 + 两条 SSE 进度流端点（channel 自注册） |
 | `src/rpc-route.ts` | RPC 信封解码与路由分发 |
 | `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
 | `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单；宿主已自带时整层不装 |

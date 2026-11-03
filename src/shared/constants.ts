@@ -51,6 +51,8 @@ export const ENDPOINT_REPORT_LOCALE = 'reportLocale'
 export const ENDPOINT_SOURCES = 'sources'
 /** 写一个模型的参数来源 pin 的 endpoint 名（空串 = 回到自动） */
 export const ENDPOINT_SET_SOURCE = 'setSource'
+/** 「刷新上游声明」的 endpoint 名：清掉声明缓存重抓一次，再按既有闸门补填（语义见 docs/decisions-config.md「参数来源」） */
+export const ENDPOINT_REFRESH_DECLARATIONS = 'refreshDeclarations'
 
 /** 宿主自此版本起自带「未配置密钥的官方提供方自动隐藏」；≥ 此值时本插件的「隐藏官方API」空转 */
 export const HOST_AUTO_HIDE_SINCE = '0.2.1-alpha.2'
@@ -60,3 +62,9 @@ export const MAX_ATTEMPTS = 3
 
 /** 三个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 自身无计时器，不给就有永久占着卡片占用态的挂死路径（取舍见 docs/decisions-config.md「写回端点」） */
 export const WRITEBACK_MS = 10_000
+
+/** 「刷新上游声明」的等待上限：一次抓取本身最长 10 秒（`upstream.ts` 的 FETCH_MS）＋一轮填充与写回，故比常规写回端点宽 */
+export const DECLARATION_REFRESH_MS = 25_000
+
+/** 两次手动刷新之间的最小间隔：防连点重复打端点（网关多为按量计费，白打一轮没有意义） */
+export const DECLARATION_REFRESH_THROTTLE_MS = 10_000
