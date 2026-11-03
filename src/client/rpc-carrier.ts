@@ -16,7 +16,8 @@ import type { VerifyTarget } from '@/client/model'
 
 /** 浏览器半经本文件调 Node 半的调用面：三个写回端点（各带 `WRITEBACK_MS` 等待上限）、语言上报与两条诊断链的读流 */
 export interface RpcCarrier {
-    /** 强制更新 RPC：channel 与端点在入口拼好，卡片只消费结果 */
+    /** 「立即更新」：先重抓上游声明，再按最新值整片覆盖；返回 `{ changed, providers, models, refetched, upstreamEmpty }`。
+     * 等待上限同「刷新声明」——它要真的打一轮网关端点，10 秒不够 */
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
     /** 重置推理级别 RPC：仅剔除模型上的 reasoningEfforts（上下文 / 输出上限 / 图片模态可在模型页自行设置，不清除；excludes 命中跳过），配置段原样保留；返回受影响的模型数 */
     resetModels: () => Promise<ConnectionRpcResult<unknown>>
@@ -49,7 +50,7 @@ export interface RpcCarrier {
 /** 取一份调用面。`rpc` 是宿主 connection 服务的 client RPC 面（由调用方在子 fiber 内取用后传入） */
 export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const channel = `/${PLUGIN_NS}`
-    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(WRITEBACK_MS))
+    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(DECLARATION_REFRESH_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)

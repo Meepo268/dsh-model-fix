@@ -68,3 +68,7 @@ export const DECLARATION_REFRESH_MS = 25_000
 
 /** 两次手动刷新之间的最小间隔：防连点重复打端点（网关多为按量计费，白打一轮没有意义） */
 export const DECLARATION_REFRESH_THROTTLE_MS = 10_000
+
+/** 「立即更新」键的冷却：点完 5 秒内保持禁用，把连点挡在浏览器侧（比"后端静默跳过重抓"更容易被看见）。
+ * Node 半另有一道同名窗口兜底跨实例/跨席位的重复点击，两侧阈值取同一值 */
+export const FORCE_COOLDOWN_MS = 5_000

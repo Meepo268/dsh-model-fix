@@ -35,6 +35,7 @@ import { DiagnoseDialog } from '@/client/diagnose-dialog'
 import { ProbeDialog } from '@/client/probe-dialog'
 import type { RpcCarrier } from '@/client/rpc-carrier'
 import { errorText } from '@/shared/errors'
+import { FORCE_COOLDOWN_MS } from '@/shared/constants'
 import { DEFAULT_CONFIG, toStored } from '@/shared/config-schema'
 import type { CardBusy, Notice } from '@/client/card-notice'
 import { isWritebackTimeout, truncateMessage } from '@/client/card-notice'
@@ -93,6 +94,18 @@ export function Card(props: CardProps) {
     const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
     const saveStarted = useRef(false)
+    // 「立即更新」键的冷却：点完禁用 5 秒。连点的代价是各打一轮网关端点（白花额度），
+    // 且后端那道窗口对跨席位点击只能「跳过重抓」、挡不住覆盖，故禁用放在浏览器侧才看得见
+    const [cooling, setCooling] = useState(false)
+    const coolTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    useEffect(() => () => {
+        if (coolTimer.current !== undefined) clearTimeout(coolTimer.current)
+    }, [])
+    const startCooldown = () => {
+        setCooling(true)
+        if (coolTimer.current !== undefined) clearTimeout(coolTimer.current)
+        coolTimer.current = setTimeout(() => { setCooling(false) }, FORCE_COOLDOWN_MS)
+    }
 
     const saved = snap.value
     const shown = draft ?? saved ?? DEFAULT_CONFIG
@@ -234,20 +247,54 @@ export function Card(props: CardProps) {
         setNotice(null)
         setDraft(null)
     }
-    // 危险操作先弹 Modal 二次确认；不依赖 canWrite/dirty（不改配置，只按目录覆盖写回模型字段）
+    // 「立即更新」：危险操作先弹 Modal 二次确认；不依赖 canWrite/dirty（不改配置，只按最新值覆盖写回模型字段）。
+    // 结果带「重抓规模 + 覆盖数」三个数，与其它写回端点的单值 `changed` 不同形，故不走 reportWriteback
     const onForce = () => {
-        if (!ready || busy) return
+        if (!ready || busy || cooling) return
         setNotice(null)
         setConfirmOpen(true)
     }
     const runForce = () => {
         setConfirmOpen(false)
         setBusy('force')
-        reportWriteback(
-            props.forceUpdate(),
-            (count) => setNotice({ text: count > 0 ? t('forceDone', { count }) : t('forceNone'), tone: 'success' }),
-            (message) => setNotice({ text: t('forceFailed', { message: truncateMessage(message) }), tone: 'error' }),
-        )
+        startCooldown()
+        void props.forceUpdate()
+            .then((result) => {
+                if (!result.ok) {
+                    setNotice({ text: t('forceFailed', { message: truncateMessage(result.error.message) }), tone: 'error' })
+                    return
+                }
+                const value = result.value as {
+                    changed?: number
+                    providers?: number
+                    models?: number
+                    refetched?: boolean
+                    upstreamEmpty?: boolean
+                } | undefined
+                const count = value?.changed ?? 0
+                if (count === 0) {
+                    setNotice({ text: t('forceNone'), tone: 'success' })
+                    return
+                }
+                // 一条声明都没拿到时本次覆盖用的是目录值：必须说清，否则用户以为用的是网关声明的值
+                if (value?.upstreamEmpty === true) {
+                    setNotice({ text: t('forceDoneCatalogOnly', { count }), tone: 'error' })
+                    return
+                }
+                setNotice(value?.refetched === false
+                    ? { text: t('forceDoneCached', { count }), tone: 'success' }
+                    : {
+                        text: t('forceDone', { providers: String(value?.providers ?? 0), models: String(value?.models ?? 0), count }),
+                        tone: 'success',
+                    })
+            })
+            .catch((error: unknown) => {
+                setNotice({
+                    text: t('forceFailed', { message: truncateMessage(isWritebackTimeout(error) ? t('writebackTimeout') : errorText(error)) }),
+                    tone: 'error',
+                })
+            })
+            .finally(() => { setBusy(null) })
     }
     // 重置推理级别：与强制更新同形（危险键 + 二次确认）；配置段零写入（开关不变），竞态防护由 Node 半事件流守卫负责
     const onReset = () => {
@@ -278,40 +325,6 @@ export function Card(props: CardProps) {
             (count) => setNotice({ text: t('restoreDone', { count }), tone: 'success' }),
             (message) => setNotice({ text: t('restoreFailed', { message: truncateMessage(message) }), tone: 'error' }),
         )
-    }
-    // 刷新上游声明：清掉 6 小时声明缓存、当场重抓一次，再按既有闸门补填（不覆盖手改值，故不弹危险确认）。
-    // 结果自带规模，与三个写回端点的单值 `changed` 不同形，故不走 reportWriteback
-    const runRefresh = () => {
-        if (!ready || busy !== null) return
-        setNotice(null)
-        setBusy('refresh')
-        void props.refreshDeclarations()
-            .then((result) => {
-                if (!result.ok) {
-                    setNotice({ text: t('refreshFailed', { message: truncateMessage(result.error.message) }), tone: 'error' })
-                    return
-                }
-                const value = result.value as { providers?: number; models?: number; changed?: number; throttled?: boolean } | undefined
-                if (value?.throttled === true) {
-                    setNotice({ text: t('refreshThrottled'), tone: 'error' })
-                    return
-                }
-                const providers = value?.providers ?? 0
-                const models = value?.models ?? 0
-                setNotice(models === 0
-                    ? { text: t('refreshNone'), tone: 'error' }
-                    : {
-                        text: t('refreshDone', { providers: String(providers), models: String(models), changed: String(value?.changed ?? 0) }),
-                        tone: 'success',
-                    })
-            })
-            .catch((error: unknown) => {
-                setNotice({
-                    text: t('refreshFailed', { message: truncateMessage(isWritebackTimeout(error) ? t('writebackTimeout') : errorText(error)) }),
-                    tone: 'error',
-                })
-            })
-            .finally(() => { setBusy(null) })
     }
     // 清空记忆：前端经自有 NS 的 settings scope 直写（与「保存」同一条写通道）；失败要显式提示。
     // 与保存共用 busy 互斥：保存整段写含 efforts 实时值，并发时后落者会覆盖先落者
@@ -400,17 +413,8 @@ export function Card(props: CardProps) {
                     <span className="dsh-mf-actions">
                         <button
                             type="button"
-                            className="dsh-mf-discard dsh-mf-hintBtn"
-                            disabled={!ready || configLocked}
-                            onClick={runRefresh}
-                        >
-                            <span className="dsh-mf-btnMain">{busy === 'refresh' ? t('refreshBusy') : t('refresh')}</span>
-                            <span className="dsh-mf-btnHint">{t('refreshHint')}</span>
-                        </button>
-                        <button
-                            type="button"
                             className="dsh-mf-force dsh-mf-hintBtn"
-                            disabled={!ready || configLocked}
+                            disabled={!ready || configLocked || cooling}
                             onClick={onForce}
                         >
                             <span className="dsh-mf-btnMain">{busy === 'force' ? t('forceBusy') : t('force')}</span>
