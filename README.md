@@ -38,6 +38,7 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 - 自动填充效果不理想，总是填充不上？【尽量匹配】尽量给出一组合适的参数填充，**但无法保证准确**
 - 模型 id 带了命名空间前缀（如 `cn:deepseek-v4-pro`）或只有名字对得上，目录里就查不到？【兜底匹配】先剥前导命名空间前缀，再按显示名找；兜底阶段取「逐维多数声明」，凑不出多数就留空，不猜
 - 网关自报的档位跟 models.dev 不一致？【上游声明】优先用供应商端点 `GET {baseURL}/models` 自报的档位 / 上下文 / 输出上限 / 模态，端点不声明才看目录
+- 网关的 `/models` 字段跟别人不一样（magpie 的 `reasoning_levels` + `modalities.input`、OpenRouter 的 `context_length`/`architecture`、LiteLLM 的 `max_input_tokens`、LM Studio 的 `max_context_length`/`capabilities.vision`）？【宽收声明】四维各自按候选表认多种血统：档位多源合并、容量取首个合法值、模态任一为真即真；认不出的键当没声明，回落目录，不猜
 - 自动填的值把你手填的覆盖了？【指纹冻结】手改过的字段不再被自动来源改写；「允许更新」只刷新插件自己写过、且现值仍等于指纹的字段
 - 某个模型想固定用哪一家提供方的参数？【参数来源】逐模型指定：自动（上游声明 > 目录）/ 只用上游声明 / 目录里某一家，选完即按该来源整体填一次
 
@@ -83,13 +84,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.1/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.2/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.1/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.2/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）

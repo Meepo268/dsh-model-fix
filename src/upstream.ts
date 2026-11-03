@@ -52,22 +52,46 @@ function firstCapacity(...values: unknown[]): number | undefined {
     }
 }
 
-/** 从若干候选字段里收集档位名：`reasoning_supported_efforts` / `supported_parameters.reasoning_efforts` /
- * `reasoning_options[].values` / `capabilities.reasoning_efforts`，统一小写并把 `none` 折算为 `off` */
-function effortsOf(entry: Record<string, unknown>): string[] | undefined {
-    const candidates: unknown[] = [entry.reasoning_supported_efforts]
-    const supported = entry.supported_parameters
-    if (isPlainObject(supported)) candidates.push(supported.reasoning_efforts)
-    const capabilities = entry.capabilities
-    if (isPlainObject(capabilities)) candidates.push(capabilities.reasoning_efforts)
+/** 档位候选来源，顺序 = 发现顺序 = 写盘键序：先 models.dev 形状，再各家自造键，最后两个历史入口。
+ * 语义是**并集**（`effortsOf` 全收后去重），所以追加来源只会让档位变多，不会挤掉已有来源。 */
+function effortCandidates(entry: Record<string, unknown>): unknown[] {
+    const candidates: unknown[] = []
+    // ① models.dev 形状：`reasoning_options:[{type:'effort', values:[…]}]`
     const options = entry.reasoning_options
     if (Array.isArray(options)) {
         for (const option of options) {
             if (isPlainObject(option) && Array.isArray(option.values)) candidates.push(option.values)
         }
     }
+    // ② 自造：`reasoning_levels:['none','low','high']`，或 `[{effort:'high'}]`（混合出现时按原序）
+    const levels = entry.reasoning_levels
+    if (Array.isArray(levels)) {
+        candidates.push(levels.map((item) => {
+            if (typeof item === 'string') return item
+            return isPlainObject(item) ? item.effort ?? item.level : undefined
+        }))
+    }
+    // ③ 自造：`supported_reasoning_levels:[{effort:'high'}]`
+    const supportedLevels = entry.supported_reasoning_levels
+    if (Array.isArray(supportedLevels)) {
+        candidates.push(supportedLevels
+            .filter((item): item is Record<string, unknown> => isPlainObject(item))
+            .map((item) => item.effort))
+    }
+    // ④ 本插件最早支持的两路自造键
+    candidates.push(entry.reasoning_supported_efforts)
+    const supported = entry.supported_parameters
+    if (isPlainObject(supported)) candidates.push(supported.reasoning_efforts)
+    const capabilities = entry.capabilities
+    if (isPlainObject(capabilities)) candidates.push(capabilities.reasoning_efforts)
+    return candidates
+}
+
+/** 从若干候选字段里收集档位名（见 `effortCandidates`）：统一小写、`none` 折算为 `off`、过滤 harness 不认的取值，
+ * 并集去重；一个都没有即返回 undefined（＝端点未声明该维度） */
+function effortsOf(entry: Record<string, unknown>): string[] | undefined {
     const collected: string[] = []
-    for (const candidate of candidates) {
+    for (const candidate of effortCandidates(entry)) {
         if (!Array.isArray(candidate)) continue
         for (const value of candidate) {
             if (typeof value !== 'string') continue
@@ -78,21 +102,37 @@ function effortsOf(entry: Record<string, unknown>): string[] | undefined {
     return collected.length > 0 ? collected : undefined
 }
 
-/** 端点是否声明了图片输入：`input_modalities`（网关）或 `architecture.input_modalities` / `supports_images`（OpenRouter 风格） */
+/** 端点是否声明了图片输入：`input_modalities`（网关）/ `architecture.input_modalities` / `supports_images`（OpenRouter 风格）
+ * / `modalities.input`（models.dev 形状）/ `capabilities.vision`（LM Studio 原生）。任一为真即真，顺序无意义 */
 function imageOf(entry: Record<string, unknown>): boolean | undefined {
     if (entry.supports_images === true) return true
-    const lists: unknown[] = [entry.input_modalities]
+    const capabilities = entry.capabilities
+    if (isPlainObject(capabilities) && capabilities.vision === true) return true
+    const lists: unknown[] = [entry.input_modalities, entry.modalities]
     const architecture = entry.architecture
     if (isPlainObject(architecture)) lists.push(architecture.input_modalities)
     for (const list of lists) {
-        if (!Array.isArray(list)) continue
-        if (list.some((item) => typeof item === 'string' && item.toLowerCase() === 'image')) return true
+        // `modalities` 是对象（`{input:[…],output:[…]}`），与 `modalities.input` 同形者取内层
+        const values = isPlainObject(list) ? list.input : list
+        if (!Array.isArray(values)) continue
+        if (values.some((item) => typeof item === 'string' && item.toLowerCase() === 'image')) return true
     }
 }
 
 /**
  * 解析端点 `/models` 回包为「模型 id → 声明」；无任何可用信息的模型直接丢弃（与目录同口径：空壳不参与）。
  * 纯函数：不抓网络、不读配置。
+ *
+ * 字段并集（各家 `/models` 没有标准，只能按「宽收 + 宁缺不错配」把常见血统都认下来）：
+ * - 档位：`reasoning_options[].values`（models.dev 形状）→ `reasoning_levels[]` → `supported_reasoning_levels[].effort`
+ *   → `reasoning_supported_efforts[]` → `supported_parameters.reasoning_efforts[]` → `capabilities.reasoning_efforts[]`
+ * - 上下文：`context_window` → `context_length` → `max_input_tokens` → `limit.context` → `top_provider.context_length`
+ *   → `max_context_length`（LM Studio 原生口）
+ * - 输出：`max_output_tokens` → `max_completion_tokens` → `limit.output` → `top_provider.max_completion_tokens` → `max_tokens`
+ * - 图片：`input_modalities` / `architecture.input_modalities` / `supports_images` / `modalities.input` / `capabilities.vision`
+ *
+ * 档位是**并集**（多源合并去重，顺序即写盘键序）；容量是**先到先得**，所以语义含糊或后到的键必须排在末尾；
+ * 图片是「任一为真即真」。
  */
 export function parseDeclarations(payload: unknown): Map<string, Declaration> {
     const result = new Map<string, Declaration>()
@@ -105,20 +145,23 @@ export function parseDeclarations(payload: unknown): Map<string, Declaration> {
         const declaration: Declaration = {}
         const efforts = effortsOf(entry)
         if (efforts) declaration.efforts = efforts
+        // 顺序 = 优先级：越靠前的键语义越确定，靠后的留给各家自造与歧义键（见文件底部说明）
         const contextWindow = firstCapacity(
             entry.context_window,
             entry.context_length,
             entry.max_input_tokens,
             limit?.context,
             top?.context_length,
+            entry.max_context_length,
         )
         if (contextWindow !== undefined) declaration.contextWindow = contextWindow
         const maxTokens = firstCapacity(
             entry.max_output_tokens,
             entry.max_completion_tokens,
-            entry.max_tokens,
             limit?.output,
             top?.max_completion_tokens,
+            // 语义最乱的一个（有的网关指输出上限，有的指上下文），只在别无他据时采用
+            entry.max_tokens,
         )
         if (maxTokens !== undefined) declaration.maxTokens = maxTokens
         const image = imageOf(entry)
