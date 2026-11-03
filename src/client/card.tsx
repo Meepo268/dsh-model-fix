@@ -35,6 +35,7 @@ import { DiagnoseDialog } from '@/client/diagnose-dialog'
 import { ProbeDialog } from '@/client/probe-dialog'
 import type { RpcCarrier } from '@/client/rpc-carrier'
 import { errorText } from '@/shared/errors'
+import { FORCE_COOLDOWN_MS } from '@/shared/constants'
 import { DEFAULT_CONFIG, toStored } from '@/shared/config-schema'
 import type { CardBusy, Notice } from '@/client/card-notice'
 import { isWritebackTimeout, truncateMessage } from '@/client/card-notice'
@@ -93,6 +94,18 @@ export function Card(props: CardProps) {
     const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
     const saveStarted = useRef(false)
+    // 「立即更新」键的冷却：点完禁用 5 秒。连点的代价是各打一轮网关端点（白花额度），
+    // 且后端那道窗口对跨席位点击只能「跳过重抓」、挡不住覆盖，故禁用放在浏览器侧才看得见
+    const [cooling, setCooling] = useState(false)
+    const coolTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    useEffect(() => () => {
+        if (coolTimer.current !== undefined) clearTimeout(coolTimer.current)
+    }, [])
+    const startCooldown = () => {
+        setCooling(true)
+        if (coolTimer.current !== undefined) clearTimeout(coolTimer.current)
+        coolTimer.current = setTimeout(() => { setCooling(false) }, FORCE_COOLDOWN_MS)
+    }
 
     const saved = snap.value
     const shown = draft ?? saved ?? DEFAULT_CONFIG
@@ -130,7 +143,7 @@ export function Card(props: CardProps) {
         probeEfforts: props.probeEfforts,
         onNotice: setNotice,
     })
-    // 五个动作键共用一个占用态：任一处在途或任一弹层开着，其余四个一并禁用
+    // 六个动作键共用一个占用态：任一处在途或任一弹层开着，其余五个一并禁用
     const configLocked = busy !== null || verify.open || probe.open
 
     // 配置服务不可用：保留静态外壳（无展开语义）
@@ -234,20 +247,54 @@ export function Card(props: CardProps) {
         setNotice(null)
         setDraft(null)
     }
-    // 危险操作先弹 Modal 二次确认；不依赖 canWrite/dirty（不改配置，只按目录覆盖写回模型字段）
+    // 「立即更新」：危险操作先弹 Modal 二次确认；不依赖 canWrite/dirty（不改配置，只按最新值覆盖写回模型字段）。
+    // 结果带「重抓规模 + 覆盖数」三个数，与其它写回端点的单值 `changed` 不同形，故不走 reportWriteback
     const onForce = () => {
-        if (!ready || busy) return
+        if (!ready || busy || cooling) return
         setNotice(null)
         setConfirmOpen(true)
     }
     const runForce = () => {
         setConfirmOpen(false)
         setBusy('force')
-        reportWriteback(
-            props.forceUpdate(),
-            (count) => setNotice({ text: count > 0 ? t('forceDone', { count }) : t('forceNone'), tone: 'success' }),
-            (message) => setNotice({ text: t('forceFailed', { message: truncateMessage(message) }), tone: 'error' }),
-        )
+        startCooldown()
+        void props.forceUpdate()
+            .then((result) => {
+                if (!result.ok) {
+                    setNotice({ text: t('forceFailed', { message: truncateMessage(result.error.message) }), tone: 'error' })
+                    return
+                }
+                const value = result.value as {
+                    changed?: number
+                    providers?: number
+                    models?: number
+                    refetched?: boolean
+                    upstreamEmpty?: boolean
+                } | undefined
+                const count = value?.changed ?? 0
+                if (count === 0) {
+                    setNotice({ text: t('forceNone'), tone: 'success' })
+                    return
+                }
+                // 一条声明都没拿到时本次覆盖用的是目录值：必须说清，否则用户以为用的是网关声明的值
+                if (value?.upstreamEmpty === true) {
+                    setNotice({ text: t('forceDoneCatalogOnly', { count }), tone: 'error' })
+                    return
+                }
+                setNotice(value?.refetched === false
+                    ? { text: t('forceDoneCached', { count }), tone: 'success' }
+                    : {
+                        text: t('forceDone', { providers: String(value?.providers ?? 0), models: String(value?.models ?? 0), count }),
+                        tone: 'success',
+                    })
+            })
+            .catch((error: unknown) => {
+                setNotice({
+                    text: t('forceFailed', { message: truncateMessage(isWritebackTimeout(error) ? t('writebackTimeout') : errorText(error)) }),
+                    tone: 'error',
+                })
+            })
+            .finally(() => { setBusy(null) })
     }
     // 重置推理级别：与强制更新同形（危险键 + 二次确认）；配置段零写入（开关不变），竞态防护由 Node 半事件流守卫负责
     const onReset = () => {
@@ -361,50 +408,68 @@ export function Card(props: CardProps) {
                 </span>
             </div>
             <div className="dsh-mf-bar">
-                <span className="dsh-mf-actions">
-                    <button
-                        type="button"
-                        className="dsh-mf-force"
-                        disabled={!ready || configLocked}
-                        onClick={onForce}
-                    >
-                        {busy === 'force' ? t('forceBusy') : t('force')}
-                    </button>
-                    <button
-                        type="button"
-                        className="dsh-mf-force"
-                        disabled={!ready || configLocked}
-                        onClick={onReset}
-                    >
-                        {busy === 'reset' ? t('resetBusy') : t('reset')}
-                    </button>
-                    <button
-                        type="button"
-                        className="dsh-mf-discard"
-                        disabled={!ready || configLocked}
-                        onClick={onRestore}
-                    >
-                        {busy === 'restore' ? t('restoreBusy') : t('restore')}
-                    </button>
-                    {/* 弹层自带额度提示与 warn 语义确认键，已构成自确认，不叠二次确认弹层；触发键同取 warn 语义 */}
-                    <button
-                        type="button"
-                        className="dsh-mf-discard dsh-mf-warn"
-                        disabled={!ready || configLocked}
-                        onClick={verify.onOpen}
-                    >
-                        {t('verify')}
-                    </button>
-                    {/* 与验证同一 warn 语义（花额度且写回）；放在验证之后——写回前用户应已读过只读验证的结论 */}
-                    <button
-                        type="button"
-                        className="dsh-mf-discard dsh-mf-warn"
-                        disabled={!ready || configLocked}
-                        onClick={probe.onOpen}
-                    >
-                        {t('probe')}
-                    </button>
-                </span>
+                <div className="dsh-mf-barGroup">
+                    <span className="dsh-mf-barLabel">{t('groupFill')}</span>
+                    <span className="dsh-mf-actions">
+                        <button
+                            type="button"
+                            className="dsh-mf-force dsh-mf-hintBtn"
+                            disabled={!ready || configLocked || cooling}
+                            onClick={onForce}
+                        >
+                            <span className="dsh-mf-btnMain">{busy === 'force' ? t('forceBusy') : t('force')}</span>
+                            <span className="dsh-mf-btnHint">{t('forceHint')}</span>
+                        </button>
+                    </span>
+                </div>
+                <div className="dsh-mf-barGroup">
+                    <span className="dsh-mf-barLabel">{t('groupDiagnose')}</span>
+                    <span className="dsh-mf-actions">
+                        {/* 弹层自带额度提示与 warn 语义确认键，已构成自确认，不叠二次确认弹层；触发键同取 warn 语义 */}
+                        <button
+                            type="button"
+                            className="dsh-mf-discard dsh-mf-warn dsh-mf-hintBtn"
+                            disabled={!ready || configLocked}
+                            onClick={verify.onOpen}
+                        >
+                            <span className="dsh-mf-btnMain">{t('verify')}</span>
+                            <span className="dsh-mf-btnHint">{t('verifyHint')}</span>
+                        </button>
+                        {/* 与验证同一 warn 语义（花额度且写回）；放在验证之后——写回前用户应已读过只读验证的结论 */}
+                        <button
+                            type="button"
+                            className="dsh-mf-discard dsh-mf-warn dsh-mf-hintBtn"
+                            disabled={!ready || configLocked}
+                            onClick={probe.onOpen}
+                        >
+                            <span className="dsh-mf-btnMain">{t('probe')}</span>
+                            <span className="dsh-mf-btnHint">{t('probeHint')}</span>
+                        </button>
+                    </span>
+                </div>
+                <div className="dsh-mf-barGroup">
+                    <span className="dsh-mf-barLabel">{t('groupCleanup')}</span>
+                    <span className="dsh-mf-actions">
+                        <button
+                            type="button"
+                            className="dsh-mf-force dsh-mf-hintBtn"
+                            disabled={!ready || configLocked}
+                            onClick={onReset}
+                        >
+                            <span className="dsh-mf-btnMain">{busy === 'reset' ? t('resetBusy') : t('reset')}</span>
+                            <span className="dsh-mf-btnHint">{t('resetHint')}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="dsh-mf-discard dsh-mf-hintBtn"
+                            disabled={!ready || configLocked}
+                            onClick={onRestore}
+                        >
+                            <span className="dsh-mf-btnMain">{busy === 'restore' ? t('restoreBusy') : t('restore')}</span>
+                            <span className="dsh-mf-btnHint">{t('restoreHint')}</span>
+                        </button>
+                    </span>
+                </div>
             </div>
             <CardMeta t={t} />
         </>

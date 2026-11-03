@@ -5,7 +5,8 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 // channel RPC 的结果信封
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import {
-    ENDPOINT_FORCE_UPDATE, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
+    DECLARATION_REFRESH_MS,
+    ENDPOINT_FORCE_UPDATE, ENDPOINT_REFRESH_DECLARATIONS, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
     ENDPOINT_RESTORE_MODELS, ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
     PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
 } from '@/shared/constants'
@@ -15,7 +16,8 @@ import type { VerifyTarget } from '@/client/model'
 
 /** 浏览器半经本文件调 Node 半的调用面：三个写回端点（各带 `WRITEBACK_MS` 等待上限）、语言上报与两条诊断链的读流 */
 export interface RpcCarrier {
-    /** 强制更新 RPC：channel 与端点在入口拼好，卡片只消费结果 */
+    /** 「立即更新」：先重抓上游声明，再按最新值整片覆盖；返回 `{ changed, providers, models, refetched, upstreamEmpty }`。
+     * 等待上限同「刷新声明」——它要真的打一轮网关端点，10 秒不够 */
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
     /** 重置推理级别 RPC：仅剔除模型上的 reasoningEfforts（上下文 / 输出上限 / 图片模态可在模型页自行设置，不清除；excludes 命中跳过），配置段原样保留；返回受影响的模型数 */
     resetModels: () => Promise<ConnectionRpcResult<unknown>>
@@ -27,6 +29,9 @@ export interface RpcCarrier {
     sources: () => Promise<ConnectionRpcResult<unknown>>
     /** 写一个模型的参数来源 pin（空串 = 回到自动）；写回由 `settings/document-updated` 触发填充，本调用只落 pin */
     setSource: (provider: string, model: string, source: string) => Promise<ConnectionRpcResult<unknown>>
+    /** 刷新上游声明：清掉声明缓存重抓一次，再按既有闸门补填；返回 `{ providers, models, changed, throttled }`。
+     * 等待上限比常规写回端点宽——它要真的打一轮网关端点 */
+    refreshDeclarations: () => Promise<ConnectionRpcResult<unknown>>
     /** 验证模型：走进度流端点，对每个勾选模型发一次不带推理级别的最小请求，逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined，没能开跑或中途异常则抛错 */
     verifyModels: (
         models: readonly VerifyTarget[],
@@ -45,13 +50,15 @@ export interface RpcCarrier {
 /** 取一份调用面。`rpc` 是宿主 connection 服务的 client RPC 面（由调用方在子 fiber 内取用后传入） */
 export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const channel = `/${PLUGIN_NS}`
-    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(WRITEBACK_MS))
+    const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(DECLARATION_REFRESH_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
     const sources = () => rpc.call(channel, ENDPOINT_SOURCES, {}, AbortSignal.timeout(WRITEBACK_MS))
     const setSource = (provider: string, model: string, source: string) =>
         rpc.call(channel, ENDPOINT_SET_SOURCE, { provider, model, source }, AbortSignal.timeout(WRITEBACK_MS))
+    const refreshDeclarations = () =>
+        rpc.call(channel, ENDPOINT_REFRESH_DECLARATIONS, {}, AbortSignal.timeout(DECLARATION_REFRESH_MS))
     /** 读一条进度流：POST 载荷，逐帧回调非终帧，收于终帧时返回整轮汇总。
      * 用 `fetch` + `getReader()` 而非 `EventSource`：后者自动重连，而重连等于把整轮重新跑一遍。非 2xx 时优先用响应体文案（Node 半两条流都会给一句中文原因）。
      * 被中止（点停止 / 关窗 / 断连）时返回 `undefined`，那不是失败 */
@@ -111,5 +118,5 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => streamSummary(PROBE_STREAM_URL, { models, ...flags }, onFrame, signal)
-    return { forceUpdate, resetModels, restoreModels, reportLocale, sources, setSource, verifyModels, probeEfforts }
+    return { forceUpdate, resetModels, restoreModels, reportLocale, sources, setSource, refreshDeclarations, verifyModels, probeEfforts }
 }

@@ -82,9 +82,16 @@ const STYLE_TEXT = [
     '.dsh-mf-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
     '@media (max-width:680px){.dsh-mf-items{grid-template-columns:minmax(0,1fr)}}',
     '@media (prefers-reduced-motion:reduce){.dsh-mf-itemChevron{transition:none}}',
-    '.dsh-mf-bar{display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:12px 0 0;border-top:0.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1))}',
+    '.dsh-mf-bar{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:8px;padding:12px 0 0;border-top:0.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1))}',
     '.dsh-mf-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px}',
     '.dsh-mf-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+    // 动作区按用途分三组（填充 / 诊断 / 清理与回退）：组名占固定窄列，键区吃掉剩余宽度
+    '.dsh-mf-barGroup{display:flex;align-items:flex-start;gap:10px;width:100%}',
+    '.dsh-mf-barLabel{flex:0 0 68px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-caption,#adb2b8);padding-top:9px}',
+    // 两行键：主文案 + 一行灰色说明（说明用 caption 令牌；禁用态随整键 opacity 一起降，不必另设色）
+    '.dsh-mf-hintBtn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;max-width:280px}',
+    '.dsh-mf-btnMain{font-size:13px;line-height:1.4}',
+    '.dsh-mf-btnHint{font-size:11px;line-height:1.35;color:var(--dsw-alias-label-caption,#adb2b8);white-space:normal}',
     // footer 键度量照官方 SettingsForm .save；force 红字透明底照 .dangerButton 语义；discard 官方无同款，度量与 save 成对
     '.dsh-mf-discard,.dsh-mf-save,.dsh-mf-force{appearance:none;border:1px solid transparent;border-radius:var(--dsw-radius-md,12px);padding:5px 14px;font:inherit;font-size:13px;line-height:1.5;cursor:pointer}',
     '.dsh-mf-discard:focus-visible,.dsh-mf-save:focus-visible,.dsh-mf-force:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,rgb(65,118,230)));outline-offset:1px}',

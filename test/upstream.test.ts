@@ -9,6 +9,7 @@ import {
     modelsUrl,
     parseDeclarations,
     setDeclarationSource,
+    summarizeDeclarations,
     UPSTREAM_FAIL_TTL_MS,
     UPSTREAM_TTL_MS,
 } from '@/upstream'
@@ -77,6 +78,48 @@ export async function run(): Promise<void> {
     check('parse 哨兵容量（无上限）与非正数视为未声明', parsed.has('e') === false)
     check('parse 接受裸数组与 {models:[…]} 两种外壳', stable([...parseDeclarations([{ id: 'x', context_window: 100 }]).keys()]) === stable(['x']) && stable([...parseDeclarations({ models: [{ id: 'y' }] }).keys()]) === stable([]) && parseDeclarations({ models: [{ id: 'y', max_tokens: 10 }] }).get('y')?.maxTokens === 10)
     check('parse 垃圾回包返回空表', parseDeclarations(null).size === 0 && parseDeclarations('x').size === 0 && parseDeclarations({ data: 42 }).size === 0)
+
+    // 各家声明血统的并集：magpie（models.dev 形状 + 自造档位键）、LM Studio 原生口、OpenRouter 富信息
+    const MAGPIE = parseDeclarations({
+        data: [
+            {
+                id: 'wkb2api22/magpie-x',
+                context_length: 1_000_000,
+                max_output_tokens: 128_000,
+                modalities: { input: ['text', 'image'], output: ['text'] },
+                reasoning_levels: ['none', 'low', 'high', 'max'],
+                supported_parameters: ['reasoning'],
+                native_endpoints: ['anthropic'],
+                magpie_label: 'X',
+            },
+        ],
+    }).get('wkb2api22/magpie-x')
+    check('magpie：reasoning_levels 收档位（none→off，保留原序）', stable(MAGPIE?.efforts) === stable(['off', 'low', 'high', 'max']))
+    check('magpie：context_length / max_output_tokens 收容量', MAGPIE?.contextWindow === 1_000_000 && MAGPIE?.maxTokens === 128_000)
+    check('magpie：modalities.input 认图片，字符串数组 supported_parameters 不误读', MAGPIE?.image === true)
+
+    const OBJECT_LEVELS = parseDeclarations({
+        data: [
+            { id: 's1', supported_reasoning_levels: [{ effort: 'high' }, { effort: 'medium' }, { nope: 1 }] },
+            { id: 's2', reasoning_levels: [{ effort: 'low' }, 'high'] },
+        ],
+    })
+    check('supported_reasoning_levels[].effort 与对象形 reasoning_levels', stable(OBJECT_LEVELS.get('s1')?.efforts) === stable(['high', 'medium']) && stable(OBJECT_LEVELS.get('s2')?.efforts) === stable(['low', 'high']))
+
+    const UNION = parseDeclarations({ data: [{ id: 'u', reasoning_options: [{ values: ['low'] }], reasoning_levels: ['none'], reasoning_supported_efforts: ['high'] }] }).get('u')
+    check('档位是并集：多源合并去重，顺序跟随发现顺序', stable(UNION?.efforts) === stable(['low', 'off', 'high']))
+
+    const LM_STUDIO = parseDeclarations({ data: [{ id: 'lm', max_context_length: 131_072, capabilities: { vision: true } }] }).get('lm')
+    check('LM Studio 原生口：max_context_length / capabilities.vision', LM_STUDIO?.contextWindow === 131_072 && LM_STUDIO?.image === true)
+
+    const OUTPUT_PRIORITY = parseDeclarations({ data: [{ id: 'p', max_tokens: 8_000, limit: { output: 64_000 } }] }).get('p')
+    check('容量先到先得：limit.output 优先于语义含糊的 max_tokens', OUTPUT_PRIORITY?.maxTokens === 64_000)
+
+    const CONTEXT_PRIORITY = parseDeclarations({ data: [{ id: 'cp', max_context_length: 4_096, context_window: 1_000_000 }] }).get('cp')
+    check('容量先到先得：context_window 优先于 max_context_length', CONTEXT_PRIORITY?.contextWindow === 1_000_000)
+
+    const NO_IMAGE = parseDeclarations({ data: [{ id: 'ti', modalities: { input: ['text'] }, capabilities: { vision: false } }] })
+    check('模态只有 text 且无其他维度时整条丢弃（空壳不参与）', NO_IMAGE.size === 0)
 
     // 抓取：同地址去重、密钥、TTL、失败回落
     clearUpstreamCache()
@@ -194,6 +237,18 @@ export async function run(): Promise<void> {
     } finally {
         restoreFetch()
     }
+
+    // summarizeDeclarations：「刷新上游声明」的一行汇报（提供方数按「至少声明了一个模型」计）
+    check('summarize 空表', summarizeDeclarations(new Map()).models === 0 && summarizeDeclarations(new Map()).providers === 0)
+    check('summarize undefined（端点全失败）', summarizeDeclarations(undefined).models === 0 && summarizeDeclarations(undefined).providers === 0)
+    const SUMMARY_TABLE: DeclarationMap = new Map([
+        ['a', new Map([['m1', { contextWindow: 1 }], ['m2', { maxTokens: 2 }]])],
+        ['b', new Map([['n1', { image: true }]])],
+        ['c', new Map()],
+    ])
+    const summary = summarizeDeclarations(SUMMARY_TABLE)
+    check('summarize 合计条数', summary.models === 3, summary)
+    check('summarize 只算有声明的提供方', summary.providers === 2, summary)
 
     // declarationOf：网关自报的 id 与调用 id 不同形时仍能对上（宁缺不错配）
     const DECLARED_TABLE: DeclarationMap = new Map([['p', new Map([

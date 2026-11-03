@@ -21,7 +21,7 @@ interface SeatOwnerProps {
     provider?: { provider?: unknown }
 }
 
-export interface SourceSeatProps extends SeatOwnerProps, Pick<RpcCarrier, 'sources' | 'setSource'> {
+export interface SourceSeatProps extends SeatOwnerProps, Pick<RpcCarrier, 'sources' | 'setSource' | 'refreshDeclarations'> {
     t: TranslateNS<'settings.modelFix'>
     /** 注册用的键：席位定向分发到 `settingsNs`，自定义提供方全都指向 `llm-pi-ai`，故只作兜底 */
     fallbackProvider: string
@@ -61,7 +61,7 @@ function loadSnapshot(
 }
 
 export function SourceSeat(props: SourceSeatProps) {
-    const { t, fallbackProvider, sources, setSource } = props
+    const { t, fallbackProvider, sources, setSource, refreshDeclarations } = props
     // 与卡片同源的样式表：席位可能先于卡片挂载，故这里也挂一次（ensureStyles 幂等）
     useLayoutEffect(() => { ensureStyles() }, [])
     const [open, setOpen] = useState(false)
@@ -94,6 +94,7 @@ export function SourceSeat(props: SourceSeatProps) {
                 }}
                 sources={sources}
                 setSource={setSource}
+                refreshDeclarations={refreshDeclarations}
                 focusProvider={providerId}
             />
         </div>

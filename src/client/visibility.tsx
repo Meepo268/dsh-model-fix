@@ -164,6 +164,7 @@ export function applySlotVisibility(
                         fallbackProvider={key}
                         sources={card.sources}
                         setSource={card.setSource}
+                        refreshDeclarations={card.refreshDeclarations}
                     />
                 )))
             }

@@ -22,9 +22,10 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 
 - 添加了第三方模型，但是不知道推理级别、上下文窗口等参数？【自动填充】按 models.dev 数据补全模型参数（推理级别、上下文窗口、最大输出、图片模态），已有配置不受影响
 - 第三方模型参数更新了，却不知道怎么填？【允许更新】自动更新模型参数（已有配置也会更新）
+- 上游网关的模型列表变了，配置却还是旧的？【立即更新】先重抓各提供方 `/models` 的声明，再用最新值整片覆盖（有声明用声明，没有的回落 models.dev 目录）；只想刷新数据、不动配置，用「参数来源」里的「刷新声明」
 - 手动给模型添加推理级别后，发现请求报错？【禁用`developer`角色】系统提示词改用旧版兼容的`system`角色
 - 请求体带 `store` 参数导致报错？【禁用`store`参数】请求体里不再带 `store` 键，兼容不认该参数的端点（如 LiteLLM 代理）
-- 某个提供方的模型不想被插件接管？【排除提供方】本插件完全不动（填充、更新、兼容性写入、强制更新、重置推理级别等功能跳过），基本等效于对它关闭插件
+- 某个提供方的模型不想被插件接管？【排除提供方】本插件完全不动（填充、更新、兼容性写入、立即更新、重置推理级别等功能跳过），基本等效于对它关闭插件
 - 切换到某个模型后，推理级别重置了，还需要手动再选择一次？【记住推理级别】每模型独立记住上次手动选择的推理级别，切换模型时自动恢复
 - 感觉推理级别记忆问题？【清除记忆】关闭「记住推理级别」时询问是否确认清除记忆，可在清除后不保存设置，依然可以继续记忆，但旧记忆已清除
 - 新配置的模型也不想自己选推理级别？【默认使用 high】切换模型时，若没有该模型的记忆，且模型提供 `high` 档位，则自动设为 `high`
@@ -37,12 +38,13 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 - 自动填充效果不理想，总是填充不上？【尽量匹配】尽量给出一组合适的参数填充，**但无法保证准确**
 - 模型 id 带了命名空间前缀（如 `cn:deepseek-v4-pro`）或只有名字对得上，目录里就查不到？【兜底匹配】先剥前导命名空间前缀，再按显示名找；兜底阶段取「逐维多数声明」，凑不出多数就留空，不猜
 - 网关自报的档位跟 models.dev 不一致？【上游声明】优先用供应商端点 `GET {baseURL}/models` 自报的档位 / 上下文 / 输出上限 / 模态，端点不声明才看目录
+- 网关的 `/models` 字段跟别人不一样（magpie 的 `reasoning_levels` + `modalities.input`、OpenRouter 的 `context_length`/`architecture`、LiteLLM 的 `max_input_tokens`、LM Studio 的 `max_context_length`/`capabilities.vision`）？【宽收声明】四维各自按候选表认多种血统：档位多源合并、容量取首个合法值、模态任一为真即真；认不出的键当没声明，回落目录，不猜
 - 自动填的值把你手填的覆盖了？【指纹冻结】手改过的字段不再被自动来源改写；「允许更新」只刷新插件自己写过、且现值仍等于指纹的字段
 - 某个模型想固定用哪一家提供方的参数？【参数来源】逐模型指定：自动（上游声明 > 目录）/ 只用上游声明 / 目录里某一家，选完即按该来源整体填一次
 
 UI界面还提供了一些额外功能：
 
-- 强制更新：按模型缓存的当前值立即覆盖一遍
+- 立即更新：先重抓上游声明，再按最新值整片覆盖一遍（含手改过的字段；上游没声明就用 models.dev 目录值）
 - 重置推理级别：删除所有模型的推理级别字段（可能触发【自动填充】）
 - 恢复备份：回退到插件启动时已存在的模型参数（提供方已删除的不会恢复，已新增的不会删除）
 - 验证模型：验证所选模型是否可用（每模型一次最小请求，只读不写配置；不支持的档位可用「探测档位」逐档试出）
@@ -82,13 +84,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.1/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.2/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.37.1/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.2/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
