@@ -32,7 +32,7 @@ function refresh(ctx: Context, retryCount = MAX_ATTEMPTS): void {
                 return
             }
             lastRefreshAt = Date.now() // 时间戳仅成功时落定：失败不封保鲜窗口
-            setCatalog(indexed)
+            setCatalog(indexed, 'network')
             // 结算不经 index.ts 事件入口，须在此自查守卫：写回在途期间照常填充会把刚删除的字段填回，故仅跳过填充
             if (isIgnoreAll()) {
                 refreshing = false

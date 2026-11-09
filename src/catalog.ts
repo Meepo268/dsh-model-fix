@@ -4,6 +4,7 @@ import { API_URL, CACHE_FILE, FETCH_MS, LEVELS, MAX_ATTEMPTS, PROVIDER_API_FALLB
 import { PLUGIN_NAME } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import type { CacheGroup, CacheRecord, Catalog, IndexedCatalog, ModelEntry, ProviderGroup, IndexEntry } from '@/types'
+import type { SourceCatalogView } from '@/shared/source-view'
 import { isCapacity } from '@/types'
 import { normalizeId } from '@/lookup'
 import { isPlainObject } from '@/shared/types'
@@ -13,12 +14,32 @@ const EMPTY_INDEX: IndexedCatalog = { catalog: {}, groups: new Map(), endpoints:
 
 let indexedCache: IndexedCatalog | undefined
 
+/** 最近一次装载结果（提供方/模型计数与失败原因）：弹层顶部那行「目录：N 家 / M 个模型」就取这里。
+ * 单独记账的理由：`getCatalog()` 只答「索引是什么」，答不了「为什么是空的」——而这两者的现象一模一样 */
+let catalogView: SourceCatalogView | undefined
+/** 最近一次装载失败的原文：下一次成功即清零，失败期间供 UI 与日志引用 */
+let lastLoadError: string | undefined
+
 export function getCatalog(): IndexedCatalog {
     return indexedCache ?? EMPTY_INDEX
 }
 
-export function setCatalog(indexed: IndexedCatalog): void {
+/** 目录装载状况：未装载时返回 `empty` 兜底，并带上最近一次失败原因（若有） */
+export function catalogInfo(): SourceCatalogView {
+    if (catalogView) return catalogView
+    return lastLoadError === undefined
+        ? { source: 'empty', providers: 0, models: 0 }
+        : { source: 'empty', providers: 0, models: 0, error: lastLoadError }
+}
+
+/** 装载索引并记账：`source` 只影响弹层顶部那行的措辞（磁盘缓存 / 刚联网刷新）。
+ * 缺省按「磁盘缓存」记账——测试与一次性调用都只关心索引本身，不该被迫选来源 */
+export function setCatalog(indexed: IndexedCatalog, source: 'cache' | 'network' = 'cache'): void {
     indexedCache = indexed
+    lastLoadError = undefined
+    let models = 0
+    for (const group of indexed.groups.values()) models += group.byId.size
+    catalogView = { source, providers: indexed.groups.size, models }
 }
 
 /** 解析 models.dev 单条模型数据为推理、容量与模态结果；无有效信息返回 undefined */
@@ -183,24 +204,29 @@ export function parseCacheGroup(value: unknown): CacheGroup | undefined {
 
 /**
  * 从缓存文件异步加载目录：顶层必须为对象，逐层逐条校验；任一层/条不合法整份不可用（缓存为派生数据，坏盘自愈优先于坏条丢弃）。
+ * 失败必留痕：原因记进 `catalogInfo()` 并（给了 `log` 时）写一条 warn——静默失败正是「目录空、下拉没候选」查不出原因的根源。
  */
-export async function readCache(): Promise<IndexedCatalog | undefined> {
+export async function readCache(log?: (message: string) => void): Promise<IndexedCatalog | undefined> {
+    const fail = (reason: string): undefined => {
+        lastLoadError = reason
+        log?.(`${PLUGIN_NAME}: 读取目录缓存失败（${CACHE_FILE}）：${reason}`)
+    }
     try {
         const parsed = JSON.parse(await readFile(CACHE_FILE, 'utf8')) as unknown
-        if (!isPlainObject(parsed)) return
+        if (!isPlainObject(parsed)) return fail('缓存文件顶层不是对象')
         const catalog: Catalog = {}
         let usable = 0
         for (const [provider, group] of Object.entries(parsed)) {
             const records = parseCacheGroup(group)
-            if (records === undefined) return
+            if (records === undefined) return fail(`缓存里的 ${provider} 组不符合当前格式`)
             if (Object.keys(records.models).length === 0) continue
             catalog[provider] = records
             usable += 1
         }
-        if (usable === 0) return
+        if (usable === 0) return fail('缓存里没有可用的提供方')
         return indexFromCatalog(catalog)
-    } catch {
-        return
+    } catch (error) {
+        return fail(errorText(error))
     }
 }
 

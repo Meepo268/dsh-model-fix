@@ -13,6 +13,7 @@ import { declarationOf } from '@/upstream'
 import type { Declaration, DeclarationMap } from '@/upstream'
 import type {
     SourceCandidateView,
+    SourceCatalogView,
     SourceFieldsView,
     SourceModelView,
     SourceProviderView,
@@ -104,12 +105,14 @@ function fieldsOfModel(model: Record<string, unknown>): SourceFieldsView {
 }
 
 /** 构造「参数来源」弹层的整份快照（纯函数、可单测）：遍历配置里的提供方与模型，
- * 给出每行当前 pin、实际取胜来源、上游声明、目录候选与配置行现值。 */
+ * 给出每行当前 pin、实际取胜来源、上游声明、目录候选与配置行现值。
+ * `catalog` 是目录装载状况，原样透传给弹层顶部那一行——没有它，「目录空」会被误读成「匹配不上」。 */
 export function buildSourceSnapshot(
     cfg: PluginConfig,
     providers: Record<string, unknown>,
     indexed: IndexedCatalog,
     declarations: DeclarationMap | undefined,
+    catalog?: SourceCatalogView,
 ): SourceSnapshot {
     const excluded = new Set(cfg.excludes)
     const rows: SourceProviderView[] = []
@@ -164,5 +167,5 @@ export function buildSourceSnapshot(
         }
         if (list.length > 0) rows.push({ id: providerId, models: list })
     }
-    return { providers: rows }
+    return { providers: rows, ...(catalog === undefined ? {} : { catalog }) }
 }

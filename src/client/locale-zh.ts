@@ -250,4 +250,9 @@ export const zh: Record<CardKey, string> = {
     sourceRefreshed: '已刷新 {providers} 个提供方、{models} 个模型声明，更新 {changed} 个模型。',
     sourceRefreshNone: '上游没有返回可用声明，配置未变。',
     sourceRefreshThrottled: '刚刚刷新过，请稍后再试。',
+    sourceCatalogLine: '目录：{providers} 家提供方 · {models} 个模型（{source}）',
+    sourceCatalogFromCache: '磁盘缓存',
+    sourceCatalogFromNetwork: '刚联网刷新',
+    sourceCatalogEmpty: '目录为空：宿主进程里没有目录索引，下拉不会有候选，自动匹配也全部落空。多半是读缓存失败或插件宿主半没加载成功。',
+    sourceCatalogError: '目录为空（读取失败：{message}）',
 }

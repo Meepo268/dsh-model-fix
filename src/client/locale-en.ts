@@ -251,4 +251,9 @@ export const en: Record<CardKey, string> = {
     sourceRefreshed: 'Refreshed {models} model declarations from {providers} provider(s); updated {changed} model(s).',
     sourceRefreshNone: 'Upstream returned no usable declarations; nothing changed.',
     sourceRefreshThrottled: 'Just refreshed; try again in a moment.',
+    sourceCatalogLine: 'Catalog: {providers} provider(s) · {models} model(s) ({source})',
+    sourceCatalogFromCache: 'disk cache',
+    sourceCatalogFromNetwork: 'fetched just now',
+    sourceCatalogEmpty: 'Catalog is empty: the host process holds no catalog index, so the list has no candidates and every automatic match misses. Usually a failed cache read or the host half never loaded.',
+    sourceCatalogError: 'Catalog is empty (read failed: {message})',
 }

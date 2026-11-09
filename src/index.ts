@@ -87,11 +87,11 @@ function runStartupChain(ctx: Context): void {
         })
         .then(() => {
             if (!ctx.fiber.store) return
-            return readCache()
+            return readCache((message) => ctx.logger.warn(message))
         })
         .then((cached) => {
             if (!ctx.fiber.store) return
-            if (cached) setCatalog(cached)
+            if (cached) setCatalog(cached, 'cache')
             fix(ctx)
                 .then(() => recoverProbeBackup(ctx))
                 .finally(() => {

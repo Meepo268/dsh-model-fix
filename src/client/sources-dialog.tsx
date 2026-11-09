@@ -38,6 +38,22 @@ function fixedLabel(text: string, model: SourceModelView, t: Translate): string 
     return fitLabel(upstreamOptionLabel(text, model.upstream, t('sourceImageMark'), t('sourceNoUpstream')), 78)
 }
 
+/** 目录状况一句话：`目录：232 家 · 9008 个模型（磁盘缓存）`。空目录时把失败原因一并说出来——
+ * 没有这一行，「目录是空」和「模型没匹配上」在界面上长得一模一样 */
+function catalogLine(catalog: NonNullable<SourceSnapshot['catalog']>, t: Translate): string {
+    if (catalog.source === 'empty') {
+        return catalog.error === undefined
+            ? t('sourceCatalogEmpty')
+            : t('sourceCatalogError', { message: catalog.error })
+    }
+    const source = catalog.source === 'cache' ? t('sourceCatalogFromCache') : t('sourceCatalogFromNetwork')
+    return t('sourceCatalogLine', {
+        providers: String(catalog.providers),
+        models: String(catalog.models),
+        source,
+    })
+}
+
 /** 搜索命中：模型 id、显示名、任一候选的来源键里有子串即可（空查询全中） */
 function hits(model: SourceModelView, needle: string): boolean {
     if (needle === '') return true
@@ -206,6 +222,11 @@ export function SourcesDialog({
                     </Button>
                 )}
             </div>
+            {snap?.catalog === undefined ? null : (
+                <p className={`dsh-mf-sourceHint${snap.catalog.source === 'empty' ? ' dsh-mf-sourceWarn' : ''}`}>
+                    {catalogLine(snap.catalog, t)}
+                </p>
+            )}
             {refreshed === null ? null : <p className="dsh-mf-sourceHint">{refreshed}</p>}
             <div className="dsh-mf-sourceBody">
                 {snap === null

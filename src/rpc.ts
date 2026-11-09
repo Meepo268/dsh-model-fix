@@ -20,7 +20,7 @@ import { errorText } from '@/shared/errors'
 import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
-import { getCatalog } from '@/catalog'
+import { catalogInfo, getCatalog, readCache, setCatalog } from '@/catalog'
 import { resolveConfig } from '@/config'
 import { fix } from '@/fix'
 import { reportLocale } from '@/effort-name'
@@ -140,7 +140,17 @@ async function handleSources(ctx: Context): Promise<ConnectionRpcResult<unknown>
         const providers = providersOf(descriptorOf(ctx, API_NS)?.user) ?? {}
         const declarations = await fetchDeclarations(ctx, providers)
         const config = resolveConfig(descriptorOf(ctx, PLUGIN_NS)?.user)
-        return { ok: true, value: buildSourceSnapshot(config, providers, getCatalog(), declarations) }
+        // 自愈：宿主里没有索引时当场重读一次磁盘缓存。启动链若因竞态或异常没填上，这里能让下拉当场恢复而不必重启；
+        // 仍然为空时 `catalogInfo()` 会带上失败原因，弹层顶部那行就能分辨「目录空」与「没匹配上」
+        let indexed = getCatalog()
+        if (indexed.groups.size === 0) {
+            const cached = await readCache((message) => ctx.logger.warn(message))
+            if (cached) {
+                setCatalog(cached, 'cache')
+                indexed = cached
+            }
+        }
+        return { ok: true, value: buildSourceSnapshot(config, providers, indexed, declarations, catalogInfo()) }
     } catch (error) {
         return { ok: false, error: { code: 'model-fix/sources-failed', message: errorText(error), details: {} } }
     }

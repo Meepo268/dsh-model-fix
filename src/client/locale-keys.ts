@@ -244,6 +244,11 @@ export type CardKey =
     | 'sourceRefreshed'
     | 'sourceRefreshNone'
     | 'sourceRefreshThrottled'
+    | 'sourceCatalogLine'
+    | 'sourceCatalogFromCache'
+    | 'sourceCatalogFromNetwork'
+    | 'sourceCatalogEmpty'
+    | 'sourceCatalogError'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
