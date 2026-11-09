@@ -55,8 +55,18 @@ export interface SourceCatalogView {
     /** 目录里的提供方数与模型数（`empty` 时为 0） */
     providers: number
     models: number
+    /** 这份目录的取得时刻（毫秒）：`network` 是抓取时刻，`cache` 取的是缓存文件的修改时刻。
+     * 光说「磁盘缓存 / 刚联网刷新」看不出新旧——目录本身很少变，唯一值得看的就是它有多旧 */
+    at: number
     /** 装载失败的原因（成功即清零）：读缓存报错、格式不合法等 */
     error?: string
+}
+
+/** 时间戳短写：`2026-11-09 22:15`（本地时区，精确到分钟——目录按小时级保鲜，秒没有信息量） */
+export function formatStamp(at: number): string {
+    const date = new Date(at)
+    const pad = (value: number): string => String(value).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 /** 整份快照 */
@@ -128,4 +138,37 @@ export function unmatchedCount(snapshot: SourceSnapshot | undefined, providerId:
     const provider = snapshot?.providers.find((entry) => entry.id === providerId)
     if (provider === undefined) return 0
     return provider.models.filter((model) => model.source === 'none' && !model.excluded).length
+}
+
+/** 徽标要的那几个数（`undefined` = 不画徽标） */
+export interface SeatCounts {
+    total: number
+    matched: number
+    unmatched: number
+    fromUpstream: number
+    fromCatalog: number
+}
+
+/** 席位上那枚徽标要的数：总数、命中、未命中、按两路来源拆开的命中数。`undefined` = 不画徽标（该提供方不在快照里、
+ * 模型表为空、或整家都在排除列表里——本插件不动排除项，标数字反而像故障）。
+ * 拆开是因为「上游 /models 自报」与「models.dev 目录匹配」的可信度不同：前者是提供方自己的话，
+ * 后者是拿 id 去公共目录里猜的。只说一句「已命中 6 个」把这两种证据混成一谈，看不出该不该手动核一遍 */
+export function seatCounts(
+    snapshot: SourceSnapshot | undefined,
+    providerId: string,
+): SeatCounts | undefined {
+    const provider = snapshot?.providers.find((entry) => entry.id === providerId)
+    if (provider === undefined || provider.models.length === 0) return undefined
+    if (provider.models.every((model) => model.excluded)) return undefined
+    const fromUpstream = provider.models.filter((model) => model.source === 'upstream').length
+    const fromCatalog = provider.models.filter((model) => model.source === 'catalog').length
+    return {
+        total: provider.models.length,
+        // 命中数按两路相加算，不用「总数 - 未命中」：排除是提供方级的，真到了这里就不会有被排除行混进来，
+        // 但万一将来改成逐模型排除，相加的口径仍然对
+        matched: fromUpstream + fromCatalog,
+        unmatched: unmatchedCount(snapshot, providerId),
+        fromUpstream,
+        fromCatalog,
+    }
 }
