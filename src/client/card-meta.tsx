@@ -2,7 +2,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
 /** 卡片末尾联系行：仓库地址、版本标记与 star / 反馈跳转键，内容全在本文件内合成。 */
 
-const REPO_URL = 'https://github.com/TikaFlow/dsh-model-fix'
+const REPO_URL = 'https://github.com/Meepo268/dsh-model-fix'
 const ISSUES_URL = `${REPO_URL}/issues/new`
 const REPO_LABEL = REPO_URL.replace(/^https?:\/\//, '')
 
