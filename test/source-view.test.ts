@@ -1,9 +1,11 @@
-// source-view.ts 纯函数测试：容量短写、候选摘要、截断、RPC 信封认快照、「未命中」计数
+// source-view.ts 纯函数测试：容量短写、候选摘要、截断、RPC 信封认快照、「未命中」计数与席位常驻计数
 import { check } from '@test/helper'
 import {
     candidateSummary,
     capacityText,
     fitLabel,
+    formatStamp,
+    seatCounts,
     snapshotOfResult,
     unmatchedCount,
     upstreamOptionLabel,
@@ -66,4 +68,31 @@ export function run(): void {
     check('unmatchedCount 提供方不在快照里给 0', unmatchedCount(snapshot(model('a', 'none')), 'p2') === 0)
     check('unmatchedCount 无快照给 0', unmatchedCount(undefined, 'p1') === 0)
     check('unmatchedCount 空模型表给 0', unmatchedCount({ providers: [{ id: 'p1', models: [] }] }, 'p1') === 0)
+
+    // formatStamp：本地时区、精确到分钟、补零
+    check('formatStamp 补零且不带秒', formatStamp(new Date(2026, 10, 9, 8, 5).getTime()) === '2026-11-09 08:05', formatStamp(new Date(2026, 10, 9, 8, 5).getTime()))
+    check('formatStamp 跨年边界', formatStamp(new Date(2025, 0, 1, 0, 0).getTime()) === '2025-01-01 00:00')
+
+    // seatCounts：徽标两种状态各说一句话（有漏报未命中数、没漏报已命中数），取不到时给 undefined（不画）
+    // 排除是提供方级的：要么整家排除（下面那条 → undefined），要么一家都不排除；
+    // 这里造混合形态只为固定判据本身
+    check(
+        'seatCounts 把两路命中拆开报（上游 / 目录）',
+        JSON.stringify(seatCounts(snapshot(model('a', 'none'), model('b', 'catalog'), model('c', 'none', true)), 'p1'))
+            === JSON.stringify({ total: 3, matched: 1, unmatched: 1, fromUpstream: 0, fromCatalog: 1 }),
+        JSON.stringify(seatCounts(snapshot(model('a', 'none'), model('b', 'catalog'), model('c', 'none', true)), 'p1')),
+    )
+    check(
+        'seatCounts 全命中时未命中为 0、两路相加等于总数',
+        JSON.stringify(seatCounts(snapshot(model('a', 'upstream'), model('b', 'catalog'), model('c', 'upstream')), 'p1'))
+            === JSON.stringify({ total: 3, matched: 3, unmatched: 0, fromUpstream: 2, fromCatalog: 1 }),
+        JSON.stringify(seatCounts(snapshot(model('a', 'upstream'), model('b', 'catalog'), model('c', 'upstream')), 'p1')),
+    )
+    check('seatCounts 提供方不在快照里给 undefined', seatCounts(snapshot(model('a', 'none')), 'p2') === undefined)
+    check('seatCounts 无快照给 undefined', seatCounts(undefined, 'p1') === undefined)
+    check('seatCounts 空模型表给 undefined', seatCounts({ providers: [{ id: 'p1', models: [] }] }, 'p1') === undefined)
+    check(
+        'seatCounts 整家在排除列表里给 undefined（不标数字，免得像故障）',
+        seatCounts(snapshot(model('a', 'none', true), model('b', 'catalog', true)), 'p1') === undefined,
+    )
 }

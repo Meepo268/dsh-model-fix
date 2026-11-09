@@ -198,8 +198,10 @@ const STYLE_TEXT = [
     '.dsh-mf-sourceBody::-webkit-scrollbar-track{background:transparent}',
     // 提供方卡片里的入口行
     '.dsh-mf-sourceSeat{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
-    '.dsh-mf-sourceSeatHint{font-size:11px;color:var(--dsw-alias-label-caption,#adb2b8)}',
     '.dsh-mf-sourceSeatBadge{font-size:11px;line-height:1.4;padding:1px 6px;border-radius:6px;background:var(--dsw-alias-state-warn-tertiary,#fff1d6);color:var(--dsw-alias-state-warn-label,#dd8629)}',
+    // 命中徽标按「证据强弱」分两色：上游自报（淡绿）> 目录匹配（灰）；未命中仍用上面的琥珀
+    '.dsh-mf-sourceSeatBadgeOk{background:var(--dsw-alias-state-success-tertiary,#e8f6ec);color:var(--dsw-alias-state-success-label,#2f9e44)}',
+    '.dsh-mf-sourceSeatBadgeDim{background:var(--dsw-alias-bg-module-platform,#f2f3f5);color:var(--dsw-alias-label-secondary,#7c828a)}',
     // 模型行里的「未命中」灰字（自动来源既无声明也无目录条目时）
     '.dsh-mf-unmatched{margin-left:6px;font-size:11px;font-weight:400;color:var(--dsw-alias-state-warn-label,#dd8629)}',
     '.dsh-mf-sourceWarn{color:var(--dsw-alias-state-warn-label,#dd8629)}',

@@ -95,10 +95,10 @@ export function run(): void {
 
     // 整份快照：目录状况原样透传（弹层顶部那行靠它分辨「目录空」与「没匹配上」），老宿主不带该键也照常工作
     const providers = { gw: { models: [{ id: MODEL, name: 'DeepSeek-V4-Pro' }] } }
-    const withCatalog = buildSourceSnapshot(cfgWith({}), providers, indexed, DECLARATIONS, { source: 'cache', providers: 232, models: 9008 })
+    const withCatalog = buildSourceSnapshot(cfgWith({}), providers, indexed, DECLARATIONS, { source: 'cache', providers: 232, models: 9008, at: 1_700_000_000_000 })
     check('快照透传目录状况', withCatalog.catalog?.source === 'cache' && withCatalog.catalog.providers === 232 && withCatalog.catalog.models === 9008, withCatalog.catalog)
     check('快照行数不受目录状况影响', withCatalog.providers.length === 1 && withCatalog.providers[0].models[0].candidates.length > 0, withCatalog.providers)
-    const emptyCatalog = buildSourceSnapshot(cfgWith({}), providers, indexed, DECLARATIONS, { source: 'empty', providers: 0, models: 0, error: 'ENOENT' })
+    const emptyCatalog = buildSourceSnapshot(cfgWith({}), providers, indexed, DECLARATIONS, { source: 'empty', providers: 0, models: 0, at: 0, error: 'ENOENT' })
     check('目录为空时原因一并透出', emptyCatalog.catalog?.source === 'empty' && emptyCatalog.catalog.error === 'ENOENT', emptyCatalog.catalog)
     const legacy = buildSourceSnapshot(cfgWith({}), providers, indexed, DECLARATIONS)
     check('不给目录状况时快照不带该键（老宿主兼容）', legacy.catalog === undefined && legacy.providers.length === 1, legacy.catalog)

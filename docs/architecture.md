@@ -60,7 +60,7 @@
 | `src/shared/types.ts` | 跨半类型声明与纯类型守卫（含各规则组行键表） |
 | `src/shared/version.ts` | 宿主版本比较与「宿主是否已自带隐藏」判据 |
 | `src/shared/verify-progress.ts` | 探测/验证的进度帧契约与逐字段解码 |
-| `src/shared/source-view.ts` | 「参数来源」视图契约（快照/行/候选形状、目录状况 `SourceCatalogView`）与容量短写、候选摘要等纯函数 |
+| `src/shared/source-view.ts` | 「参数来源」视图契约（快照/行/候选形状、目录状况 `SourceCatalogView`）与容量短写、候选摘要、席位计数（`unmatchedCount` / `seatCounts`）等纯函数 |
 
 ### 浏览器半（`src/client/`）
 

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
-import { candidateSummary, fitLabel, snapshotOfResult, upstreamOptionLabel, type SourceModelView, type SourceSnapshot } from '@/shared/source-view'
+import { candidateSummary, fitLabel, formatStamp, snapshotOfResult, upstreamOptionLabel, type SourceModelView, type SourceSnapshot } from '@/shared/source-view'
 
 const { Button, Modal } = primitives
 
@@ -38,19 +38,19 @@ function fixedLabel(text: string, model: SourceModelView, t: Translate): string 
     return fitLabel(upstreamOptionLabel(text, model.upstream, t('sourceImageMark'), t('sourceNoUpstream')), 78)
 }
 
-/** 目录状况一句话：`目录：232 家 · 9008 个模型（磁盘缓存）`。空目录时把失败原因一并说出来——
- * 没有这一行，「目录是空」和「模型没匹配上」在界面上长得一模一样 */
+/** 目录状况一句话：`目录：235 家提供方 · 8864 个模型（2026-11-09 22:15）`。空目录时把失败原因一并说出来——
+ * 没有这一行，「目录是空」和「模型没匹配上」在界面上长得一模一样。
+ * 时间戳是这份目录的取得时刻（缓存取文件修改时刻、联网取抓取时刻）：目录本身很少变，值得看的只有新旧 */
 function catalogLine(catalog: NonNullable<SourceSnapshot['catalog']>, t: Translate): string {
     if (catalog.source === 'empty') {
         return catalog.error === undefined
             ? t('sourceCatalogEmpty')
             : t('sourceCatalogError', { message: catalog.error })
     }
-    const source = catalog.source === 'cache' ? t('sourceCatalogFromCache') : t('sourceCatalogFromNetwork')
     return t('sourceCatalogLine', {
         providers: String(catalog.providers),
         models: String(catalog.models),
-        source,
+        at: formatStamp(catalog.at),
     })
 }
 

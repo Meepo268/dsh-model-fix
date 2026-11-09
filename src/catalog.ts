@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import { API_URL, CACHE_FILE, FETCH_MS, LEVELS, MAX_ATTEMPTS, PROVIDER_API_FALLBACKS, RETRY_DELAY_MS } from '@/constants'
 import { alive } from '@/lifecycle'
@@ -24,6 +24,9 @@ let lastLoadError: string | undefined
 /** 本进程最近一次成功写缓存文件的时刻（毫秒，0 = 从未写过）：「拉取目录」把它回报给卡片，
  * 用来区分「抓到了但没落盘」与「根本没抓到」——这两种情况在界面上长得一模一样，却是完全不同的故障 */
 let cacheWrittenAt = 0
+/** 缓存文件最后一次被读进内存时的修改时刻（毫秒，0 = 没读过）：弹层顶部那行的「（时间戳）」
+ * 在 `cache` 来源下取它——说「磁盘缓存」看不出新旧，说时刻才看得出这份目录有多旧 */
+let cacheMtime = 0
 
 /** 本进程是否写过缓存（及何时）：诊断端点与排查文案取这里，不另外维护状态 */
 export function cacheWriteInfo(): { writtenAt: number } {
@@ -38,18 +41,18 @@ export function getCatalog(): IndexedCatalog {
 export function catalogInfo(): SourceCatalogView {
     if (catalogView) return catalogView
     return lastLoadError === undefined
-        ? { source: 'empty', providers: 0, models: 0 }
-        : { source: 'empty', providers: 0, models: 0, error: lastLoadError }
+        ? { source: 'empty', providers: 0, models: 0, at: 0 }
+        : { source: 'empty', providers: 0, models: 0, at: 0, error: lastLoadError }
 }
 
-/** 装载索引并记账：`source` 只影响弹层顶部那行的措辞（磁盘缓存 / 刚联网刷新）。
- * 缺省按「磁盘缓存」记账——测试与一次性调用都只关心索引本身，不该被迫选来源 */
+/** 装载索引并记账：`source` 决定弹层顶部那行的时间戳取哪儿——`network` 取此刻（刚抓的），
+ * `cache` 取缓存文件的修改时刻。缺省按「磁盘缓存」记账——测试与一次性调用都只关心索引本身，不该被迫选来源 */
 export function setCatalog(indexed: IndexedCatalog, source: 'cache' | 'network' = 'cache'): void {
     indexedCache = indexed
     lastLoadError = undefined
     let models = 0
     for (const group of indexed.groups.values()) models += group.byId.size
-    catalogView = { source, providers: indexed.groups.size, models }
+    catalogView = { source, providers: indexed.groups.size, models, at: source === 'network' ? Date.now() : cacheMtime || Date.now() }
 }
 
 /** 解析 models.dev 单条模型数据为推理、容量与模态结果；无有效信息返回 undefined */
@@ -222,6 +225,7 @@ export async function readCache(log?: (message: string) => void): Promise<Indexe
         log?.(`${PLUGIN_NAME}: 读取目录缓存失败（${CACHE_FILE}）：${reason}`)
     }
     try {
+        const info = await stat(CACHE_FILE)
         const parsed = JSON.parse(await readFile(CACHE_FILE, 'utf8')) as unknown
         if (!isPlainObject(parsed)) return fail('缓存文件顶层不是对象')
         const catalog: Catalog = {}
@@ -234,6 +238,8 @@ export async function readCache(log?: (message: string) => void): Promise<Indexe
             usable += 1
         }
         if (usable === 0) return fail('缓存里没有可用的提供方')
+        // 只在校验全过之后记时刻：坏文件不算「读到了目录」
+        cacheMtime = info.mtimeMs
         return indexFromCatalog(catalog)
     } catch (error) {
         return fail(errorText(error))
