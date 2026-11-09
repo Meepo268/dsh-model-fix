@@ -85,6 +85,7 @@ export function isDirty(draft: Flags, saved: Flags): boolean {
             if (groupValue(draft, group, key) !== groupValue(saved, group, key)) return true
         }
     }
+    if (draft.debugLog !== saved.debugLog) return true
     return !sameIdList(draft.excludes, saved.excludes)
 }
 

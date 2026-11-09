@@ -5,7 +5,8 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 // channel RPC 的结果信封
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import {
-    DECLARATION_REFRESH_MS,
+    CATALOG_REFRESH_MS, DECLARATION_REFRESH_MS,
+    ENDPOINT_FETCH_CATALOG,
     ENDPOINT_FORCE_UPDATE, ENDPOINT_REFRESH_DECLARATIONS, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
     ENDPOINT_RESTORE_MODELS, ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
     PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
@@ -19,6 +20,9 @@ export interface RpcCarrier {
     /** 「立即更新」：先重抓上游声明，再按最新值整片覆盖；返回 `{ changed, providers, models, refetched, upstreamEmpty }`。
      * 等待上限同「刷新声明」——它要真的打一轮网关端点，10 秒不够 */
     forceUpdate: () => Promise<ConnectionRpcResult<unknown>>
+    /** 「拉取目录」：重抓 models.dev 的目录数据（不是网关声明）再按既有闸门补填；返回 `{ providers, models, changed, written }`。
+     * `written=false` 表示这次没写缓存（内容无变化，或写入被跳过/失败）——排查时先看这一个字段 */
+    fetchCatalog: () => Promise<ConnectionRpcResult<unknown>>
     /** 重置推理级别 RPC：仅剔除模型上的 reasoningEfforts（上下文 / 输出上限 / 图片模态可在模型页自行设置，不清除；excludes 命中跳过），配置段原样保留；返回受影响的模型数 */
     resetModels: () => Promise<ConnectionRpcResult<unknown>>
     /** 恢复备份 RPC：回退启动时备份到当前配置（共有 provider 的共有 model 回退，其下被删的 model 复活）；返回被恢复与复活的模型数 */
@@ -51,6 +55,7 @@ export interface RpcCarrier {
 export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const channel = `/${PLUGIN_NS}`
     const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(DECLARATION_REFRESH_MS))
+    const fetchCatalog = () => rpc.call(channel, ENDPOINT_FETCH_CATALOG, {}, AbortSignal.timeout(CATALOG_REFRESH_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
@@ -118,5 +123,8 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
         onFrame: (frame: VerifyProgressUpdate) => void,
         signal: AbortSignal,
     ) => streamSummary(PROBE_STREAM_URL, { models, ...flags }, onFrame, signal)
-    return { forceUpdate, resetModels, restoreModels, reportLocale, sources, setSource, refreshDeclarations, verifyModels, probeEfforts }
+    return {
+        forceUpdate, fetchCatalog, resetModels, restoreModels, reportLocale, sources, setSource,
+        refreshDeclarations, verifyModels, probeEfforts,
+    }
 }

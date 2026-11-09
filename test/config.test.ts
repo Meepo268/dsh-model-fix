@@ -1,6 +1,6 @@
 // config.ts 纯函数测试：resolveConfig / parseSnapshot / versionKey / parseVersion
 import { resolveConfig } from '@/config'
-import { DEFAULT_CONFIG, parseSnapshot, parseVersion, versionKey } from '@/shared/config-schema'
+import { DEFAULT_CONFIG, parseSnapshot, parseVersion, toStored, versionKey } from '@/shared/config-schema'
 import { check, stable } from '@test/helper'
 
 export function run(): void {
@@ -155,6 +155,12 @@ export function run(): void {
     check('parseSnapshot v8 userExperience 非法字段触发整段非法（不是单个键）', parseSnapshot({ configVersion: 8, userExperience: { rememberEfforts: 'bad' } }) === undefined, parseSnapshot({ configVersion: 8, userExperience: { rememberEfforts: 'bad' } }))
     check('v8 快照里的 followParent 经 resolveConfig 原样生效', stable(resolveConfig({ 'version-8': v8Entry }).userExperience) === stable({ rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: true, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true }), resolveConfig({ 'version-8': v8Entry }).userExperience)
     check('parseSnapshot 剥离 configVersion 等运行时不消费的键', Object.keys(parseSnapshot(v7Entry) ?? {}).sort().join(',') === 'allowUpdate,autoFill,behavior,compat,efforts,excludes,sources,userExperience,written', parseSnapshot(v7Entry))
+    // 排查日志开关：缺省不写键（旧快照无需迁移），只有明确的 true 才出现且原样往返
+    check('parseSnapshot 缺省不含 debugLog 键', parseSnapshot({ configVersion: 8 })?.debugLog === undefined, parseSnapshot({ configVersion: 8 }))
+    check('parseSnapshot debugLog=true 原样保留', parseSnapshot({ configVersion: 8, debugLog: true })?.debugLog === true)
+    check('parseSnapshot debugLog 非 true 一律按关', parseSnapshot({ configVersion: 8, debugLog: 'yes' })?.debugLog === undefined, parseSnapshot({ configVersion: 8, debugLog: 'yes' }))
+    check('toStored 关闭时不写 debugLog 键', 'debugLog' in toStored({ ...DEFAULT_CONFIG }) === false, toStored({ ...DEFAULT_CONFIG }))
+    check('toStored 开启时写入 debugLog 并保留旧键', stable(toStored({ ...DEFAULT_CONFIG, debugLog: true }).debugLog) === stable(true) && toStored({ ...DEFAULT_CONFIG, debugLog: true }).configVersion === 8)
     // 缺省 excludes 落的是新建数组：解析结果被调用方改动不得污染 DEFAULT_CONFIG
     const materialized = parseSnapshot({ configVersion: 7 })
     materialized?.excludes.push('mutated')

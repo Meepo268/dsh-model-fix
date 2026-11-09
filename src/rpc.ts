@@ -1,5 +1,5 @@
 /** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报
- * + sources / setSource 「参数来源」读写 + refreshDeclarations 手动刷新上游声明；
+ * + sources / setSource 「参数来源」读写 + refreshDeclarations 手动刷新上游声明 + fetchCatalog 手动拉取目录；
  * 验证与探测档位的进度各开一条 `connection.fetch` exact 路由。
  * 路由自注册而非宿主 `connection.rpc.handle` 的原因见 docs/decisions-config.md「写回端点」 */
 
@@ -10,17 +10,19 @@ import type {} from '@deepseek-ai/dsh-llm'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import {
-    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_FORCE_UPDATE, ENDPOINT_REFRESH_DECLARATIONS,
+    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_FETCH_CATALOG, ENDPOINT_FORCE_UPDATE,
+    ENDPOINT_REFRESH_DECLARATIONS,
     ENDPOINT_REPORT_LOCALE, FORCE_COOLDOWN_MS,
     ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
     ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
     PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE,
 } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
+import { logLine } from '@/log'
 import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
-import { getCatalog } from '@/catalog'
+import { cacheWriteInfo, catalogInfo, fetchLatest, getCatalog, readCache, setCatalog } from '@/catalog'
 import { resolveConfig } from '@/config'
 import { fix } from '@/fix'
 import { reportLocale } from '@/effort-name'
@@ -73,6 +75,8 @@ async function handleForceUpdate(ctx: Context): Promise<ConnectionRpcResult<unkn
         const declarations = refetch ? await fetchDeclarations(ctx, providers) : undefined
         const changed = await fix(ctx, true)
         const summary = summarizeDeclarations(declarations)
+        const upstreamEmpty = refetch && hasFetchableProvider(providers) && summary.models === 0
+        logLine(`${PLUGIN_NAME}: 立即更新完成：重抓=${refetch ? '是' : '否'}，声明 ${summary.providers} 家/${summary.models} 条，覆盖 ${changed} 个模型`)
         return {
             ok: true,
             value: {
@@ -81,11 +85,45 @@ async function handleForceUpdate(ctx: Context): Promise<ConnectionRpcResult<unkn
                 models: summary.models,
                 refetched: refetch,
                 // 有可抓的提供方、抓完却一条声明都没有：网关没响应或没声明，本次覆盖用的是目录值
-                upstreamEmpty: refetch && hasFetchableProvider(providers) && summary.models === 0,
+                upstreamEmpty,
             },
         }
     } catch (error) {
+        logLine(`${PLUGIN_NAME}: 立即更新失败：${errorText(error)}`)
         return { ok: false, error: { code: 'model-fix/force-update-failed', message: errorText(error), details: {} } }
+    } finally {
+        endIgnoreAll()
+    }
+}
+
+/** 「拉取目录」：重抓 models.dev 的**目录数据本身**（不是网关声明）并补一轮填充。
+ * 与「立即更新」的分工：那条换的是上游声明（数据来源优先级里的第二档），这条换的是目录（第三档）；
+ * 目录平时只在启动链 6 小时过期时才自动重拉，因此「上游改了但目录还旧」需要一个人工入口。
+ * 失败不阻塞：抓取自带 10 秒超时（`FETCH_MS`），失败即以错误结果返回，界面只出一条提示，卡片不会挂在占用态。
+ * 返回值里的 `written` 是排查用的事实：抓到数据却没落盘时，界面能说清「缓存没写成」而不是让用户以为网络坏了 */
+async function handleFetchCatalog(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    const before = cacheWriteInfo().writtenAt
+    startIgnoreAll()
+    try {
+        const indexed = await fetchLatest(ctx)
+        setCatalog(indexed, 'network')
+        const changed = await fix(ctx)
+        const view = catalogInfo()
+        const written = cacheWriteInfo().writtenAt > before
+        logLine(`${PLUGIN_NAME}: 拉取目录完成：${view.providers} 家/${view.models} 个模型，落盘=${written ? '是' : '否'}，覆盖 ${changed} 个模型`)
+        return {
+            ok: true,
+            value: {
+                providers: view.providers,
+                models: view.models,
+                changed,
+                written,
+            },
+        }
+    } catch (error) {
+        logLine(`${PLUGIN_NAME}: 拉取目录失败：${errorText(error)}`)
+        return { ok: false, error: { code: 'model-fix/fetch-catalog-failed', message: errorText(error), details: {} } }
     } finally {
         endIgnoreAll()
     }
@@ -140,7 +178,17 @@ async function handleSources(ctx: Context): Promise<ConnectionRpcResult<unknown>
         const providers = providersOf(descriptorOf(ctx, API_NS)?.user) ?? {}
         const declarations = await fetchDeclarations(ctx, providers)
         const config = resolveConfig(descriptorOf(ctx, PLUGIN_NS)?.user)
-        return { ok: true, value: buildSourceSnapshot(config, providers, getCatalog(), declarations) }
+        // 自愈：宿主里没有索引时当场重读一次磁盘缓存。启动链若因竞态或异常没填上，这里能让下拉当场恢复而不必重启；
+        // 仍然为空时 `catalogInfo()` 会带上失败原因，弹层顶部那行就能分辨「目录空」与「没匹配上」
+        let indexed = getCatalog()
+        if (indexed.groups.size === 0) {
+            const cached = await readCache((message) => ctx.logger.warn(message))
+            if (cached) {
+                setCatalog(cached, 'cache')
+                indexed = cached
+            }
+        }
+        return { ok: true, value: buildSourceSnapshot(config, providers, indexed, declarations, catalogInfo()) }
     } catch (error) {
         return { ok: false, error: { code: 'model-fix/sources-failed', message: errorText(error), details: {} } }
     }
@@ -170,6 +218,7 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
     if (isIgnoreAll()) return writeInProgress()
     const now = Date.now()
     if (now - lastFetchAt < DECLARATION_REFRESH_THROTTLE_MS) {
+        logLine(`${PLUGIN_NAME}: 刷新声明被跳过（${DECLARATION_REFRESH_THROTTLE_MS / 1000} 秒内重复点击）`)
         return { ok: true, value: { providers: 0, models: 0, changed: 0, throttled: true } }
     }
     lastFetchAt = now
@@ -180,15 +229,18 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
         clearUpstreamCache()
         const declarations = await fetchDeclarations(ctx, providers)
         const changed = await fix(ctx)
-        return { ok: true, value: { ...summarizeDeclarations(declarations), changed, throttled: false } }
+        const summary = summarizeDeclarations(declarations)
+        logLine(`${PLUGIN_NAME}: 刷新声明完成：${summary.providers} 家/${summary.models} 条，覆盖 ${changed} 个模型`)
+        return { ok: true, value: { ...summary, changed, throttled: false } }
     } catch (error) {
+        logLine(`${PLUGIN_NAME}: 刷新声明失败：${errorText(error)}`)
         return { ok: false, error: { code: 'model-fix/refresh-declarations-failed', message: errorText(error), details: {} } }
     } finally {
         endIgnoreAll()
     }
 }
 
-/** 注册一个 channel（四个写回端点 + 两条「参数来源」+ 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
+/** 注册一个 channel（三个写回端点 + 三条「参数来源/目录」端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer；无 webServer 的 profile（如 headless）下子 fiber 不启动，其余功能不受影响
     ctx.inject(['connection', 'webServer'], (rpcCtx) => {
@@ -200,6 +252,7 @@ export function installRpc(ctx: Context): void {
             const handler: EndpointHandler = async (endpoint, payload) => {
                 switch (endpoint) {
                     case ENDPOINT_FORCE_UPDATE: return handleForceUpdate(ctx)
+                    case ENDPOINT_FETCH_CATALOG: return handleFetchCatalog(ctx)
                     case ENDPOINT_RESET_MODELS: return handleResetModels(ctx)
                     case ENDPOINT_RESTORE_MODELS: return handleRestoreModels(ctx)
                     case ENDPOINT_REPORT_LOCALE: return handleReportLocale(payload)

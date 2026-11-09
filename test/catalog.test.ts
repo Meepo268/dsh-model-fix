@@ -1,7 +1,7 @@
-// catalog.ts 纯函数测试：buildCatalog 分组构建与剪裁（推理/容量/图片模态三源）、端点采集与缓存条目结构校验
-import { buildCatalog, isCacheRecord, parseCacheGroup } from '@/catalog'
+// catalog.ts 纯函数测试：buildCatalog 分组构建与剪裁（推理/容量/图片模态三源）、端点采集与缓存条目结构校验、目录状况记账
+import { buildCatalog, cacheWriteInfo, catalogInfo, getCatalog, isCacheRecord, parseCacheGroup, setCatalog } from '@/catalog'
 import { CAPACITY_UNLIMITED } from '@/constants'
-import type { CacheRecord } from '@/types'
+import type { CacheRecord, IndexedCatalog } from '@/types'
 import { isCapacity } from '@/types'
 import { check, stable } from '@test/helper'
 
@@ -90,4 +90,22 @@ export function run(): void {
         && parseCacheGroup({ a: { efforts: [] } }) === undefined
         && parseCacheGroup('x') === undefined
         && parseCacheGroup([]) === undefined)
+
+    // 目录状况：装载来源与计数要能直接读出来，且未装载时是 empty 兜底——
+    // 弹层顶部那行「目录：N 家 / M 个模型」与「目录空」的判据全在这里
+    check('未装载时 catalogInfo 是 empty 兜底', catalogInfo().source === 'empty' && catalogInfo().providers === 0 && catalogInfo().models === 0, catalogInfo())
+    setCatalog({
+        catalog: {} as IndexedCatalog['catalog'],
+        groups: new Map([
+            ['p1', { ids: ['a'], byId: new Map([['a', { id: 'a', efforts: ['high'] }]]) }],
+            ['p2', { ids: ['b', 'c'], byId: new Map([['b', { id: 'b', efforts: ['low'] }], ['c', { id: 'c', efforts: ['low'] }]]) }],
+        ]),
+        endpoints: new Map(),
+    }, 'network')
+    check('setCatalog 记下来源、提供方数与模型总数', catalogInfo().source === 'network' && catalogInfo().providers === 2 && catalogInfo().models === 3, catalogInfo())
+    // 复位成空索引，避免这份模块级状态影响后续用例
+    setCatalog({ catalog: {} as IndexedCatalog['catalog'], groups: new Map(), endpoints: new Map() }, 'cache')
+    check('空索引的计数归零', getCatalog().groups.size === 0 && catalogInfo().models === 0, catalogInfo())
+    // 缓存写入记账：本模块只记账不落盘，未跑过 fetchLatest 时必为 0——「抓到了但没写盘」与「没抓到」全靠它区分
+    check('未写过缓存时 cacheWriteInfo 为 0', cacheWriteInfo().writtenAt === 0, cacheWriteInfo())
 }

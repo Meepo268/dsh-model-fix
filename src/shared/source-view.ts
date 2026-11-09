@@ -48,9 +48,22 @@ export interface SourceProviderView {
     models: SourceModelView[]
 }
 
+/** 目录装载状况：区分「目录是空」与「模型没匹配上」——两者的现象一模一样，只有这一行能分辨。
+ * `cache`/`network` 是索引真正装载的来源，`empty` 表示宿主进程里没有索引（读缓存失败或加载链未跑） */
+export interface SourceCatalogView {
+    source: 'cache' | 'network' | 'empty'
+    /** 目录里的提供方数与模型数（`empty` 时为 0） */
+    providers: number
+    models: number
+    /** 装载失败的原因（成功即清零）：读缓存报错、格式不合法等 */
+    error?: string
+}
+
 /** 整份快照 */
 export interface SourceSnapshot {
     providers: SourceProviderView[]
+    /** 目录状况（老宿主可能没有，故可选） */
+    catalog?: SourceCatalogView
 }
 
 /** 档位列表 -> 展示串（`['low','high']` → `low / high`） */

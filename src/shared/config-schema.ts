@@ -228,7 +228,11 @@ export function parseSnapshot(value: unknown): PluginConfig | undefined {
     const written = parseEfforts(value.written)
     // sources 是用户意图（认哪家提供方的参数），宽松解析但保留 trim 后的非空值
     const sources = parseSources(value.sources)
-    return { allowUpdate, autoFill, compat, excludes, efforts, written, sources, behavior, userExperience }
+    // debugLog 沿用「默认不写键」的规矩：只有明确的 true 才出现在配置里（缺省即关，坏值也按关）
+    return {
+        allowUpdate, autoFill, compat, excludes, efforts, written, sources, behavior, userExperience,
+        ...(value.debugLog === true ? { debugLog: true } : {}),
+    }
 }
 
 /** 运行时配置 -> 规范 v8 存储快照。字段一律拷贝，防 DEFAULT_CONFIG 被就地改写 */
@@ -244,5 +248,7 @@ export function toStored(config: PluginConfig): PluginConfigSnapshot {
         sources: { ...config.sources },
         behavior: { ...config.behavior },
         userExperience: { ...config.userExperience },
+        // 关着就不写这个键：缺省即关，存储面与旧版本逐字节一致
+        ...(config.debugLog === true ? { debugLog: true } : {}),
     }
 }

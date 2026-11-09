@@ -38,6 +38,22 @@ function fixedLabel(text: string, model: SourceModelView, t: Translate): string 
     return fitLabel(upstreamOptionLabel(text, model.upstream, t('sourceImageMark'), t('sourceNoUpstream')), 78)
 }
 
+/** 目录状况一句话：`目录：232 家 · 9008 个模型（磁盘缓存）`。空目录时把失败原因一并说出来——
+ * 没有这一行，「目录是空」和「模型没匹配上」在界面上长得一模一样 */
+function catalogLine(catalog: NonNullable<SourceSnapshot['catalog']>, t: Translate): string {
+    if (catalog.source === 'empty') {
+        return catalog.error === undefined
+            ? t('sourceCatalogEmpty')
+            : t('sourceCatalogError', { message: catalog.error })
+    }
+    const source = catalog.source === 'cache' ? t('sourceCatalogFromCache') : t('sourceCatalogFromNetwork')
+    return t('sourceCatalogLine', {
+        providers: String(catalog.providers),
+        models: String(catalog.models),
+        source,
+    })
+}
+
 /** 搜索命中：模型 id、显示名、任一候选的来源键里有子串即可（空查询全中） */
 function hits(model: SourceModelView, needle: string): boolean {
     if (needle === '') return true
@@ -55,6 +71,8 @@ interface SourcesDialogProps {
     setSource: (provider: string, model: string, source: string) => Promise<ConnectionRpcResult<unknown>>
     /** 刷新上游声明（清缓存重抓 + 按闸门补填）：不传则本弹层不显示该键（只读快照仍可用） */
     refreshDeclarations?: () => Promise<ConnectionRpcResult<unknown>>
+    /** 拉取 models.dev 目录（清缓存重抓 + 落盘 + 补填）：「刷新数据」键的另一半，缺任一半则该键不显示 */
+    fetchCatalog?: () => Promise<ConnectionRpcResult<unknown>>
     /** 从这里进来时只看这个提供方（提供方卡片上的入口）；缺省即看全部 */
     focusProvider?: string
 }
@@ -69,6 +87,7 @@ export function SourcesDialog({
     sources: fetchSources,
     setSource: writeSource,
     refreshDeclarations,
+    fetchCatalog,
     focusProvider,
 }: SourcesDialogProps) {
     const [snap, setSnap] = useState<SourceSnapshot | null>(null)
@@ -122,27 +141,34 @@ export function SourcesDialog({
             setBusy(false)
         }
     }
-    // 刷新上游声明：本次点击的唯一意义是「绕开 6 小时缓存」，故 Node 半先清缓存再重抓；
-    // 抓完按既有闸门补填（不覆盖手改值），随后重取快照让列表反映新声明
+    // 刷新数据：一次点击取两路——目录（models.dev 数据本身）与上游声明（网关自报）。
+    // 顺序不能反：目录是「按名字找参数」的底座，先取声明会拿旧目录去匹配，白抓一次。
+    // 两路都只是重抓 + 按既有闸门补填（不覆盖手改值），随后重取快照让列表反映新数据
     const onRefresh = async () => {
-        if (refreshDeclarations === undefined) return
+        if (refreshDeclarations === undefined || fetchCatalog === undefined) return
         setRefreshing(true)
         setRefreshed(null)
         try {
+            const catalog = await fetchCatalog()
+            if (!catalog.ok) {
+                setError(t('sourceFailed', { message: catalog.error.message }))
+                return
+            }
+            const catalogValue = catalog.value as { providers?: number; models?: number } | undefined
             const result = await refreshDeclarations()
             if (!result.ok) {
                 setError(t('sourceFailed', { message: result.error.message }))
                 return
             }
             const value = result.value as { providers?: number; models?: number; changed?: number; throttled?: boolean } | undefined
-            const models = value?.models ?? 0
             setError(null)
             if (value?.throttled === true) setRefreshed(t('sourceRefreshThrottled'))
-            else if (models === 0) setRefreshed(t('sourceRefreshNone'))
             else {
-                setRefreshed(t('sourceRefreshed', {
+                setRefreshed(t('sourceRefreshedCatalog', {
+                    catalogProviders: String(catalogValue?.providers ?? 0),
+                    catalogModels: String(catalogValue?.models ?? 0),
                     providers: String(value?.providers ?? 0),
-                    models: String(models),
+                    models: String(value?.models ?? 0),
                     changed: String(value?.changed ?? 0),
                 }))
             }
@@ -195,7 +221,7 @@ export function SourcesDialog({
                         {t('sourceOnlyProvider')}
                     </label>
                 )}
-                {refreshDeclarations === undefined ? null : (
+                {refreshDeclarations === undefined || fetchCatalog === undefined ? null : (
                     <Button
                         variant="outline"
                         title={t('sourceRefreshHint')}
@@ -206,6 +232,11 @@ export function SourcesDialog({
                     </Button>
                 )}
             </div>
+            {snap?.catalog === undefined ? null : (
+                <p className={`dsh-mf-sourceHint${snap.catalog.source === 'empty' ? ' dsh-mf-sourceWarn' : ''}`}>
+                    {catalogLine(snap.catalog, t)}
+                </p>
+            )}
             {refreshed === null ? null : <p className="dsh-mf-sourceHint">{refreshed}</p>}
             <div className="dsh-mf-sourceBody">
                 {snap === null

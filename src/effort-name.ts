@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { EFFORT_NAMES_ZH, EFFORT_NAME_SEP } from '@/shared/constants'
 import { isPlainObject } from '@/shared/types'
 import { descriptorOf, sectionOf } from '@/section'
+import { alive } from '@/lifecycle'
 import { getConfig } from '@/config'
 
 /** 宿主 locale 插件在 settings 文档里的段名与字段名（与其 `LOCALE_SETTINGS_NAMESPACE` / `LOCALE_PREFERENCE_FIELD` 同字面量） */
@@ -64,14 +65,14 @@ interface LocalizedLayer {
 }
 
 /** 装上档位名本地化：把 `ctx.llm` 的 `resolveModelInfo` 遮成「中文界面下换名、否则直通」的一层。
- * 卸载不动服务上的属性（遮蔽链式，动属性会抹掉别人的遮蔽）；wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `ctx.fiber.store` 作守卫，不通过即直通 original；HMR 重载整函数重跑，靠品牌标记幂等 */
+ * 卸载不动服务上的属性（遮蔽链式，动属性会抹掉别人的遮蔽）；wrapped 闭包捕获的 ctx 在 fiber dispose 后失活，用 `alive(ctx)` 作守卫，不通过即直通 original；HMR 重载整函数重跑，靠品牌标记幂等 */
 export function installEffortNameLocale(ctx: Context): void {
     const llm = ctx.llm
     const original = llm.resolveModelInfo
     if (LOCALIZED_LAYER in original) return
     const wrapped: LocalizedLayer = async (provider, model, signal) => {
         const info = await original.call(llm, provider, model, signal)
-        if (ctx.fiber.store && getConfig().userExperience.localizeEfforts && isZh(localeNow(ctx))) {
+        if (alive(ctx) && getConfig().userExperience.localizeEfforts && isZh(localeNow(ctx))) {
             return localizeEffortNames(info, getConfig().userExperience.showOriginalEfforts)
         }
         return info

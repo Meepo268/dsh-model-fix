@@ -10,6 +10,7 @@ import { API_NS, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
 import { CONFIG_VERSION, versionKey } from '@/shared/config-schema'
 import { getConfig } from '@/config'
 import { stripEmptyFields } from '@/empty'
+import { alive } from '@/lifecycle'
 import { queueTask } from '@/host'
 import { isCapacity, type IndexedCatalog } from '@/types'
 import { fieldStampsOf, isPluginWritten, mayReplace, parseStamps, stampPatched, stampSource, withStamps, writtenOf, type StampField, type StampSource } from '@/stamp'
@@ -205,7 +206,7 @@ export async function fix(ctx: Context, force = false): Promise<number> {
     let declarations: DeclarationMap | undefined
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         // 卸载后不再碰 settings（服务已 dispose，访问即抛 inactive context）
-        if (!ctx.fiber.store) return 0
+        if (!alive(ctx)) return 0
         const descriptor = descriptorOf(ctx, API_NS)
         if (!descriptor) return 0
         const providers = providersOf(descriptor.user)

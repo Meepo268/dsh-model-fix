@@ -12,7 +12,7 @@
 | `src/config.ts` | 配置解析（快照优先级）与配置源持有 |
 | `src/migrate.ts` | 启动迁移、旧快照清理与自愈（排除列表去重） |
 | `src/upgrade.ts` | 冻结的升级台阶链（v7 → 当前版） |
-| `src/catalog.ts` | models.dev 目录拉取、缓存读写与分组 / 端点索引 |
+| `src/catalog.ts` | models.dev 目录拉取、缓存读写与分组 / 端点索引、装载状况记账（`catalogInfo` 供弹层顶部那行、`cacheWriteInfo` 供「刷新数据」回报是否落盘） |
 | `src/lookup.ts` | 模型 id 匹配（端点 → 提供方 → 全局三级级联）与档位转换 |
 | `src/upstream.ts` | 上游声明：`GET {baseURL}/models` 回包解析（纯函数）+ 按 URL 缓存/去重的抓取（best-effort） |
 | `src/stamp.ts` | 参数指纹：四字段指纹采集/序列化、来源等级与 `mayReplace` 覆盖判定、按字段合并写入 |
@@ -23,6 +23,8 @@
 | `src/empty.ts` | 空壳字段判据 `stripEmptyFields`，所有写回路径共用 |
 | `src/reset.ts` | 重置推理级别（仅剔除 `reasoningEfforts`） |
 | `src/restore.ts` | 启动备份捕获与恢复 |
+| `src/lifecycle.ts` | 写回生命周期守卫 `alive(ctx)`：只有明确的假才算卸载，字段缺失按「仍在装载」继续（DSH 0.2.1-rc.5 的 `fiber.store` 一直是 undefined） |
+| `src/log.ts` | 运行期日志 `logLine`：写 `lib/model-fix.log`（128 KiB 轮转），串行 append，永不抛错、不阻塞 |
 | `src/guard.ts` | 事件流守卫：写回期间短路整条事件链 |
 | `src/host.ts` | settings 写回必经的 `queueTask` 收口（HMR 事务感知） |
 | `src/section.ts` | settings 节读取收口（读不到一律 `undefined`） |
@@ -35,7 +37,7 @@
 | `src/probe-plan.ts` | 共用的计划层（入参校验、展开、分组、配额） |
 | `src/probe-report.ts` | 共用的汇报层（逐组结论、全局统计） |
 | `src/probe-engine.ts` | 共用执行引擎（单次请求受理判定、并发、进度帧） |
-| `src/rpc.ts` | 四个写回端点（含 `refreshDeclarations`）+ 两条「参数来源」端点 + 两条 SSE 进度流端点（channel 自注册） |
+| `src/rpc.ts` | 四个写回端点（含 `refreshDeclarations`、`fetchCatalog`）+ 两条「参数来源」端点（`sources` 读到空索引时自愈重读缓存） + 两条 SSE 进度流端点（channel 自注册）；三个手动端点各写一条 `logLine` |
 | `src/rpc-route.ts` | RPC 信封解码与路由分发 |
 | `src/refresh.ts` | 目录保鲜刷新（窗口过期才拉取，失败限次重试） |
 | `src/official-filter.ts` | 「隐藏官方API」：遮蔽 `listModels`，未配密钥返回空清单；宿主已自带时整层不装 |
@@ -58,7 +60,7 @@
 | `src/shared/types.ts` | 跨半类型声明与纯类型守卫（含各规则组行键表） |
 | `src/shared/version.ts` | 宿主版本比较与「宿主是否已自带隐藏」判据 |
 | `src/shared/verify-progress.ts` | 探测/验证的进度帧契约与逐字段解码 |
-| `src/shared/source-view.ts` | 「参数来源」视图契约（快照/行/候选形状）与容量短写、候选摘要等纯函数 |
+| `src/shared/source-view.ts` | 「参数来源」视图契约（快照/行/候选形状、目录状况 `SourceCatalogView`）与容量短写、候选摘要等纯函数 |
 
 ### 浏览器半（`src/client/`）
 

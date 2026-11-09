@@ -53,6 +53,8 @@ export const ENDPOINT_SOURCES = 'sources'
 export const ENDPOINT_SET_SOURCE = 'setSource'
 /** 「刷新上游声明」的 endpoint 名：清掉声明缓存重抓一次，再按既有闸门补填（语义见 docs/decisions-config.md「参数来源」） */
 export const ENDPOINT_REFRESH_DECLARATIONS = 'refreshDeclarations'
+/** 「拉取目录」的 endpoint 名：抓的是 models.dev 的目录数据本身（不是网关声明），再按既有闸门补填 */
+export const ENDPOINT_FETCH_CATALOG = 'fetchCatalog'
 
 /** 宿主自此版本起自带「未配置密钥的官方提供方自动隐藏」；≥ 此值时本插件的「隐藏官方API」空转 */
 export const HOST_AUTO_HIDE_SINCE = '0.2.1-alpha.2'
@@ -72,3 +74,7 @@ export const DECLARATION_REFRESH_THROTTLE_MS = 10_000
 /** 「立即更新」键的冷却：点完 5 秒内保持禁用，把连点挡在浏览器侧（比"后端静默跳过重抓"更容易被看见）。
  * Node 半另有一道同名窗口兜底跨实例/跨席位的重复点击，两侧阈值取同一值 */
 export const FORCE_COOLDOWN_MS = 5_000
+
+/** 「拉取目录」的等待上限：抓目录自带 10 秒超时（`constants.ts` 的 `FETCH_MS`）＋写缓存最多 3 次重试（`RETRY_DELAY_MS`）＋一轮填充，
+ * 故比常规写回端点宽一档。这条上限的意义是「网络不通也不要把卡片挂在占用态」：超时后浏览器半按写回超时提示收尾 */
+export const CATALOG_REFRESH_MS = 30_000

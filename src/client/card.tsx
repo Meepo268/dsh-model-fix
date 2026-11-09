@@ -219,6 +219,13 @@ export function Card(props: CardProps) {
         setNotice(null)
         setDraft(removeExclude(shown, id))
     }
+    // 排查日志开关：设置项而非动作，同样只改草稿、保存才落盘（与瓦片一条路径）。默认关——
+    // 只有排查故障时才需要它，平时开着等于给每次启动留一份没人看的文件
+    const onToggleLog = () => {
+        if (!canWrite) return
+        setNotice(null)
+        setDraft({ ...shown, debugLog: shown.debugLog !== true })
+    }
     const onSave = () => {
         if (!canWrite || !dirty || busy) return
         setNotice(null)
@@ -444,6 +451,17 @@ export function Card(props: CardProps) {
                         >
                             <span className="dsh-mf-btnMain">{t('probe')}</span>
                             <span className="dsh-mf-btnHint">{t('probeHint')}</span>
+                        </button>
+                        {/* 排查日志：设置项而非动作，故与上面两个键同一行但取默认（非 warn）语义；改草稿、保存才落盘 */}
+                        <button
+                            type="button"
+                            className="dsh-mf-discard dsh-mf-hintBtn"
+                            disabled={!canWrite || busy !== null}
+                            aria-pressed={shown.debugLog === true}
+                            onClick={onToggleLog}
+                        >
+                            <span className="dsh-mf-btnMain">{shown.debugLog === true ? t('logOn') : t('logOff')}</span>
+                            <span className="dsh-mf-btnHint">{t('logHint')}</span>
                         </button>
                     </span>
                 </div>

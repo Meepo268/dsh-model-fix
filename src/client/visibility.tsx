@@ -165,6 +165,7 @@ export function applySlotVisibility(
                         sources={card.sources}
                         setSource={card.setSource}
                         refreshDeclarations={card.refreshDeclarations}
+                        fetchCatalog={card.fetchCatalog}
                     />
                 )))
             }

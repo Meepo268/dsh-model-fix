@@ -2,6 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_ATTEMPTS } from '@/constants'
 import { getConfig } from '@/config'
+import { alive } from '@/lifecycle'
 import { queueTask } from '@/host'
 import { descriptorOf } from '@/section'
 import { errorText, isSettingsConflict } from '@/shared/errors'
@@ -97,7 +98,7 @@ export async function updateMemory(ctx: Context): Promise<void> {
 /** 一轮剪枝（读 → 采 → 计划 → 写回）。任何一步判定「不必剪」即整轮早退 */
 async function pruneOnce(ctx: Context): Promise<void> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (!ctx.fiber.store) return
+        if (!alive(ctx)) return
         const cfg = getConfig()
         if (!cfg.userExperience.forgetRemoved) return
         const live = await collectLiveModels(ctx, Object.keys(cfg.efforts))
