@@ -19,6 +19,14 @@ let indexedCache: IndexedCatalog | undefined
 let catalogView: SourceCatalogView | undefined
 /** 最近一次装载失败的原文：下一次成功即清零，失败期间供 UI 与日志引用 */
 let lastLoadError: string | undefined
+/** 本进程最近一次成功写缓存文件的时刻（毫秒，0 = 从未写过）：「拉取目录」把它回报给卡片，
+ * 用来区分「抓到了但没落盘」与「根本没抓到」——这两种情况在界面上长得一模一样，却是完全不同的故障 */
+let cacheWrittenAt = 0
+
+/** 本进程是否写过缓存（及何时）：诊断端点与排查文案取这里，不另外维护状态 */
+export function cacheWriteInfo(): { writtenAt: number } {
+    return { writtenAt: cacheWrittenAt }
+}
 
 export function getCatalog(): IndexedCatalog {
     return indexedCache ?? EMPTY_INDEX
@@ -248,6 +256,7 @@ export async function fetchLatest(ctx: Context): Promise<IndexedCatalog> {
             if (!ctx.fiber.store) break
             try {
                 await writeFile(CACHE_FILE, serialized)
+                cacheWrittenAt = Date.now()
                 break
             } catch (error) {
                 ctx.logger.warn(

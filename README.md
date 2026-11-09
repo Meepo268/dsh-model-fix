@@ -45,6 +45,7 @@ DSH[（DeepSeek Harness）](https://github.com/deepseek-ai/deepseek-harness) 插
 UI界面还提供了一些额外功能：
 
 - 立即更新：先重抓上游声明，再按最新值整片覆盖一遍（含手改过的字段；上游没声明就用 models.dev 目录值）
+- 拉取目录：重抓 models.dev 的目录数据本身（不是网关声明）再补一轮填充——目录平时 6 小时才自动重拉一次，上游改了而目录还旧时点它；**网络不通会在 10 秒内失败退出**，不会把卡片挂住
 - 重置推理级别：删除所有模型的推理级别字段（可能触发【自动填充】）
 - 恢复备份：回退到插件启动时已存在的模型参数（提供方已删除的不会恢复，已新增的不会删除）
 - 验证模型：验证所选模型是否可用（每模型一次最小请求，只读不写配置；不支持的档位可用「探测档位」逐档试出）
@@ -84,13 +85,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.3/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.4/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.3/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.4/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
@@ -129,6 +130,7 @@ Remove-Item "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-model-fix\n
 
 - **有数字**（N ≥ 1）：目录已装载。某行没候选是该模型确实不在目录里，或 id 形态对不上——用搜索换个写法，或在那一行手动指定来源。
 - **显示「目录为空」**：宿主进程里没有目录索引，此时**所有**自动匹配都会落空。插件会在打开弹层时重读一次磁盘缓存自愈；仍为空时，把它后面括号里的原因（`ENOENT`、格式不合法……）连同 DSH 日志里的 `dsh-model-fix: 读取目录缓存失败` 一起反馈即可定位。
+- **想立刻换一份新目录**：点卡片「填充」组里的【拉取目录】。它是唯一的手动目录刷新入口（平时目录 6 小时才自动重拉），失败会直接提示原因而不阻塞；提示末尾的「缓存已写入 / 未重写」是排查用的：**抓到了却没写盘**与**根本没抓到**在界面上长得一样，这一句把它们分开。
 
 ## 版本说明
 

@@ -1,5 +1,5 @@
 // catalog.ts 纯函数测试：buildCatalog 分组构建与剪裁（推理/容量/图片模态三源）、端点采集与缓存条目结构校验、目录状况记账
-import { buildCatalog, catalogInfo, getCatalog, isCacheRecord, parseCacheGroup, setCatalog } from '@/catalog'
+import { buildCatalog, cacheWriteInfo, catalogInfo, getCatalog, isCacheRecord, parseCacheGroup, setCatalog } from '@/catalog'
 import { CAPACITY_UNLIMITED } from '@/constants'
 import type { CacheRecord, IndexedCatalog } from '@/types'
 import { isCapacity } from '@/types'
@@ -106,4 +106,6 @@ export function run(): void {
     // 复位成空索引，避免这份模块级状态影响后续用例
     setCatalog({ catalog: {} as IndexedCatalog['catalog'], groups: new Map(), endpoints: new Map() }, 'cache')
     check('空索引的计数归零', getCatalog().groups.size === 0 && catalogInfo().models === 0, catalogInfo())
+    // 缓存写入记账：本模块只记账不落盘，未跑过 fetchLatest 时必为 0——「抓到了但没写盘」与「没抓到」全靠它区分
+    check('未写过缓存时 cacheWriteInfo 为 0', cacheWriteInfo().writtenAt === 0, cacheWriteInfo())
 }

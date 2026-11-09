@@ -1,5 +1,5 @@
 /** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报
- * + sources / setSource 「参数来源」读写 + refreshDeclarations 手动刷新上游声明；
+ * + sources / setSource 「参数来源」读写 + refreshDeclarations 手动刷新上游声明 + fetchCatalog 手动拉取目录；
  * 验证与探测档位的进度各开一条 `connection.fetch` exact 路由。
  * 路由自注册而非宿主 `connection.rpc.handle` 的原因见 docs/decisions-config.md「写回端点」 */
 
@@ -10,7 +10,8 @@ import type {} from '@deepseek-ai/dsh-llm'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import {
-    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_FORCE_UPDATE, ENDPOINT_REFRESH_DECLARATIONS,
+    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_FETCH_CATALOG, ENDPOINT_FORCE_UPDATE,
+    ENDPOINT_REFRESH_DECLARATIONS,
     ENDPOINT_REPORT_LOCALE, FORCE_COOLDOWN_MS,
     ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
     ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
@@ -20,7 +21,7 @@ import { errorText } from '@/shared/errors'
 import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
-import { catalogInfo, getCatalog, readCache, setCatalog } from '@/catalog'
+import { cacheWriteInfo, catalogInfo, fetchLatest, getCatalog, readCache, setCatalog } from '@/catalog'
 import { resolveConfig } from '@/config'
 import { fix } from '@/fix'
 import { reportLocale } from '@/effort-name'
@@ -86,6 +87,36 @@ async function handleForceUpdate(ctx: Context): Promise<ConnectionRpcResult<unkn
         }
     } catch (error) {
         return { ok: false, error: { code: 'model-fix/force-update-failed', message: errorText(error), details: {} } }
+    } finally {
+        endIgnoreAll()
+    }
+}
+
+/** 「拉取目录」：重抓 models.dev 的**目录数据本身**（不是网关声明）并补一轮填充。
+ * 与「立即更新」的分工：那条换的是上游声明（数据来源优先级里的第二档），这条换的是目录（第三档）；
+ * 目录平时只在启动链 6 小时过期时才自动重拉，因此「上游改了但目录还旧」需要一个人工入口。
+ * 失败不阻塞：抓取自带 10 秒超时（`FETCH_MS`），失败即以错误结果返回，界面只出一条提示，卡片不会挂在占用态。
+ * 返回值里的 `written` 是排查用的事实：抓到数据却没落盘时，界面能说清「缓存没写成」而不是让用户以为网络坏了 */
+async function handleFetchCatalog(ctx: Context): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    const before = cacheWriteInfo().writtenAt
+    startIgnoreAll()
+    try {
+        const indexed = await fetchLatest(ctx)
+        setCatalog(indexed, 'network')
+        const changed = await fix(ctx)
+        const view = catalogInfo()
+        return {
+            ok: true,
+            value: {
+                providers: view.providers,
+                models: view.models,
+                changed,
+                written: cacheWriteInfo().writtenAt > before,
+            },
+        }
+    } catch (error) {
+        return { ok: false, error: { code: 'model-fix/fetch-catalog-failed', message: errorText(error), details: {} } }
     } finally {
         endIgnoreAll()
     }
@@ -198,7 +229,7 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
     }
 }
 
-/** 注册一个 channel（四个写回端点 + 两条「参数来源」+ 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
+/** 注册一个 channel（三个写回端点 + 三条「参数来源/目录」端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer；无 webServer 的 profile（如 headless）下子 fiber 不启动，其余功能不受影响
     ctx.inject(['connection', 'webServer'], (rpcCtx) => {
@@ -210,6 +241,7 @@ export function installRpc(ctx: Context): void {
             const handler: EndpointHandler = async (endpoint, payload) => {
                 switch (endpoint) {
                     case ENDPOINT_FORCE_UPDATE: return handleForceUpdate(ctx)
+                    case ENDPOINT_FETCH_CATALOG: return handleFetchCatalog(ctx)
                     case ENDPOINT_RESET_MODELS: return handleResetModels(ctx)
                     case ENDPOINT_RESTORE_MODELS: return handleRestoreModels(ctx)
                     case ENDPOINT_REPORT_LOCALE: return handleReportLocale(payload)
