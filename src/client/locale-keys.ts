@@ -149,6 +149,9 @@ export type CardKey =
     | 'probeFillFailed'
     | 'probeStoppedLine'
     | 'probeHint'
+    | 'logOn'
+    | 'logOff'
+    | 'logHint'
     // 宿主 TerminalBlock 的展示文案：键名与官方安装页 terminalLabels(t) 的映射对齐（`DSH/packages/client/ui-plugin-manager/…/locales.ts`）
     | 'terminalCommandLine'
     | 'terminalSignal'

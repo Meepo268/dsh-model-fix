@@ -85,13 +85,13 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.5/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.6/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.5/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.6/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
@@ -130,7 +130,7 @@ Remove-Item "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-model-fix\n
 
 - **显示「目录为空」**：宿主进程里没有目录索引，此时**所有**自动匹配都会落空。插件会在打开弹层时重读一次磁盘缓存自愈；仍为空时，把它后面括号里的原因（`ENOENT`、格式不合法……）连同 `lib\model-fix.log` 里 `dsh-model-fix: 读取目录缓存失败` 那一行一起反馈即可定位。
 - **显示「目录为空」**：宿主进程里没有目录索引，此时**所有**自动匹配都会落空。插件会在打开弹层时重读一次磁盘缓存自愈；仍为空时，把它后面括号里的原因（`ENOENT`、格式不合法……）连同 DSH 日志里的 `dsh-model-fix: 读取目录缓存失败` 一起反馈即可定位。
-- **想知道插件到底做了什么**：DSH 桌面端不写运行期日志，插件的排查日志落在插件目录下的 `lib\model-fix.log`（与 `models-cache.json` 同目录，约 128 KiB 自动轮转）。启动链的每一跳、目录与声明的抓取结果、三个手动端点的成败都在里面——「插件看起来活着却什么都没做」时，先看这个文件。
+- **想知道插件到底做了什么**：先在卡片「诊断」组末尾把【记录日志：关】点成【记录日志：开】并保存（**默认关**——只有排查故障时才需要它），之后的日志写进插件目录下的 `lib\model-fix.log`（与 `models-cache.json` 同目录，约 128 KiB 自动轮转）。启动链的每一跳、目录与声明的抓取结果、三个手动端点的成败都在里面——「插件看起来活着却什么都没做」时，先看这个文件。
 - **想立刻换一份新数据**：打开「参数来源」，点右上角【刷新数据】。它一次重抓两路（models.dev 目录 + 各提供方 `/models` 声明）；网络不通会在 10 秒内失败并给出原因，不会把弹层卡住。
 
 ## 版本说明

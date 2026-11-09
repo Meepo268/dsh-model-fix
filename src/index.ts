@@ -11,7 +11,7 @@ import { installRpc } from '@/rpc'
 import { fix } from '@/fix'
 import { updateMemory } from '@/memory'
 import { alive } from '@/lifecycle'
-import { logLine } from '@/log'
+import { logEnabled, logLine } from '@/log'
 import { isIgnoreAll } from '@/guard'
 import { captureBackup } from '@/restore'
 import { restoreProbeBackup } from '@/probe-backup'
@@ -40,6 +40,8 @@ function pruneMemory(ctx: Context): void {
 /** 自有段变更：自愈 → 填充 → 记忆清理；守卫开启（插件写回期间）整链短路 */
 function refillAfterOwnChange(ctx: Context): void {
     if (isIgnoreAll()) return
+    // 日志开关本身的变化也记一条：开启后这一行就是「从这一刻起有日志」的起点（关闭时本行被开关自身抑制）
+    if (logEnabled()) logLine(`${PLUGIN_NAME}: 配置段已更新（排查日志：开）`)
     void selfHealConfig(ctx)
         .catch((error: unknown) => {
             ctx.logger.warn(`${PLUGIN_NAME}: 排除列表自愈失败（不影响后续填充）：${errorText(error)}`)

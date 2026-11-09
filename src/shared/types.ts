@@ -107,6 +107,10 @@ export interface PluginConfig {
     behavior: BehaviorRules
     /** 用户体验规则（前端行为开关，不支持按提供方排除） */
     userExperience: UserExperienceRules
+    /** 排查日志开关（缺省=关）：开启后把启动链、抓取与手动端点的结果写进 `lib/model-fix.log`。
+     * 只有排查故障时才需要它——平时开着等于给每次启动留一份没人看的文件。存储侧沿用「默认不写键」的
+     * 老规矩（缺省即关），故升级旧快照无需迁移，旧的整配置断言也不必改动 */
+    debugLog?: boolean
 }
 
 /** 当前版本的存储快照：运行时配置字段 + 显式版本号 */
@@ -121,6 +125,8 @@ export interface PluginConfigSnapshot {
     sources: SourceMap
     behavior: BehaviorRules
     userExperience: UserExperienceRules
+    /** 仅当开关为「开」时才出现在快照里（缺省=关，旧快照无需迁移） */
+    debugLog?: boolean
 }
 
 /** 命名空间下的整段配置：version-N -> 对应版本的配置快照（保留低版本历史与更高新版本，便于无损回退） */
