@@ -10,6 +10,8 @@ import { cancelRefreshRetry, refreshIfStale } from '@/refresh'
 import { installRpc } from '@/rpc'
 import { fix } from '@/fix'
 import { updateMemory } from '@/memory'
+import { alive } from '@/lifecycle'
+import { logLine } from '@/log'
 import { isIgnoreAll } from '@/guard'
 import { captureBackup } from '@/restore'
 import { restoreProbeBackup } from '@/probe-backup'
@@ -52,11 +54,11 @@ function refillAfterApiChange(ctx: Context): void {
     if (isIgnoreAll()) return
     fix(ctx)
         .finally(() => {
-            if (!ctx.fiber.store) return
+            if (!alive(ctx)) return
             refreshIfStale(ctx)
         })
         .then(() => {
-            if (!ctx.fiber.store) return
+            if (!alive(ctx)) return
             pruneMemory(ctx)
         })
         .catch(swallowFixError)
@@ -66,7 +68,7 @@ function refillAfterApiChange(ctx: Context): void {
 async function recoverProbeBackup(ctx: Context): Promise<void> {
     try {
         const changed = await restoreProbeBackup(ctx)
-        if (changed > 0 && ctx.fiber.store) await fix(ctx)
+        if (changed > 0 && alive(ctx)) await fix(ctx)
     } catch (error) {
         ctx.logger.warn(`${PLUGIN_NAME}: 探测档位的兜底回退失败（配置可能停在半截形态）：${errorText(error)}`)
     }
@@ -78,31 +80,45 @@ function readVolatile(config: unknown): unknown {
     return typeof value?.get === 'function' ? value.get() : config
 }
 
-/** 首轮启动链：迁移（必须最先，旧格式快照会被按当前 schema 误解析）→ 读缓存 → 填充 → 探测兜底回退 → 异步刷新 */
+/** 首轮启动链：迁移（必须最先，旧格式快照会被按当前 schema 误解析）→ 读缓存 → 填充 → 探测兜底回退 → 异步刷新。
+ * 每一跳都写一条文件日志（`logLine`）：这条链任何一处静默退出，现象都是「插件活着但什么都没做」，
+ * 而没有日志时连它停在哪一跳都无从判断——0.38.5 之前正是如此 */
 function runStartupChain(ctx: Context): void {
+    const startedAt = Date.now()
+    const since = (): number => Date.now() - startedAt
+    logLine(`${PLUGIN_NAME}: 启动链开始`)
     void migrateConfig(ctx)
         .catch((error: unknown) => {
-            if (!ctx.fiber.store) return
+            logLine(`${PLUGIN_NAME}: 配置迁移失败（继续执行）：${errorText(error)}`)
+            if (!alive(ctx)) return
             ctx.logger.warn(`${PLUGIN_NAME}: 配置迁移失败，使用当前生效配置继续：${errorText(error)}`)
         })
         .then(() => {
-            if (!ctx.fiber.store) return
+            logLine(`${PLUGIN_NAME}: 迁移结束（${since()}ms）`)
+            if (!alive(ctx)) return
             return readCache((message) => ctx.logger.warn(message))
         })
         .then((cached) => {
-            if (!ctx.fiber.store) return
+            if (!alive(ctx)) return
+            logLine(cached === undefined
+                ? `${PLUGIN_NAME}: 读缓存无结果（${since()}ms）`
+                : `${PLUGIN_NAME}: 读缓存成功（${cached.groups.size} 家提供方，${since()}ms）`)
             if (cached) setCatalog(cached, 'cache')
             fix(ctx)
+                .then((changed) => {
+                    logLine(`${PLUGIN_NAME}: 启动填充结束，覆盖 ${changed} 个模型（${since()}ms）`)
+                })
                 .then(() => recoverProbeBackup(ctx))
                 .finally(() => {
-                    if (!ctx.fiber.store) return
+                    if (!alive(ctx)) return
                     refreshIfStale(ctx)
                 })
                 .then(() => {
-                    if (ctx.fiber.store) pruneMemory(ctx)
+                    if (alive(ctx)) pruneMemory(ctx)
                 })
                 .catch((error: unknown) => {
-                    if (!ctx.fiber.store) return
+                    logLine(`${PLUGIN_NAME}: 启动填充失败：${errorText(error)}`)
+                    if (!alive(ctx)) return
                     ctx.logger.warn(`${PLUGIN_NAME}: 填充失败：${errorText(error)}`)
                 })
         })
@@ -130,6 +146,7 @@ export function apply(ctx: Context, config?: unknown): void {
     installEffortNameLocale(ctx) // 「本地化推理级别」：判定实时现算，无事件接线
     installRpc(ctx) // 浏览器半三个写回端点的 RPC channel
     ctx.effect(() => {
+        logLine(`${PLUGIN_NAME}: 插件装载完成，启动链入队`)
         runStartupChain(ctx)
         return () => cancelRefreshRetry() // 卸载后取消待触发的拉取重试
     })

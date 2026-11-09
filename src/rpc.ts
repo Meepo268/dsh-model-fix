@@ -18,6 +18,7 @@ import {
     PLUGIN_NAME, PLUGIN_NS, PROBE_STREAM_ROUTE, VERIFY_STREAM_ROUTE,
 } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
+import { logLine } from '@/log'
 import { encodeProgressFrame } from '@/shared/verify-progress'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
 import type { ProbeRunOptions } from '@/probe-engine'
@@ -74,6 +75,8 @@ async function handleForceUpdate(ctx: Context): Promise<ConnectionRpcResult<unkn
         const declarations = refetch ? await fetchDeclarations(ctx, providers) : undefined
         const changed = await fix(ctx, true)
         const summary = summarizeDeclarations(declarations)
+        const upstreamEmpty = refetch && hasFetchableProvider(providers) && summary.models === 0
+        logLine(`${PLUGIN_NAME}: 立即更新完成：重抓=${refetch ? '是' : '否'}，声明 ${summary.providers} 家/${summary.models} 条，覆盖 ${changed} 个模型`)
         return {
             ok: true,
             value: {
@@ -82,10 +85,11 @@ async function handleForceUpdate(ctx: Context): Promise<ConnectionRpcResult<unkn
                 models: summary.models,
                 refetched: refetch,
                 // 有可抓的提供方、抓完却一条声明都没有：网关没响应或没声明，本次覆盖用的是目录值
-                upstreamEmpty: refetch && hasFetchableProvider(providers) && summary.models === 0,
+                upstreamEmpty,
             },
         }
     } catch (error) {
+        logLine(`${PLUGIN_NAME}: 立即更新失败：${errorText(error)}`)
         return { ok: false, error: { code: 'model-fix/force-update-failed', message: errorText(error), details: {} } }
     } finally {
         endIgnoreAll()
@@ -106,16 +110,19 @@ async function handleFetchCatalog(ctx: Context): Promise<ConnectionRpcResult<unk
         setCatalog(indexed, 'network')
         const changed = await fix(ctx)
         const view = catalogInfo()
+        const written = cacheWriteInfo().writtenAt > before
+        logLine(`${PLUGIN_NAME}: 拉取目录完成：${view.providers} 家/${view.models} 个模型，落盘=${written ? '是' : '否'}，覆盖 ${changed} 个模型`)
         return {
             ok: true,
             value: {
                 providers: view.providers,
                 models: view.models,
                 changed,
-                written: cacheWriteInfo().writtenAt > before,
+                written,
             },
         }
     } catch (error) {
+        logLine(`${PLUGIN_NAME}: 拉取目录失败：${errorText(error)}`)
         return { ok: false, error: { code: 'model-fix/fetch-catalog-failed', message: errorText(error), details: {} } }
     } finally {
         endIgnoreAll()
@@ -211,6 +218,7 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
     if (isIgnoreAll()) return writeInProgress()
     const now = Date.now()
     if (now - lastFetchAt < DECLARATION_REFRESH_THROTTLE_MS) {
+        logLine(`${PLUGIN_NAME}: 刷新声明被跳过（${DECLARATION_REFRESH_THROTTLE_MS / 1000} 秒内重复点击）`)
         return { ok: true, value: { providers: 0, models: 0, changed: 0, throttled: true } }
     }
     lastFetchAt = now
@@ -221,8 +229,11 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
         clearUpstreamCache()
         const declarations = await fetchDeclarations(ctx, providers)
         const changed = await fix(ctx)
-        return { ok: true, value: { ...summarizeDeclarations(declarations), changed, throttled: false } }
+        const summary = summarizeDeclarations(declarations)
+        logLine(`${PLUGIN_NAME}: 刷新声明完成：${summary.providers} 家/${summary.models} 条，覆盖 ${changed} 个模型`)
+        return { ok: true, value: { ...summary, changed, throttled: false } }
     } catch (error) {
+        logLine(`${PLUGIN_NAME}: 刷新声明失败：${errorText(error)}`)
         return { ok: false, error: { code: 'model-fix/refresh-declarations-failed', message: errorText(error), details: {} } }
     } finally {
         endIgnoreAll()

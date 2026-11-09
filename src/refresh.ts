@@ -1,6 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { fetchLatest, setCatalog } from '@/catalog'
 import { MAX_ATTEMPTS, REFRESH_INTERVAL_MS, RETRY_DELAY_MS } from '@/constants'
+import { alive } from '@/lifecycle'
+import { logLine } from '@/log'
 import { PLUGIN_NAME } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import { fix } from '@/fix'
@@ -16,6 +18,7 @@ let retryTimer: ReturnType<typeof setTimeout> | undefined
 export function refreshIfStale(ctx: Context): void {
     const isFresh = Date.now() - lastRefreshAt < REFRESH_INTERVAL_MS
     if (refreshing || isFresh) return
+    logLine(`${PLUGIN_NAME}: 目录已过保鲜期，触发重抓`)
     refresh(ctx)
 }
 
@@ -27,40 +30,41 @@ function refresh(ctx: Context, retryCount = MAX_ATTEMPTS): void {
     refreshing = true
     fetchLatest(ctx)
         .then((indexed) => {
-            if (!ctx.fiber.store) {
+            if (!alive(ctx)) {
                 refreshing = false
                 return
             }
             lastRefreshAt = Date.now() // 时间戳仅成功时落定：失败不封保鲜窗口
             setCatalog(indexed, 'network')
+            logLine(`${PLUGIN_NAME}: 目录重抓成功（${indexed.groups.size} 家提供方）`)
             // 结算不经 index.ts 事件入口，须在此自查守卫：写回在途期间照常填充会把刚删除的字段填回，故仅跳过填充
             if (isIgnoreAll()) {
                 refreshing = false
                 return
             }
             fix(ctx).catch((error) => {
-                if (!ctx.fiber.store) return
+                if (!alive(ctx)) return
                 ctx.logger.warn(`${PLUGIN_NAME}: 填充失败：${errorText(error)}`)
             })
             refreshing = false
         })
         .catch((error) => {
-            if (!ctx.fiber.store) {
+            if (!alive(ctx)) {
                 refreshing = false
                 return
             }
             // 每次失败都记录，便于判断是一次成功还是重试后才成功
             const attempt = MAX_ATTEMPTS - retryCount + 1
-            ctx.logger.warn(
-                `${PLUGIN_NAME}: 拉取 models.dev 最新数据失败（第 ${attempt}/${MAX_ATTEMPTS} 次）：${errorText(error)}`,
-            )
+            const message = `${PLUGIN_NAME}: 拉取 models.dev 最新数据失败（第 ${attempt}/${MAX_ATTEMPTS} 次）：${errorText(error)}`
+            ctx.logger.warn(message)
+            logLine(message)
             if (--retryCount <= 0) { // 重试次数用尽则放弃，交由后续事件或重启再触发
                 refreshing = false
                 return
             }
             retryTimer = setTimeout(() => {
                 retryTimer = undefined
-                if (!ctx.fiber.store) {
+                if (!alive(ctx)) {
                     refreshing = false
                     return
                 }

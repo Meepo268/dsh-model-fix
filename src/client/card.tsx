@@ -296,47 +296,6 @@ export function Card(props: CardProps) {
             })
             .finally(() => { setBusy(null) })
     }
-    // 「拉取目录」：与「立即更新」同组，但换的是**目录数据**（models.dev）而非上游声明，且不越过任何闸门（走 fix(ctx)），故不弹二次确认。
-    // 没有冷却：目录抓取是幂等只读的重抓，重复点最坏是多下一次网；占用态由 busy 互斥挡
-    const runCatalog = () => {
-        if (!ready || busy) return
-        setNotice(null)
-        setBusy('catalog')
-        void props.fetchCatalog()
-            .then((result) => {
-                if (!result.ok) {
-                    setNotice({ text: t('catalogFailed', { message: truncateMessage(result.error.message) }), tone: 'error' })
-                    return
-                }
-                const value = result.value as {
-                    providers?: number
-                    models?: number
-                    changed?: number
-                    written?: boolean
-                } | undefined
-                // 抓到了但一条可用模型都没有：与「抓取失败」是两回事（响应体合法、内容不可用），单列一条
-                if ((value?.providers ?? 0) === 0) {
-                    setNotice({ text: t('catalogEmpty'), tone: 'error' })
-                    return
-                }
-                setNotice({
-                    text: t('catalogDone', {
-                        providers: String(value?.providers ?? 0),
-                        models: String(value?.models ?? 0),
-                        count: value?.changed ?? 0,
-                        cache: value?.written === true ? t('catalogCacheWritten') : t('catalogCacheSkipped'),
-                    }),
-                    tone: 'success',
-                })
-            })
-            .catch((error: unknown) => {
-                setNotice({
-                    text: t('catalogFailed', { message: truncateMessage(isWritebackTimeout(error) ? t('writebackTimeout') : errorText(error)) }),
-                    tone: 'error',
-                })
-            })
-            .finally(() => { setBusy(null) })
-    }
     // 重置推理级别：与强制更新同形（危险键 + 二次确认）；配置段零写入（开关不变），竞态防护由 Node 半事件流守卫负责
     const onReset = () => {
         if (!ready || busy) return
@@ -460,16 +419,6 @@ export function Card(props: CardProps) {
                         >
                             <span className="dsh-mf-btnMain">{busy === 'force' ? t('forceBusy') : t('force')}</span>
                             <span className="dsh-mf-btnHint">{t('forceHint')}</span>
-                        </button>
-                        {/* 换数据不换写法：只重抓目录并补一轮填充（仍受指纹与「允许更新」闸门约束），故不需要二次确认 */}
-                        <button
-                            type="button"
-                            className="dsh-mf-discard dsh-mf-hintBtn"
-                            disabled={!ready || configLocked}
-                            onClick={runCatalog}
-                        >
-                            <span className="dsh-mf-btnMain">{busy === 'catalog' ? t('catalogBusy') : t('catalog')}</span>
-                            <span className="dsh-mf-btnHint">{t('catalogHint')}</span>
                         </button>
                     </span>
                 </div>

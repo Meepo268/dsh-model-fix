@@ -1,6 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import { API_URL, CACHE_FILE, FETCH_MS, LEVELS, MAX_ATTEMPTS, PROVIDER_API_FALLBACKS, RETRY_DELAY_MS } from '@/constants'
+import { alive } from '@/lifecycle'
+import { logLine } from '@/log'
 import { PLUGIN_NAME } from '@/shared/constants'
 import { errorText } from '@/shared/errors'
 import type { CacheGroup, CacheRecord, Catalog, IndexedCatalog, ModelEntry, ProviderGroup, IndexEntry } from '@/types'
@@ -250,13 +252,21 @@ export async function fetchLatest(ctx: Context): Promise<IndexedCatalog> {
     // 空数据拒绝覆盖，避免坏响应破坏现有目录
     if (Object.keys(catalog).length === 0) throw new Error(`${API_URL} 返回的数据未包含可用的模型信息`)
     const indexed = indexFromCatalog(catalog)
+    logLine(`${PLUGIN_NAME}: 抓取目录成功：${indexed.groups.size} 家提供方`)
     const serialized = JSON.stringify(catalog)
+    let outcome = '内容与内存索引一致，未重写'
     if (!indexedCache || serialized !== JSON.stringify(indexedCache.catalog)) {
+        outcome = `写入失败（已用尽 ${MAX_ATTEMPTS} 次重试）`
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            if (!ctx.fiber.store) break
+            // 生命周期守卫：判定不可写就放弃本次落盘（本次运行仍用新目录，只是文件没更新）
+            if (!alive(ctx)) {
+                outcome = '跳过写入：生命周期守卫判定不可写'
+                break
+            }
             try {
                 await writeFile(CACHE_FILE, serialized)
                 cacheWrittenAt = Date.now()
+                outcome = '已写入'
                 break
             } catch (error) {
                 ctx.logger.warn(
@@ -268,5 +278,6 @@ export async function fetchLatest(ctx: Context): Promise<IndexedCatalog> {
             }
         }
     }
+    logLine(`${PLUGIN_NAME}: 缓存${outcome}`)
     return indexed
 }

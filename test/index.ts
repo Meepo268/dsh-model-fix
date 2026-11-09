@@ -8,6 +8,7 @@ import { run as runEffortName } from '@test/effort-name.test'
 import { run as runEmpty } from '@test/empty.test'
 import { run as runFix } from '@test/fix.test'
 import { run as runGuard } from '@test/guard.test'
+import { run as runLifecycle } from '@test/lifecycle.test'
 import { run as runLookup } from '@test/lookup.test'
 import { run as runMemory } from '@test/memory.test'
 import { run as runMigrate } from '@test/migrate.test'
@@ -47,6 +48,8 @@ section('empty.test.ts')
 runEmpty()
 section('guard.test.ts')
 runGuard()
+section('lifecycle.test.ts')
+runLifecycle()
 section('lookup.test.ts')
 runLookup()
 section('memory.test.ts')

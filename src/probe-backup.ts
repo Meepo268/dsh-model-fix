@@ -11,6 +11,7 @@ import { API_NS, PLUGIN_NAME, PLUGIN_NS } from '@/shared/constants'
 import { isPlainObject, providersOf } from '@/shared/types'
 import type { EffortApply } from '@/fill'
 import { stripEmptyFields } from '@/empty'
+import { alive } from '@/lifecycle'
 import { startIgnoreAll, endIgnoreAll } from '@/guard'
 import { queueTask } from '@/host'
 import { descriptorOf, ownSection } from '@/section'
@@ -112,7 +113,7 @@ function planProbeRestore(
 /** 写自有段（冲突重试，读回最新 revision 后重发同一组 op——备份与清除都是幂等的） */
 async function mutateOwn(ctx: Context, ops: readonly SettingsPathOp[]): Promise<void> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (!ctx.fiber.store) throw new Error(`${PLUGIN_NAME}: 插件已卸载`)
+        if (!alive(ctx)) throw new Error(`${PLUGIN_NAME}: 插件已卸载`)
         const descriptor = descriptorOf(ctx, PLUGIN_NS)
         if (!descriptor) throw new Error(`${PLUGIN_NAME}: 自有配置段 ${PLUGIN_NS} 不可读`)
         try {
@@ -145,7 +146,7 @@ export function clearProbeBackup(ctx: Context): Promise<void> {
 /** 按备份撤掉预声明（语义见 `planProbeRestore`）；刻意不走 writeback.ts 的写回外壳——本回退不打逐次日志 */
 async function restoreProviders(ctx: Context, backup: ProbeBackup): Promise<number> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (!ctx.fiber.store) return 0
+        if (!alive(ctx)) return 0
         const descriptor = descriptorOf(ctx, API_NS)
         const providers = providersOf(descriptor?.user)
         // 读不到段时显式失败（返回 0 会被当成「本就一致」而吞掉真故障，与 restoreModels 同理）
