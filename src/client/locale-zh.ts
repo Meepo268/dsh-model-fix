@@ -182,6 +182,18 @@ export const zh: Record<CardKey, string> = {
     star: '点个 star',
     feedback: '问题反馈',
     issueBody: '--用一句话描述你遇到的问题--\n\n### 问题现象\n\n### 环境\n- 插件版本：{version}\n- DSH 版本：--如 0.2.0--\n- 操作系统：--如 Windows 11--\n\n### 复现步骤\n1. --第一步做了什么--\n2. --第二步做了什么--\n\n### 期望行为',
+    // 卡片末尾的「检查更新」：只查 GitHub 最新 Release 并给出 tarball 地址，不代用户安装
+    checkUpdate: '检查更新',
+    checkUpdateHint: '查一次 GitHub 上的最新 Release（api.github.com，匿名限 60 次/小时）',
+    checkingUpdate: '检查中…',
+    updateLatest: '已是最新',
+    updateAvailable: 'v{version} 可用',
+    updateAvailableHint: '打开 v{version} 的 Release 页，手动下载安装',
+    updateFailed: '检查失败',
+    updateFailedHint: '没能查到最新版：点一下打开 Releases 页，手动挑版本下载',
+    copyInstallUrl: '复制安装地址',
+    copyInstallHint: '复制构建产物 tarball 的地址，粘到「设置 → 插件 → 添加插件」里安装',
+    copiedInstallUrl: '已复制',
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     chipModelOpt: '模型优化',
     chipFollowOn: '跟随中',

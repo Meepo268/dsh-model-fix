@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { compareVersions, copyText, fetchLatestRelease, RELEASES_PAGE } from '@/client/update-check'
+import type { ReleaseInfo } from '@/client/update-check'
 
-/** 卡片末尾联系行：仓库地址、版本标记与 star / 反馈跳转键，内容全在本文件内合成。 */
+/** 卡片末尾联系行：仓库地址、版本标记、检查更新与 star / 反馈跳转键，内容全在本文件内合成。 */
 
 const REPO_URL = 'https://github.com/Meepo268/dsh-model-fix'
 const ISSUES_URL = `${REPO_URL}/issues/new`
@@ -49,16 +52,89 @@ function IconIssue() {
     )
 }
 
-/** 卡片末尾联系行组件：地址、版本与 issue 正文均在本文件内合成，只吃一个翻译函数。 */
+/** 检查更新的六个态：idle → checking → latest | newer → copied；任一步失败落 failed（点一下直接开 Releases 页） */
+type UpdateState =
+    | { readonly kind: 'idle' }
+    | { readonly kind: 'checking' }
+    | { readonly kind: 'latest' }
+    | { readonly kind: 'newer'; readonly release: ReleaseInfo }
+    | { readonly kind: 'copied'; readonly release: ReleaseInfo }
+    | { readonly kind: 'failed' }
+
+/** 「已是最新」「已复制」这类回执态停留时长：够看清，又不至于把位置一直占着 */
+const RECEIPT_MS = 4000
+const COPY_RECEIPT_MS = 2500
+
+/** 卡片末尾联系行组件：地址、版本、检查更新与 issue 正文均在本文件内合成，只吃一个翻译函数。 */
 export function CardMeta(props: { t: TranslateNS<'settings.modelFix'> }) {
     const { t } = props
     // 反馈链接预填版本与 issue 模板
     const issuesHref = `${ISSUES_URL}?body=${encodeURIComponent(t('issueBody', { version: PLUGIN_VERSION }))}`
+    const [update, setUpdate] = useState<UpdateState>({ kind: 'idle' })
+    // 回执态的定时器要能随卡片卸载清掉，否则会往已卸载的组件上 setState
+    const timers = useRef<number[]>([])
+    useEffect(() => () => {
+        for (const id of timers.current) window.clearTimeout(id)
+        timers.current = []
+    }, [])
+    const later = (run: () => void, ms: number): void => {
+        timers.current.push(window.setTimeout(run, ms))
+    }
+
+    /** 只在用户点按时查一次：不轮询、不随卡片挂载自检（匿名限流 60 次/小时/IP） */
+    const check = async (): Promise<void> => {
+        if (update.kind === 'checking') return
+        setUpdate({ kind: 'checking' })
+        const release = await fetchLatestRelease()
+        if (release === null) {
+            setUpdate({ kind: 'failed' })
+            return
+        }
+        // 版本不可解析时按「没有新版」处理：宁可少提示一次，也不要把用户引到旧包上
+        if ((compareVersions(release.version, PLUGIN_VERSION) ?? 0) > 0) {
+            setUpdate({ kind: 'newer', release })
+            return
+        }
+        setUpdate({ kind: 'latest' })
+        later(() => setUpdate({ kind: 'idle' }), RECEIPT_MS)
+    }
+
+    /** 复制 tarball 地址；被 webview 拒了就退一步打开 Release 页，让用户从页面里拿 */
+    const copy = async (release: ReleaseInfo): Promise<void> => {
+        if (!await copyText(release.installUrl)) {
+            window.open(release.pageUrl, '_blank', 'noopener,noreferrer')
+            return
+        }
+        setUpdate({ kind: 'copied', release })
+        later(() => setUpdate({ kind: 'newer', release }), COPY_RECEIPT_MS)
+    }
+
     return (
         <div className="dsh-mf-meta">
             <span className="dsh-mf-metaLeft">
                 <a className="dsh-mf-chip dsh-mf-chipAddress" href={REPO_URL} target="_blank" rel="noreferrer noopener"><IconGitHub />{REPO_LABEL}</a>
                 <span className="dsh-mf-chip dsh-mf-chipVersion"><IconTag />v{PLUGIN_VERSION}</span>
+                {update.kind === 'idle' && (
+                    <button className="dsh-mf-chip dsh-mf-chipButton" type="button" title={t('checkUpdateHint')} onClick={() => { void check() }}>{t('checkUpdate')}</button>
+                )}
+                {update.kind === 'checking' && (
+                    <button className="dsh-mf-chip dsh-mf-chipButton" type="button" disabled>{t('checkingUpdate')}</button>
+                )}
+                {update.kind === 'latest' && (
+                    <span className="dsh-mf-chip dsh-mf-chipLatest">{t('updateLatest')}</span>
+                )}
+                {update.kind === 'failed' && (
+                    <button className="dsh-mf-chip dsh-mf-chipButton dsh-mf-chipFailed" type="button" title={t('updateFailedHint')}
+                        onClick={() => window.open(RELEASES_PAGE, '_blank', 'noopener,noreferrer')}>{t('updateFailed')}</button>
+                )}
+                {(update.kind === 'newer' || update.kind === 'copied') && (
+                    <>
+                        <a className="dsh-mf-chip dsh-mf-chipNewer" href={update.release.pageUrl} target="_blank" rel="noreferrer noopener"
+                            title={t('updateAvailableHint', { version: update.release.version })}>{t('updateAvailable', { version: update.release.version })}</a>
+                        <button className="dsh-mf-chip dsh-mf-chipButton" type="button" title={t('copyInstallHint')}
+                            onClick={() => { void copy(update.release) }}>{update.kind === 'copied' ? t('copiedInstallUrl') : t('copyInstallUrl')}</button>
+                    </>
+                )}
             </span>
             <span className="dsh-mf-actions">
                 <a className="dsh-mf-chip" href={REPO_URL} target="_blank" rel="noreferrer noopener"><IconStar />{t('star')}</a>

@@ -183,6 +183,18 @@ export const en: Record<CardKey, string> = {
     star: 'Star',
     feedback: 'Feedback',
     issueBody: '--Describe the problem in one sentence--\n\n### What happened\n\n### Environment\n- Plugin version: {version}\n- DSH version: --e.g. 0.2.0--\n- OS: --e.g. Windows 11--\n\n### Steps to reproduce\n1. --What you did first--\n2. --What you did next--\n\n### Expected behavior',
+    // The footer update check: reads the latest GitHub release and hands over a tarball URL; it never installs
+    checkUpdate: 'Check for updates',
+    checkUpdateHint: 'Ask GitHub for the latest release (api.github.com, 60 anonymous requests per hour)',
+    checkingUpdate: 'Checking…',
+    updateLatest: 'Up to date',
+    updateAvailable: 'v{version} available',
+    updateAvailableHint: 'Open the v{version} release page and install it by hand',
+    updateFailed: 'Check failed',
+    updateFailedHint: 'Could not read the latest release — click to open the Releases page and pick a build',
+    copyInstallUrl: 'Copy install URL',
+    copyInstallHint: 'Copy the built tarball URL, then paste it into Settings → Plugins → Add plugin',
+    copiedInstallUrl: 'Copied',
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     chipModelOpt: 'Model tuning',
     chipFollowOn: 'Following',

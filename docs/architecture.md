@@ -119,6 +119,7 @@
 ## 数据流
 
 - **段变更按 ns 分流**：自有段「自愈 → 填充 → 记忆清理」，`llm-pi-ai` 段「填充 → 保鲜刷新 → 记忆清理」，入口先判事件流守卫。
+- **凭据变更补一轮**：`credentials/record-updated` / `credentials/reference-updated` 到达时（密钥入库晚于设置文档落盘，第一次抓取只能匿名），等 `upstream` 的在途抓取结算 → 只放掉失败槽 → 跑一轮保守填充；不碰目录、不 `force`。
 - **记忆三条链**：浏览器半 `memory-listener` 管存取；Node 半 `memory.ts` 按宿主全量模型列表做失效清理；两条诊断链路（验证只读 / 探测写回）共用 probe 四层，进度走 SSE。
 - **请求期链**：`agent/request` 瀑布判定「跟随父智能体」；`self-tune` 按开关装/卸注入面。两者均不写配置。
 - **只读遮蔽支线**：`official-filter` 遮 `listModels`、`effort-name` 遮 `resolveModelInfo`，判定逐次现算，不挂事件。

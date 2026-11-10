@@ -210,6 +210,25 @@ export function clearUpstreamCache(): void {
     cache.clear()
 }
 
+/** 等当前在途抓取结算（没有在途即刻返回）：凭据刚入库时要重抓的地址，正被上一轮匿名请求占着，
+ * 而同地址并发去重会复用它那份失败——不清完就在途请求会把失败槽写回来，这一轮补抓等于没做 */
+export async function settleUpstreamInflight(): Promise<void> {
+    if (inflight.size === 0) return
+    await Promise.allSettled([...inflight.values()])
+}
+
+/** 只放掉「抓取失败」的短缓存槽（成功的 6 小时声明原样保留：凭据入库只可能救回失败过的那几家），
+ * 返回放掉的地址数——0 表示没有待重试的地址。与 `settleUpstreamInflight` 配对使用 */
+export function clearFailedUpstream(): number {
+    let cleared = 0
+    for (const [url, slot] of cache) {
+        if (slot.ttl !== UPSTREAM_FAIL_TTL_MS) continue
+        cache.delete(url)
+        cleared++
+    }
+    return cleared
+}
+
 /** 声明规模：`providers` = 至少声明了一个模型的提供方数，`models` = 声明条数合计（刷新结果的一行汇报用） */
 export interface DeclarationSummary {
     providers: number

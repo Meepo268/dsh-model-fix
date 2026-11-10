@@ -3,12 +3,14 @@ import type { Context } from '@deepseek-ai/cordis'
 import { check, stable } from '@test/helper'
 import {
     altModelsUrl,
+    clearFailedUpstream,
     clearUpstreamCache,
     declarationOf,
     fetchDeclarations,
     modelsUrl,
     parseDeclarations,
     setDeclarationSource,
+    settleUpstreamInflight,
     summarizeDeclarations,
     UPSTREAM_FAIL_TTL_MS,
     UPSTREAM_TTL_MS,
@@ -234,6 +236,58 @@ export async function run(): Promise<void> {
     try {
         const rejected = await fetchDeclarations(CTX, { a: { baseURL: 'https://gw-locked' } })
         check('401 不换路径重试（只打一次）', rejected.size === 0 && CALLS.length === 1, CALLS.map(call => call.url))
+    } finally {
+        restoreFetch()
+    }
+
+    // 凭据入库补抓（方案 B 的全部机制）：失败槽可单独放掉，成功槽原样保留
+    clearUpstreamCache()
+    CALLS.length = 0
+    globalThis.fetch = (async (input: unknown, init?: { headers?: Record<string, string> }) => {
+        const url = String(input)
+        const headers = init?.headers ?? {}
+        CALLS.push({ url, headers })
+        return headers.authorization === undefined
+            ? new Response('{}', { status: 401 })
+            : new Response(JSON.stringify(DECLARED), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+    try {
+        const noLogger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} }
+        const ANON = { logger: noLogger, credentials: { resolve: async () => undefined } } as unknown as Context
+        const KEYED = { logger: noLogger, credentials: { resolve: async () => ({ value: 'sk-test' }) } } as unknown as Context
+        const providers = { p: { baseURL: 'https://gw-cred/v1', apiKeyEnv: 'P_KEY' } }
+        const failed = await fetchDeclarations(ANON, providers)
+        check('无密钥抓取：401 后回落空表', failed.size === 0 && CALLS.length === 1, CALLS)
+        const stillFailed = await fetchDeclarations(KEYED, providers)
+        check('失败槽挡住紧接着的带密钥重抓（正是保存后补密钥无效的原因）', stillFailed.size === 0 && CALLS.length === 1, CALLS.length)
+        check('clearFailedUpstream 只放掉失败槽', clearFailedUpstream() === 1)
+        const recovered = await fetchDeclarations(KEYED, providers)
+        check('放掉失败槽后带密钥重抓成功', recovered.get('p')?.get('a')?.contextWindow === 200_000 && CALLS.length === 2, CALLS.length)
+        check('重抓带上了密钥', CALLS[1]?.headers.authorization === 'Bearer sk-test', CALLS[1])
+        await fetchDeclarations(ANON, providers)
+        check('成功槽不动：换回匿名也复用 6 小时缓存', CALLS.length === 2 && clearFailedUpstream() === 0, CALLS.length)
+    } finally {
+        restoreFetch()
+    }
+
+    // 在途抓取结算：凭据事件要等匿名请求落地再清失败槽，否则清完会被它写回去
+    clearUpstreamCache()
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    globalThis.fetch = (async () => {
+        await gate
+        return new Response('{}', { status: 401 })
+    }) as typeof fetch
+    try {
+        const pending = fetchDeclarations(CTX, { slow: { baseURL: 'https://gw-slow/v1' } })
+        const state: { settled: boolean } = { settled: false }
+        const waiter = settleUpstreamInflight().then(() => { state.settled = true })
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        check('在途抓取未落地时 settle 不返回（否则清完的失败槽会被写回来）', state.settled === false)
+        release()
+        await pending
+        await waiter
+        check('在途抓取落地后 settle 返回', state.settled === true)
     } finally {
         restoreFetch()
     }

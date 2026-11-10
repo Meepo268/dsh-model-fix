@@ -175,6 +175,18 @@ export type CardKey =
     | 'star'
     | 'feedback'
     | 'issueBody'
+    // 卡片末尾的「检查更新」：查 GitHub 最新 Release，有新版就给 tarball 地址（不代装）
+    | 'checkUpdate'
+    | 'checkUpdateHint'
+    | 'checkingUpdate'
+    | 'updateLatest'
+    | 'updateAvailable'
+    | 'updateAvailableHint'
+    | 'updateFailed'
+    | 'updateFailedHint'
+    | 'copyInstallUrl'
+    | 'copyInstallHint'
+    | 'copiedInstallUrl'
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     | 'chipModelOpt'
     | 'chipFollowOn'

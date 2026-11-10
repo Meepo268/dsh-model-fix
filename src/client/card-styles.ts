@@ -103,7 +103,7 @@ const STYLE_TEXT = [
     '.dsh-mf-discard:disabled,.dsh-mf-save:disabled,.dsh-mf-force:disabled{opacity:.4;cursor:default}',
     // 末尾项目链接行：border-top 即分割线，footer 下间距归零、让给本行 padding-top，两条分割线到最近内容距离相等
     '.dsh-mf-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0 4px;border-top:0.5px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1))}',
-    '.dsh-mf-metaLeft{display:inline-flex;align-items:center;gap:8px;min-width:0}',
+    '.dsh-mf-metaLeft{display:inline-flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}',
     // 仓库地址与跳转键同为描边小片，一律 12px，不做主次层级
     '.dsh-mf-chip{display:inline-flex;align-items:center;gap:6px;min-width:0;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:8px;padding:3px 10px;font:inherit;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#61666b);text-decoration:none;white-space:nowrap}',
     'a.dsh-mf-chip:hover{color:var(--dsw-alias-label-primary,#0f1115);border-color:var(--dsw-alias-label-dimmed,#e1e5ee)}',
@@ -111,6 +111,14 @@ const STYLE_TEXT = [
     // 版本标记底色取 border-l3 的 50% 透明（等同开关 :disabled 压在卡片底的观感）；不能用 opacity 整体压，会连字一起变淡
     '.dsh-mf-chipVersion{background:color-mix(in srgb, var(--dsw-alias-border-l3,rgba(0,0,0,.12)) 50%, transparent)}',
     '.dsh-mf-linkIcon{flex:none;display:block;width:12px;height:12px;color:currentColor}',
+    // 「检查更新」是 <button>，沿用 chip 的描边与字号，只补背景/光标；回执态（已是最新 / 可用 / 失败）各借一支状态色
+    'button.dsh-mf-chip{background:none;cursor:pointer}',
+    'button.dsh-mf-chip:hover:not(:disabled){color:var(--dsw-alias-label-primary,#0f1115);border-color:var(--dsw-alias-label-dimmed,#e1e5ee)}',
+    'button.dsh-mf-chip:disabled{opacity:.55;cursor:default}',
+    '.dsh-mf-chipLatest{color:var(--dsw-alias-state-success-primary,#1a7f37)}',
+    '.dsh-mf-chipNewer{color:var(--dsw-alias-state-warning-primary,#b26a00);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary,#b26a00) 40%, transparent)}',
+    '.dsh-mf-chipNewer:hover{color:var(--dsw-alias-state-warning-primary,#b26a00);border-color:var(--dsw-alias-state-warning-primary,#b26a00)}',
+    '.dsh-mf-chipFailed{color:var(--dsw-alias-state-error-primary,#ec1313)}',
     // 危险确认键照官方 .deleteConfirm
     '.dsh-mf-confirmDanger:not(:disabled){border-color:var(--dsw-alias-state-error-primary,#ec1313);color:var(--dsw-alias-state-error-primary,#ec1313)}',
     '.dsh-mf-confirmDanger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger,rgba(236,19,19,.05))}',

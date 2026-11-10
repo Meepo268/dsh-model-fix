@@ -21,7 +21,8 @@
 - `listProviders()` 同步、当前全部活路由；`listModels(provider)` 直穿 adapter 无缓存，provider 未注册抛 `NO_ADAPTER`（剪枝须当「读不到」）；`listConfigurableProviders()` 同步声明序（「隐藏官方API」读它取 settingsNs / settingsPath 定位凭据段；目录条目是声明而非活路由，未声明无从判定、照常显示）。
 - `listModels` 是原型方法，可用实例自有属性遮蔽（`llm.listModels = wrapped` 全部消费者生效）——「隐藏官方API」即据此实现，安装带 `Symbol.for` 标记幂等。**宿主若把它改成箭头函数类字段，遮蔽失效**。
 - UI 模型目录唯一生成链路（`DSH/packages/api/session-controller/src/types/catalog.ts`）：`buildModelCatalog` 逐 provider `listModels` + `resolveModelInfo`，末了滤掉模型数为 0 的组 ⇒ 返回空清单即组从目录消失。本仓刻意不用它：逐模型 `resolveModelInfo` 可能打网络，且默认参数求值执行未 inject 的 `ctx.agentDefaultModel`。
-- 目录刷新由浏览器侧宿主服务负责：`llm/adapters-updated`、`settings/document-updated`、`credentials/record-updated`、`credentials/reference-updated` 任一到达即 `catalog.refresh()` ⇒ 插件改开关 / 配密钥后 UI 自动重取，零事件接线。
+- 目录刷新由浏览器侧宿主服务负责：`llm/adapters-updated`、`settings/document-updated`、`credentials/record-updated`、`credentials/reference-updated` 任一到达即 `catalog.refresh()` ⇒ 插件改开关 / 配密钥后 UI 自动重取，**UI 侧**零事件接线。这两个凭据事件本仓在 Node 半另订阅一份：语义是「凭据变更已提交、此刻可解析」，用于密钥入库后重抓上游声明（与目录刷新无关，也不代表事件带载荷可用）。
+- 凭据事件载荷：`credentials/reference-updated (ref)` 与 `credentials/record-updated (key)` 各带一个品牌键，两者键文法互斥；本仓不读载荷，只把它当「可以再解析一次凭据了」的时点信号。
 - `llm/adapters-updated`：provider 拓扑变化在每个 commit 点（含 dispose）触发，payload-free ⇒ 到达时拓扑已是新的。模型级增删不触发它 ⇒ 记忆剪枝除挂它外还挂 `settings/document-updated(llm-pi-ai)`。
 
 ## `resolveModelInfo`：档位显示名的唯一出口

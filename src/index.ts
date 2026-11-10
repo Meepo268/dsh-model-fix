@@ -7,6 +7,7 @@ import { resolveConfig, setConfigSource } from '@/config'
 import { setHmrExecuting } from '@/host'
 import { migrateConfig, selfHealConfig } from '@/migrate'
 import { cancelRefreshRetry, refreshIfStale } from '@/refresh'
+import { clearFailedUpstream, settleUpstreamInflight } from '@/upstream'
 import { installRpc } from '@/rpc'
 import { fix } from '@/fix'
 import { updateMemory } from '@/memory'
@@ -62,6 +63,22 @@ function refillAfterApiChange(ctx: Context): void {
         .then(() => {
             if (!alive(ctx)) return
             pruneMemory(ctx)
+        })
+        .catch(swallowFixError)
+}
+
+/** 凭据入库：宿主保存自定义供应商是两次写入——设置文档先落（那一轮填充只能发匿名请求、401 后进 1 分钟失败缓存），
+ * 密钥随后入库。密钥到位就把失败过的地址放出来再补一轮填充；保守 `fix`（force=false），
+ * 已写下的目录值靠「允许更新」+ 指纹闸门升级，手填值不受影响 */
+function refillAfterCredential(ctx: Context): void {
+    if (isIgnoreAll()) return
+    void settleUpstreamInflight()
+        .then(() => {
+            if (!alive(ctx)) return
+            const cleared = clearFailedUpstream()
+            if (cleared === 0) return
+            logLine(`${PLUGIN_NAME}: 凭据入库，放掉 ${cleared} 个失败地址后重抓上游声明`)
+            return fix(ctx)
         })
         .catch(swallowFixError)
 }
@@ -140,6 +157,9 @@ export function apply(ctx: Context, config?: unknown): void {
         if (ns === PLUGIN_NS) refillAfterOwnChange(ctx)
         else if (ns === API_NS) refillAfterApiChange(ctx)
     })
+    // 凭据入库（保存自定义供应商时密钥晚于设置文档落盘）：失败过的声明地址当场重试一次
+    ctx.on('credentials/record-updated', () => refillAfterCredential(ctx))
+    ctx.on('credentials/reference-updated', () => refillAfterCredential(ctx))
     // provider 拓扑变化（宿主 commit 后发出）：记忆清理跟着它走
     ctx.on('llm/adapters-updated', () => pruneMemory(ctx))
     installSubagentFollowParent(ctx) // 「跟随父智能体」：agent/request 瀑布最外层，每请求现算
