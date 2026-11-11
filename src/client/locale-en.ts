@@ -193,7 +193,7 @@ export const en: Record<CardKey, string> = {
     updateFailed: 'Check failed',
     updateFailedHint: 'Could not read the latest release — click to open the Releases page and pick a build',
     copyInstallUrl: 'Copy install URL',
-    copyInstallHint: 'Copy the built tarball URL, then paste it into Settings → Plugins → Add plugin',
+    copyInstallHint: 'Copy the built tarball URL (with the ghfast.top mirror prefix), then paste it into Settings → Plugins → Add plugin',
     copiedInstallUrl: 'Copied',
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     chipModelOpt: 'Model tuning',

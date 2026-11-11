@@ -3,7 +3,9 @@
  * 三条约束决定了这里的形状：
  * - 只读 `releases/latest`：GitHub 对浏览器开放 CORS，匿名限流 60 次/小时/IP，故只在用户点「检查更新」时才请求，不做轮询、不做启动自检；
  * - 任何失败（超时、非 2xx、JSON 不合规、网络异常）一律收敛成 `null`，由调用方降级成「打开 Releases 页」——检查更新坏掉不能连累卡片其它部分；
- * - 安装地址必须是**构建产物 tarball**（`pnpm pack` 的产出），不是仓库地址：仓库里 `lib/` 被 .gitignore 排除，装源码会加载失败。
+ * - 安装地址必须是**构建产物 tarball**（`pnpm pack` 的产出），不是仓库地址：仓库里 `lib/` 被 .gitignore 排除，装源码会加载失败；
+ * - 安装地址默认带镜像前缀：直连 github.com 在国内常被静默丢包（宿主内的 pnpm 又不读系统代理，HEAD 直接 ETIMEDOUT），
+ *   实测带 `https://ghfast.top/` 前缀的地址能被宿主安装器一次装上；把 `MIRROR_PREFIX` 置空即回到直连。
  */
 
 import { compareHostVersion, parseHostVersion } from '@/shared/version'
@@ -31,9 +33,19 @@ export interface ReleaseInfo {
     readonly notes: string
 }
 
-/** 钉住 tag 的 tarball 地址；不复用 `releases/latest/download`，那个地址不可复现（同一 URL 不同时间可能是不同字节） */
-export function installUrlOf(tag: string): string {
+/** 加速前缀：原样把完整 URL 挂在镜像域名后面（`https://ghfast.top/https://github.com/...`）。
+ * 换成别的镜像只改这一行；置空串即回到直连——镜像只是「连不上 GitHub 时的路」，不是信任转移。 */
+const MIRROR_PREFIX = 'https://ghfast.top/'
+
+/** 直连地址（不含镜像前缀）：文档、排查、以及想绕开第三方镜像时用 */
+export function directInstallUrlOf(tag: string): string {
     return `${REPO_URL}/releases/download/${tag}/${ASSET_NAME}`
+}
+
+/** 钉住 tag 的 tarball 地址（带镜像前缀），复制给宿主的「添加插件」用；
+ * 不复用 `releases/latest/download`：那个地址不可复现（同一 URL 不同时间可能是不同字节） */
+export function installUrlOf(tag: string): string {
+    return `${MIRROR_PREFIX}${directInstallUrlOf(tag)}`
 }
 
 /** 去掉标签上常见的 `v` 前缀；比较器只认 `a.b.c[-alpha|rc.N]` */

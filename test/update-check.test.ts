@@ -3,6 +3,7 @@ import {
     RELEASES_API,
     RELEASES_PAGE,
     compareVersions,
+    directInstallUrlOf,
     fetchLatestRelease,
     installUrlOf,
     parseRelease,
@@ -22,7 +23,9 @@ function fakeFetch(spec: { ok?: boolean; payload?: unknown; throws?: boolean }):
 }
 
 export async function run(): Promise<void> {
-    check('installUrl 钉 tag 的 tarball', installUrlOf('v0.38.13') === 'https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.13/dsh-model-fix.tgz')
+    check('installUrl 钉 tag 的 tarball 且带镜像前缀', installUrlOf('v0.38.13') === 'https://ghfast.top/https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.13/dsh-model-fix.tgz')
+    check('直连地址不带镜像前缀', directInstallUrlOf('v0.38.13') === 'https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.13/dsh-model-fix.tgz')
+    check('镜像地址就是「前缀 + 直连地址」', installUrlOf('v1.2.3') === `https://ghfast.top/${directInstallUrlOf('v1.2.3')}`)
     check('versionOfTag 去 v 前缀并去空白',
         versionOfTag('v0.38.13') === '0.38.13' && versionOfTag('V1.2.3') === '1.2.3' && versionOfTag(' 0.38.1 ') === '0.38.1')
 
@@ -42,7 +45,7 @@ export async function run(): Promise<void> {
         tag: 'v0.38.14',
         version: '0.38.14',
         pageUrl: 'https://github.com/Meepo268/dsh-model-fix/releases/tag/v0.38.14',
-        installUrl: 'https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz',
+        installUrl: 'https://ghfast.top/https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz',
         notes: '修复若干问题',
     }), parseRelease(payload))
     check('parseRelease 无 v 前缀亦可', parseRelease({ tag_name: '0.38.14' })?.version === '0.38.14')

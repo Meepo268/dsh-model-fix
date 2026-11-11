@@ -192,7 +192,7 @@ export const zh: Record<CardKey, string> = {
     updateFailed: '检查失败',
     updateFailedHint: '没能查到最新版：点一下打开 Releases 页，手动挑版本下载',
     copyInstallUrl: '复制安装地址',
-    copyInstallHint: '复制构建产物 tarball 的地址，粘到「设置 → 插件 → 添加插件」里安装',
+    copyInstallHint: '复制构建产物 tarball 的地址（已带 ghfast.top 加速前缀），粘到「设置 → 插件 → 添加插件」里安装',
     copiedInstallUrl: '已复制',
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     chipModelOpt: '模型优化',

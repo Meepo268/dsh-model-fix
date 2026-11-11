@@ -56,7 +56,7 @@ UI界面还提供了一些额外功能：
 - **悬浮按钮组**：内容区左侧的一组按钮：返回对话、插件图标；「返回对话」按钮会逐级返回到当前会话的「对话」页签
 - **经典设置**：侧栏底部恢复为一枚直接的「设置」按钮（遮蔽宿主账号菜单，故意见反馈与登录入口不可见；在【UI 与行为】里关掉即恢复）
 - **插件UI相关配置**：【UI 与行为】控制配置插件UI的行为，如设置卡片入口的位置、显示「跟随」状态灯、显示「返回对话」按钮、启用「经典设置」等。
-- **检查更新**：卡片末尾版本号旁的一枚小按钮。点一下才查（`api.github.com` 的 `releases/latest`，匿名限 60 次/小时，不轮询、不随卡片挂载自检）；有新版就变成「vX 可用」+「复制安装地址」，复制的是**构建产物 tarball** 的地址（钉在 tag 上，可直接粘进「设置 → 插件 → 添加插件」），不是仓库地址——仓库里 `lib/` 不入库，装源码会加载失败。查不到（离线 / 限流 / 被 webview 拦）就退一步直开 Releases 页，不代装、不改 profile
+- **检查更新**：卡片末尾版本号旁的一枚小按钮。点一下才查（`api.github.com` 的 `releases/latest`，匿名限 60 次/小时，不轮询、不随卡片挂载自检）；有新版就变成「vX 可用」+「复制安装地址」，复制的是**构建产物 tarball** 的地址（钉在 tag 上、**带 `https://ghfast.top/` 加速前缀**，可直接粘进「设置 → 插件 → 添加插件」），不是仓库地址——仓库里 `lib/` 不入库，装源码会加载失败。想走直连就把前缀去掉。查不到（离线 / 限流 / 被 webview 拦）就退一步直开 Releases 页，不代装、不改 profile
 
 ### 可视化设置
 
@@ -87,13 +87,19 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.13/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz
+```
+
+国内直连 `github.com` 常常是「TCP 通了、TLS 被丢包」，宿主内的 pnpm 又不读系统代理，表现为 `HEAD … ETIMEDOUT` 重试三轮后 `fetch failed`。此时把地址原样挂到加速镜像后面即可（插件卡片上「复制安装地址」复制的就是这个形态）：
+
+```txt
+https://ghfast.top/https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.13/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）
