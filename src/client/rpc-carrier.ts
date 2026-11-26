@@ -6,7 +6,7 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import {
     CATALOG_REFRESH_MS, DECLARATION_REFRESH_MS,
-    ENDPOINT_FETCH_CATALOG,
+    ENDPOINT_ADOPT_MODELS, ENDPOINT_FETCH_CATALOG,
     ENDPOINT_FORCE_UPDATE, ENDPOINT_REFRESH_DECLARATIONS, ENDPOINT_REPORT_LOCALE, ENDPOINT_RESET_MODELS,
     ENDPOINT_RESTORE_MODELS, ENDPOINT_SET_SOURCE, ENDPOINT_SOURCES,
     PLUGIN_NS, PROBE_STREAM_URL, VERIFY_STREAM_URL, WRITEBACK_MS,
@@ -36,6 +36,8 @@ export interface RpcCarrier {
     /** 刷新上游声明：清掉声明缓存重抓一次，再按既有闸门补填；返回 `{ providers, models, changed, throttled }`。
      * 等待上限比常规写回端点宽——它要真的打一轮网关端点 */
     refreshDeclarations: () => Promise<ConnectionRpcResult<unknown>>
+    /** 一键上线：把待上线的对话模型写进模型列表并补参数；返回 { added, remaining } */
+    adoptModels: (picked: readonly { provider: string; model: string }[]) => Promise<ConnectionRpcResult<unknown>>
     /** 验证模型：走进度流端点，对每个勾选模型发一次不带推理级别的最小请求，逐条回调实时进度；整轮跑完回汇总，被中止（停止 / 关窗 / 断连）回 undefined，没能开跑或中途异常则抛错 */
     verifyModels: (
         models: readonly VerifyTarget[],
@@ -57,6 +59,7 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     const forceUpdate = () => rpc.call(channel, ENDPOINT_FORCE_UPDATE, {}, AbortSignal.timeout(DECLARATION_REFRESH_MS))
     const fetchCatalog = () => rpc.call(channel, ENDPOINT_FETCH_CATALOG, {}, AbortSignal.timeout(CATALOG_REFRESH_MS))
     const resetModels = () => rpc.call(channel, ENDPOINT_RESET_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
+    const adoptModels = (picked: readonly { provider: string; model: string }[]) => rpc.call(channel, ENDPOINT_ADOPT_MODELS, { items: picked }, AbortSignal.timeout(WRITEBACK_MS))
     const restoreModels = () => rpc.call(channel, ENDPOINT_RESTORE_MODELS, {}, AbortSignal.timeout(WRITEBACK_MS))
     const reportLocale = (locale: string) => rpc.call(channel, ENDPOINT_REPORT_LOCALE, locale)
     const sources = () => rpc.call(channel, ENDPOINT_SOURCES, {}, AbortSignal.timeout(WRITEBACK_MS))
@@ -125,6 +128,7 @@ export function makeRpcCarrier(rpc: ClientConnectionRpc): RpcCarrier {
     ) => streamSummary(PROBE_STREAM_URL, { models, ...flags }, onFrame, signal)
     return {
         forceUpdate, fetchCatalog, resetModels, restoreModels, reportLocale, sources, setSource,
+        adoptModels,
         refreshDeclarations, verifyModels, probeEfforts,
     }
 }

@@ -1,16 +1,17 @@
 /** RPC 端点：forceUpdate / resetModels / restoreModels 三个写回端点（共用事件流守卫互斥）+ reportLocale 语言上报
  * + sources / setSource 「参数来源」读写 + refreshDeclarations 手动刷新上游声明 + fetchCatalog 手动拉取目录；
  * 验证与探测档位的进度各开一条 `connection.fetch` exact 路由。
- * 路由自注册而非宿主 `connection.rpc.handle` 的原因见 docs/decisions-config.md「写回端点」 */
+ * 通道优先挂宿主 `connection.rpc.handle`（信封、信任围栏、浏览器会话认证全在宿主里，与 `/api` 同一条路），
+ * 拿不到时退回自建的 `webServer` 前缀路由（见 `src/rpc-route.ts`） */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/dsh-client-connection'
+import type { ConnectionRpcHandler, ConnectionRpcResult, HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 // ctx.llm 服务面声明合并（仅 type-only，不引运行期依赖；LLM 服务是插件 inject 依赖，装载即在）
 import type {} from '@deepseek-ai/dsh-llm'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import {
-    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_FETCH_CATALOG, ENDPOINT_FORCE_UPDATE,
+    API_NS, DECLARATION_REFRESH_THROTTLE_MS, ENDPOINT_ADOPT_MODELS, ENDPOINT_FETCH_CATALOG, ENDPOINT_FORCE_UPDATE,
     ENDPOINT_REFRESH_DECLARATIONS,
     ENDPOINT_REPORT_LOCALE, FORCE_COOLDOWN_MS,
     ENDPOINT_RESET_MODELS, ENDPOINT_RESTORE_MODELS,
@@ -24,7 +25,8 @@ import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progres
 import type { ProbeRunOptions } from '@/probe-engine'
 import { cacheWriteInfo, catalogInfo, fetchLatest, getCatalog, readCache, setCatalog } from '@/catalog'
 import { resolveConfig } from '@/config'
-import { fix } from '@/fix'
+import { adoptPending, type PendingRef } from '@/adopt'
+import { fix, lastFixReport } from '@/fix'
 import { reportLocale } from '@/effort-name'
 import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
 import { queueTask } from '@/host'
@@ -38,7 +40,7 @@ import { providersOf } from '@/shared/types'
 import { fetchDeclarations, clearUpstreamCache, summarizeDeclarations } from '@/upstream'
 import { verifyModels } from '@/verify'
 import { createChannelRoute } from '@/rpc-route'
-import type { EndpointHandler } from '@/rpc-route'
+import type { ChannelFence, EndpointHandler } from '@/rpc-route'
 
 /** 一轮执行的入口：载荷 → 进度帧 → 终帧。验证与探测档位同型，只有执行器不同 */
 type ProgressRunner = (payload: unknown, options: ProbeRunOptions) => Promise<VerifySummary>
@@ -149,6 +151,40 @@ async function handleRestoreModels(ctx: Context): Promise<ConnectionRpcResult<un
     }
 }
 
+/** 一键上线：把 `pending` 里的对话模型写进模型列表，再跑一轮填充补参数（守卫已开即拒） */
+async function handleAdoptModels(ctx: Context, payload: unknown): Promise<ConnectionRpcResult<unknown>> {
+    if (isIgnoreAll()) return writeInProgress()
+    startIgnoreAll()
+    try {
+        const parsed = parseAdopt(payload)
+        if (!parsed) return { ok: false, error: { code: 'model-fix/adopt-models-invalid', message: '一键上线载荷非法', details: {} } }
+        const result = await adoptPending(ctx, parsed)
+        logLine(`${PLUGIN_NAME}: 一键上线 ${result.added.length} 个模型`)
+        return { ok: true, value: result }
+    } catch (error) {
+        logLine(`${PLUGIN_NAME}: 一键上线失败：${errorText(error)}`)
+        return { ok: false, error: { code: 'model-fix/adopt-models-failed', message: errorText(error), details: {} } }
+    } finally {
+        endIgnoreAll()
+    }
+}
+
+/** 一键上线载荷：勾选的条目列表 */
+function parseAdopt(payload: unknown): PendingRef[] | undefined {
+    if (typeof payload !== 'object' || payload === null) return
+    const items = (payload as { items?: unknown }).items
+    if (!Array.isArray(items)) return
+    const picked: PendingRef[] = []
+    for (const item of items) {
+        if (typeof item !== 'object' || item === null) continue
+        const { provider, model } = item as Record<string, unknown>
+        if (typeof provider !== 'string' || provider === '') continue
+        if (typeof model !== 'string' || model === '') continue
+        picked.push({ provider, model })
+    }
+    return picked
+}
+
 /** 浏览器半启动时上报探测语言：Node 侧没有 locale 服务，见 effort-name.ts 的语言解析 */
 function handleReportLocale(payload: unknown): ConnectionRpcResult<unknown> {
     reportLocale(payload)
@@ -229,9 +265,20 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
         clearUpstreamCache()
         const declarations = await fetchDeclarations(ctx, providers)
         const changed = await fix(ctx)
+        const report = lastFixReport()
+        const removedCount = report.removed.length
         const summary = summarizeDeclarations(declarations)
-        logLine(`${PLUGIN_NAME}: 刷新声明完成：${summary.providers} 家/${summary.models} 条，覆盖 ${changed} 个模型`)
-        return { ok: true, value: { ...summary, changed, throttled: false } }
+        logLine(`${PLUGIN_NAME}: 刷新声明完成：${summary.providers} 家/${summary.models} 条，覆盖 ${changed} 个模型${removedCount > 0 ? `，移除 ${removedCount} 个已下架模型` : ''}`)
+        return {
+            ok: true,
+            value: {
+                ...summary,
+                changed,
+                removed: report.removed,
+                discovered: report.discovered,
+                throttled: false,
+            },
+        }
     } catch (error) {
         logLine(`${PLUGIN_NAME}: 刷新声明失败：${errorText(error)}`)
         return { ok: false, error: { code: 'model-fix/refresh-declarations-failed', message: errorText(error), details: {} } }
@@ -240,11 +287,86 @@ async function handleRefreshDeclarations(ctx: Context): Promise<ConnectionRpcRes
     }
 }
 
+/** 宿主 connection 服务上与围栏有关的那一丁点面：0.2.3-alpha 起是 `admit(request) → { peer } | { rejection: 401|403|503 }`，
+ * 0.1.x 是 `requestRejection(request) → 401 | 403 | undefined`。两者的判定内容相同（受信来源 + 浏览器会话认证） */
+interface FenceRequest {
+    readonly headers: Record<string, string | string[] | undefined>
+    readonly method?: string | undefined
+    readonly url?: string | undefined
+    readonly socket?: { readonly destroyed: boolean } | undefined
+}
+
+interface FenceHost {
+    readonly admit?: (request: FenceRequest) => { readonly peer?: unknown } | { readonly rejection?: number }
+    readonly requestRejection?: (request: FenceRequest) => number | undefined
+}
+
+/** 合成信任围栏：优先 `admit`（0.2.3-alpha 起的宿主），其次 `requestRejection`（旧宿主），都没有返回 undefined
+ * 让路由退回「宿主 auth 传了 peer 才放行」。`admit` 抛错按拒绝处理——围栏要 fail closed，不能靠异常冒到宿主变成 400 */
+export function fenceOf(connection: unknown): ChannelFence | undefined {
+    const host = connection as FenceHost
+    if (typeof host.admit === 'function') {
+        const admit = host.admit.bind(host)
+        return (request) => {
+            let admission: ReturnType<NonNullable<FenceHost['admit']>>
+            try {
+                admission = admit({
+                    headers: request.headers,
+                    method: request.method,
+                    url: request.url,
+                    socket: request.socket,
+                })
+            } catch {
+                return 403
+            }
+            return 'rejection' in admission ? admission.rejection : undefined
+        }
+    }
+    if (typeof host.requestRejection === 'function') {
+        const rejectionOf = host.requestRejection.bind(host)
+        return (request) => rejectionOf(request)
+    }
+    return undefined
+}
+
+/** 宿主 channel 注册面：`connection.rpc.handle(channel, handler) → 异步 disposer`。
+ * 0.2.3-alpha 起 `get rpc()` 只把 `register` 绑给调用方，不再求值 `owner.webServer`，
+ * 因此在 Node 半可以安全取用；旧宿主上取值或注册可能抛错，一律当作「不可用」返回 undefined 交给兜底路由 */
+interface HostChannelRpc {
+    readonly handle?: (channel: string, handler: ConnectionRpcHandler) => () => Promise<void>
+}
+
+/** 把通道挂到宿主 RPC 注册表；返回 disposer，宿主不提供这条面（或当场抛错）时返回 undefined */
+export function registerHostChannel(
+    connection: unknown,
+    channel: string,
+    handler: EndpointHandler,
+): (() => void) | undefined {
+    let rpc: HostChannelRpc | undefined
+    try {
+        rpc = (connection as { rpc?: HostChannelRpc }).rpc
+    } catch {
+        return undefined
+    }
+    const handle = rpc?.handle
+    if (typeof handle !== 'function') return undefined
+    try {
+        const dispose = handle.call(rpc, channel, (endpoint, payload, signal) => handler(endpoint, payload, signal))
+        logLine(`${PLUGIN_NAME}: 通道 ${channel} 挂在宿主 connection.rpc 上`)
+        return () => {
+            void dispose()
+        }
+    } catch (error) {
+        logLine(`${PLUGIN_NAME}: 宿主 connection.rpc 注册失败，改用自建路由：${errorText(error)}`)
+        return undefined
+    }
+}
+
 /** 注册一个 channel（三个写回端点 + 三条「参数来源/目录」端点 + 语言上报）；register 返回 disposer，经 ctx.effect 挂卸载自动回收 */
 export function installRpc(ctx: Context): void {
     // 子 fiber 声明 connection + webServer；无 webServer 的 profile（如 headless）下子 fiber 不启动，其余功能不受影响
     ctx.inject(['connection', 'webServer'], (rpcCtx) => {
-        const connection = rpcCtx.get('connection') as Pick<HostConnectionService, 'requestRejection' | 'fetch'>
+        const connection = rpcCtx.get('connection') as Pick<HostConnectionService, 'fetch'>
         const webServer = rpcCtx.get('webServer') as WebServer
         rpcCtx.effect(() => {
             const channel = `/${PLUGIN_NS}`
@@ -259,11 +381,22 @@ export function installRpc(ctx: Context): void {
                     case ENDPOINT_SOURCES: return handleSources(ctx)
                     case ENDPOINT_SET_SOURCE: return handleSetSource(ctx, payload)
                     case ENDPOINT_REFRESH_DECLARATIONS: return handleRefreshDeclarations(ctx)
+            case ENDPOINT_ADOPT_MODELS: return handleAdoptModels(ctx, payload)
+
                     default:
                         return { ok: false, error: { code: 'model-fix/unknown-endpoint', message: `未知端点：${endpoint}`, details: {} } }
                 }
             }
-            const disposeChannel = webServer.register({ kind: 'prefix', path: channel, handler: createChannelRoute(connection, channel, handler) })
+            // 优先把通道挂到宿主的 RPC 注册表上：信封解析、Method/Content-Type 校验、信任围栏与浏览器会话认证
+            // 都由宿主完成，与官方 `/api` 通道走同一条路（自建路由要自己复刻这一整套，且宿主围栏一改就跟着坏）
+            let disposeChannel = registerHostChannel(connection, channel, handler)
+            // 兜底：宿主没有可用 `connection.rpc.handle`（或它当场抛错）时自建前缀路由，
+            // auth 不显式写——宿主对路由的默认策略就是 required（未认证不派发、认证过才给 peer），
+            // 而 0.1.x 的 WebRoute 还没有这个字段，省略它两边都成立
+            if (disposeChannel === undefined) {
+                const fence = fenceOf(connection)
+                disposeChannel = webServer.register({ kind: 'prefix', path: channel, handler: createChannelRoute(fence, channel, handler) })
+            }
             // 两条进度流走 connection.fetch exact 路由（RPC 一次调用只对应一个 JSON 结果，装不下持续多帧的响应）
             const disposeStream = connection.fetch.register({
                 path: VERIFY_STREAM_ROUTE,

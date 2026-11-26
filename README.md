@@ -87,19 +87,19 @@ UI界面还提供了一些额外功能：
 在 DSH 中，点击「插件」-->「添加插件」，复制以下链接到输入框，完成安装并立即启用：
 
 ```txt
-https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz
+https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.26/dsh-model-fix.tgz
 ```
 
 国内直连 `github.com` 常常是「TCP 通了、TLS 被丢包」，宿主内的 pnpm 又不读系统代理，表现为 `HEAD … ETIMEDOUT` 重试三轮后 `fetch failed`。此时把地址原样挂到加速镜像后面即可（插件卡片上「复制安装地址」复制的就是这个形态）：
 
 ```txt
-https://ghfast.top/https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz
+https://ghfast.top/https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.26/dsh-model-fix.tgz
 ```
 
 或在命令行执行：
 
 ```bash
-dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.14/dsh-model-fix.tgz
+dsh plugin --profile web add https://github.com/Meepo268/dsh-model-fix/releases/download/v0.38.26/dsh-model-fix.tgz
 ```
 
 ### 方式三：通过 Git 安装（不推荐）

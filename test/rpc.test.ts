@@ -1,6 +1,8 @@
-// rpc.ts 进度流测试：以标准 Request/Response 驱动 progressStreamFetch，覆盖正常发帧、异常发 failed 终帧、中止不发终帧与非法请求体
-import { check } from '@test/helper'
-import { progressStreamFetch } from '@/rpc'
+// rpc.ts 进度流测试：以标准 Request/Response 驱动 progressStreamFetch，覆盖正常发帧、异常发 failed 终帧、中止不发终帧与非法请求体；另测 fenceOf 对两代宿主围栏 API 的适配
+import type { IncomingMessage } from 'node:http'
+import { check, stable } from '@test/helper'
+import { fenceOf, progressStreamFetch, registerHostChannel } from '@/rpc'
+import type { EndpointHandler } from '@/rpc-route'
 import { endIgnoreAll, isIgnoreAll, startIgnoreAll } from '@/guard'
 import type { ProbeRunOptions } from '@/probe-engine'
 import type { VerifyProgressFrame, VerifySummary } from '@/shared/verify-progress'
@@ -98,4 +100,37 @@ export async function run(): Promise<void> {
     endIgnoreAll()
     check('探测流在守卫已开时回 409 且不执行', busy.status === 409 && !probeRan, busy.status)
     check('守卫互斥判定不遗留守卫状态', isIgnoreAll() === false)
+
+    // ---------- fenceOf：两代宿主围栏 API 的适配 ----------
+    const req = { headers: { host: '127.0.0.1:2718' }, method: 'POST', url: '/tikaflow-model-fix/sources', socket: { destroyed: false } } as unknown as IncomingMessage
+    // 0.2.3-alpha 起：admit 返回 { rejection } 即拒、返回 { peer } 即放行，请求字段原样转交
+    let seen: unknown
+    const admitted = fenceOf({ admit: (request: unknown) => { seen = request; return { peer: { id: 'owner' } } } })
+    check('fenceOf 用 admit 放行时返回 undefined', admitted?.(req) === undefined)
+    check('fenceOf 把 headers/method/url/socket 转给 admit', stable(seen) === stable({ headers: { host: '127.0.0.1:2718' }, method: 'POST', url: '/tikaflow-model-fix/sources', socket: { destroyed: false } }), stable(seen))
+    check('fenceOf 用 admit 的 rejection 拒答', fenceOf({ admit: () => ({ rejection: 401 }) })?.(req) === 401)
+    check('fenceOf 用 admit 的 503 拒答', fenceOf({ admit: () => ({ rejection: 503 }) })?.(req) === 503)
+    check('fenceOf 在 admit 抛错时 fail closed 回 403', fenceOf({ admit: () => { throw new Error('boom') } })?.(req) === 403)
+    // 旧宿主：requestRejection
+    check('fenceOf 用 requestRejection 拒答', fenceOf({ requestRejection: () => 403 })?.(req) === 403)
+    check('fenceOf 用 requestRejection 放行时返回 undefined', fenceOf({ requestRejection: () => undefined })?.(req) === undefined)
+    // 同时存在时优先 admit（新宿主的判定口径）
+    check('fenceOf 同时存在时优先 admit', fenceOf({ admit: () => ({ rejection: 401 }), requestRejection: () => 403 })?.(req) === 401)
+    // 两样都没有：留给路由按 auth 传进来的 peer 判定
+    check('fenceOf 两代 API 都没有时返回 undefined', fenceOf({ fetch: {} }) === undefined)
+
+    // ---------- registerHostChannel：优先挂宿主的 channel 注册表 ----------
+    const plainHandler: EndpointHandler = async () => ({ ok: true, value: {} })
+    let handled: { channel: string; endpoint?: string } = { channel: '' }
+    const disposeHost = registerHostChannel(
+        { rpc: { handle: (channel: string, handler: (endpoint: string, payload: unknown) => Promise<unknown>) => { handled = { channel }; void handler; return async () => {} } } },
+        '/tikaflow-model-fix',
+        plainHandler,
+    )
+    check('registerHostChannel 优先用 connection.rpc.handle 并回 disposer', handled.channel === '/tikaflow-model-fix' && typeof disposeHost === 'function')
+    disposeHost?.()
+    // 旧宿主：get rpc 抛错或没有 handle → undefined，交给自建路由兜底
+    check('registerHostChannel 在取 rpc 抛错时回 undefined', registerHostChannel({ get rpc(): never { throw new Error('no webServer') } }, '/tikaflow-model-fix', plainHandler) === undefined)
+    check('registerHostChannel 在没有 handle 时回 undefined', registerHostChannel({ rpc: {} }, '/tikaflow-model-fix', plainHandler) === undefined)
+    check('registerHostChannel 在 handle 抛错时回 undefined', registerHostChannel({ rpc: { handle: () => { throw new Error('boom') } } }, '/tikaflow-model-fix', plainHandler) === undefined)
 }

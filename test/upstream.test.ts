@@ -7,6 +7,7 @@ import {
     clearUpstreamCache,
     declarationOf,
     fetchDeclarations,
+    fetchUpstream,
     modelsUrl,
     parseDeclarations,
     setDeclarationSource,
@@ -139,6 +140,22 @@ export async function run(): Promise<void> {
         check('无 baseURL 的提供方不发请求（file:// 也不算）', CALLS.every(call => call.url.startsWith('https://')))
         check('声明按提供方 id 分发给同地址的每条路由', first.has('a') && first.has('b') && first.get('b')?.get('a')?.contextWindow === 200_000)
         check('密钥取自该地址下声明了 apiKeyEnv 的提供方', CALLS[0]?.headers.authorization === 'Bearer sk-test')
+    } finally {
+        restoreFetch()
+    }
+
+    // 首轮记账要绕缓存：同地址可能留着上一次的快照，拿它播种会让「后来上架的模型」永远不算新面孔
+    clearUpstreamCache()
+    CALLS.length = 0
+    let serveNew = false
+    stubFetch(() => ({ body: serveNew ? { data: [{ id: 'a' }, { id: 'brand-new' }] } : { data: [{ id: 'a' }] } }))
+    try {
+        await fetchUpstream(CTX, { p: { baseURL: 'https://gw-seed/v1' } })
+        serveNew = true
+        const cached = await fetchUpstream(CTX, { p: { baseURL: 'https://gw-seed/v1' } })
+        check('同一地址第二次不重抓（6h 缓存生效）', [...(cached.get('p')?.roster.keys() ?? [])].length === 1, [...(cached.get('p')?.roster.keys() ?? [])])
+        const fresh = await fetchUpstream(CTX, { p: { baseURL: 'https://gw-seed/v1' } }, Date.now(), new Set(['p']))
+        check('首轮记账的提供方绕缓存重抓', (fresh.get('p')?.roster.has('brand-new') ?? false) === true, [...(fresh.get('p')?.roster.keys() ?? [])])
     } finally {
         restoreFetch()
     }

@@ -12,8 +12,11 @@ const base: PluginConfig = {
     efforts: {},
     written: {},
     sources: {},
-        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-    userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true },
+    known: {},
+    pending: {},
+    missing: {},
+        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: false, backToChat: false, showInFloat: false, classicSetting: true },
+    userExperience: { rememberEfforts: true, defaultHigh: false, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: false, localizeEfforts: true, showOriginalEfforts: true, looseMatch: false, nameFallback: true, notifyNewModels: true, autoRemoveModels: true },
 }
 
 /** 取 modelOps 中 path 匹配的第一条 set op 的 value（provider 级 models 数组） */

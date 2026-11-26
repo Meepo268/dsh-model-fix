@@ -44,6 +44,9 @@ function cfg(overrides: Partial<PluginConfig> = {}): PluginConfig {
         efforts: overrides.efforts ?? {},
         written: overrides.written ?? {},
         sources: overrides.sources ?? {},
+        known: overrides.known ?? {},
+        pending: overrides.pending ?? {},
+        missing: overrides.missing ?? {},
         behavior: { ...DEFAULT_CONFIG.behavior, ...overrides.behavior },
         userExperience: { ...DEFAULT_CONFIG.userExperience, ...overrides.userExperience },
     }
@@ -498,7 +501,7 @@ export async function run(): Promise<void> {
         const ctx = makeStubCtx({
             api: { providers: { testprovider: { models: [{ id: 'model-x' }] } } },
         })
-        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true, nameFallback: true } }))
+        setConfig(cfg({ autoFill: { reasoning: true, context: true, image: true }, userExperience: { ...DEFAULT_CONFIG.userExperience, looseMatch: true, nameFallback: true, notifyNewModels: true, autoRemoveModels: true } }))
         setCatalog(AMBIGUOUS_CAT)
         const changes = await fix(ctx as unknown as Context)
         const model = modelsOf(ctx, 'testprovider')[0]

@@ -13,7 +13,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { FETCH_MS, LEVELS } from '@/constants'
 import { stripNamespace } from '@/lookup'
 import { isCapacity } from '@/types'
-import { isPlainObject } from '@/shared/types'
+import { isPlainObject, type ModelKind } from '@/shared/types'
 
 /** 单个模型的上游声明：缺项表示端点未声明该维度（不是「声明为无」） */
 export interface Declaration {
@@ -26,6 +26,30 @@ export interface Declaration {
 
 /** provider id → 模型 id（原样，含命名空间前缀）→ 声明 */
 export type DeclarationMap = Map<string, Map<string, Declaration>>
+
+/** 一份端点回包里的模型条目：只取「上新提示」用得上的两样（显示名与种类）。
+ * 与 `Declaration` 分开存放：声明表只收「有可用能力字段」的条目（见 `parseDeclarations` 末尾的过滤），
+ * 而清单要包含全部 id —— 一个只带 `{id, object}` 的模型同样可能值得提示用户 */
+export interface RosterEntry {
+    /** 上游声明的显示名（多数网关给 `name` / `display_name`；裸 OpenAI 口没有） */
+    name?: string
+    /** 模型种类判定（见 `parseRoster`）；判不出时按 chat */
+    kind: ModelKind
+}
+
+/** provider id → 模型 id → 条目 */
+export type RosterMap = Map<string, Map<string, RosterEntry>>
+
+/** 一个端点的完整回包快照：`ok` 区分「抓取失败」与「抓到了但确实没有模型」——
+ * 后者才能触发下架删除，前者必须原样不动账本（见 `src/roster.ts`） */
+export interface EndpointSnapshot {
+    readonly ok: boolean
+    readonly declarations: Map<string, Declaration>
+    readonly roster: Map<string, RosterEntry>
+}
+
+/** provider id → 快照 */
+export type SnapshotMap = Map<string, EndpointSnapshot>
 
 /** 声明来源（测试注入点）：给定提供方表，返回各提供方的声明表；生产实现见 `fetchFromEndpoints` */
 export type DeclarationLoader = (providers: Record<string, unknown>) => Promise<DeclarationMap>
@@ -171,6 +195,61 @@ export function parseDeclarations(payload: unknown): Map<string, Declaration> {
     return result
 }
 
+/** 声明的输出模态：OpenRouter 风 `modalities.output`、部分网关 `output_modalities`、`architecture.output_modalities`。
+ * 这是判定「能不能当对话模型用」最可靠的一手信号（实测网关：纯文本模型一律 `['text']`，图像 `['image']`，视频 `['video']`） */
+function outputsOf(entry: Record<string, unknown>): string[] | undefined {
+    const modalities = isPlainObject(entry.modalities) ? entry.modalities : undefined
+    const architecture = isPlainObject(entry.architecture) ? entry.architecture : undefined
+    const raw = modalities?.output ?? entry.output_modalities ?? architecture?.output_modalities
+    if (!Array.isArray(raw)) return undefined
+    const outputs = raw.filter((item): item is string => typeof item === 'string')
+    return outputs.length > 0 ? outputs : undefined
+}
+
+/** 名字里带这些词的只可能是非对话模型：裸 OpenAI 口（只回 `{id, object, created}`）没模态字段时的兜底 */
+const NON_CHAT_ID = /(?:^|[^a-z])(?:embed|embedding|rerank|whisper|tts|asr|moderation|bge|gte|dall-?e|sdxl|flux)(?:[^a-z]|$)/i
+
+/** 判定模型种类：模态字段优先，其次 `image_generation` / `video_generation` 布尔，再次 `tags`，最后 id 兜底。
+ * 判不出时按 `chat` —— 多加一个用不了的条目只是碍眼，把能用的模型藏起来才是事故 */
+export function kindOf(entry: Record<string, unknown>, id: string): ModelKind {
+    const outputs = outputsOf(entry)
+    if (outputs !== undefined) {
+        if (outputs.includes('text')) return 'chat'
+        if (outputs.includes('image')) return 'image'
+        if (outputs.includes('video')) return 'video'
+        return 'other'
+    }
+    if (entry.image_generation === true) return 'image'
+    if (entry.video_generation === true) return 'video'
+    const tags = Array.isArray(entry.tags) ? entry.tags.filter((tag): tag is string => typeof tag === 'string') : []
+    if (tags.some((tag) => /image/i.test(tag))) return 'image'
+    if (tags.some((tag) => /video/i.test(tag))) return 'video'
+    if (NON_CHAT_ID.test(id)) return 'other'
+    return 'chat'
+}
+
+/** 上游声明的显示名：各家字段不一（OpenAI 口通常没有，只能回落到 id） */
+function nameOf(entry: Record<string, unknown>): string | undefined {
+    for (const key of ['name', 'display_name', 'magpie_label']) {
+        const value = entry[key]
+        if (typeof value === 'string' && value.trim() !== '') return value.trim()
+    }
+    return undefined
+}
+
+/** 解析端点的**完整清单**（含没有能力字段的条目）：上新提示与下架判定都以它为准 */
+export function parseRoster(payload: unknown): Map<string, RosterEntry> {
+    const result = new Map<string, RosterEntry>()
+    for (const entry of entriesOf(payload) ?? []) {
+        if (!isPlainObject(entry)) continue
+        const rawId = entry.id ?? entry.model
+        if (typeof rawId !== 'string' || rawId === '') continue
+        const name = nameOf(entry)
+        result.set(rawId, name === undefined ? { kind: kindOf(entry, rawId) } : { kind: kindOf(entry, rawId), name })
+    }
+    return result
+}
+
 /** 端点地址：`baseURL` 去掉尾斜杠后接 `/models`（OpenAI 兼容路由的 baseURL 已含 `/v1`） */
 export function modelsUrl(baseURL: string): string {
     return `${baseURL.replace(/\/+$/, '')}/models`
@@ -188,13 +267,13 @@ export function altModelsUrl(baseURL: string): string | undefined {
 /** 抓取缓存：按 baseURL 记（同一地址多路由共享一份回包） */
 interface CacheSlot {
     readonly at: number
-    readonly value: Map<string, Declaration>
+    readonly value: EndpointSnapshot
     readonly ttl: number
 }
 const cache = new Map<string, CacheSlot>()
 
 /** 进行中的抓取（同地址并发去重：一批里多条路由共用一次请求） */
-const inflight = new Map<string, Promise<Map<string, Declaration>>>()
+const inflight = new Map<string, Promise<EndpointSnapshot>>()
 
 /** 测试注入的声明来源；未注入时走真实端点抓取 */
 let loader: DeclarationLoader | undefined
@@ -271,13 +350,15 @@ class HttpError extends Error {
 
 /** 抓一个端点的声明；主路径 404/405（很多网关把列表放在 `/v1/models`）时换备用路径再试一次，
  * 其余失败直接抛，由调用方吞掉并回落目录 */
-async function fetchOne(url: string, alt: string | undefined, key: string | undefined): Promise<Map<string, Declaration>> {
-    const request = async (target: string): Promise<Map<string, Declaration>> => {
+async function fetchOne(url: string, alt: string | undefined, key: string | undefined): Promise<EndpointSnapshot> {
+    const request = async (target: string): Promise<EndpointSnapshot> => {
         const headers: Record<string, string> = { accept: 'application/json' }
         if (key !== undefined && key !== '') headers.authorization = `Bearer ${key}`
         const response = await fetch(target, { headers, signal: AbortSignal.timeout(FETCH_MS) })
         if (!response.ok) throw new HttpError(response.status)
-        return parseDeclarations(await response.json())
+        const payload: unknown = await response.json()
+        // 同一份回包解析两遍：声明表只收有能力的条目，清单收全部 id（见 EndpointSnapshot 的说明）
+        return { ok: true, declarations: parseDeclarations(payload), roster: parseRoster(payload) }
     }
     try {
         return await request(url)
@@ -323,10 +404,12 @@ async function fetchFromEndpoints(
     ctx: Context,
     providers: Record<string, unknown>,
     now: number,
-): Promise<DeclarationMap> {
-    const result: DeclarationMap = new Map()
-    /** url → 声明（空表 = 本批已知失败，直接回落目录）；同批多个提供方共享 */
-    const loaded = new Map<string, Map<string, Declaration>>()
+    fresh?: ReadonlySet<string>,
+): Promise<SnapshotMap> {
+    const result: SnapshotMap = new Map()
+    /** url → 快照（失败槽是同形 `ok: false` 的空快照，见 `EndpointSnapshot`）；同批多个提供方共享 */
+    const loaded = new Map<string, EndpointSnapshot>()
+    const failed: EndpointSnapshot = { ok: false, declarations: new Map(), roster: new Map() }
     /** 参与抓取的提供方（先扫一遍再抓，密钥与地址的顺序差异才不影响结果） */
     const targets: { providerId: string; url: string; alt: string | undefined }[] = []
     /** url → 该地址下第一条声明了 apiKeyEnv 的提供方（回包与路由无关，谁有密钥都一样） */
@@ -339,40 +422,78 @@ async function fetchFromEndpoints(
         targets.push({ providerId, url, alt: altModelsUrl(baseURL) })
         if (typeof profile.apiKeyEnv === 'string' && !keys.has(url)) keys.set(url, profile.apiKeyEnv)
     }
+    /** 需要绕缓存重抓的地址：首轮记账（该提供方还没有 known 行）不能拿别人留下的旧快照播种，
+     *  否则「网关后来才上架的模型」会被当成一直存在，永远不提示上新 */
+    const freshUrls = new Set<string>()
+    for (const { providerId, url } of targets) {
+        if (fresh?.has(providerId) === true) freshUrls.add(url)
+    }
     const jobs: Promise<void>[] = []
     for (const { url, alt } of targets) {
         if (loaded.has(url)) continue
         const slot = cache.get(url)
-        if (slot && now - slot.at < slot.ttl) {
+        if (slot && now - slot.at < slot.ttl && !freshUrls.has(url)) {
             loaded.set(url, slot.value)
             continue
         }
         const pending = inflight.get(url)
         if (pending) {
-            loaded.set(url, new Map())
+            loaded.set(url, failed)
             jobs.push(pending.then((value) => { loaded.set(url, value) }))
             continue
         }
-        const job = (async (): Promise<Map<string, Declaration>> => {
+        const job = (async (): Promise<EndpointSnapshot> => {
             try {
                 const value = await fetchOne(url, alt, await resolveKey(ctx, { apiKeyEnv: keys.get(url) }))
                 cache.set(url, { at: Date.now(), value, ttl: UPSTREAM_TTL_MS })
                 return value
             } catch (error) {
                 // 端点不可达/拒绝：短缓存失败态，交给目录兜底；仅告警不抛（保存配置不该因上游抖动失败）
-                cache.set(url, { at: Date.now(), value: new Map(), ttl: UPSTREAM_FAIL_TTL_MS })
+                cache.set(url, { at: Date.now(), value: failed, ttl: UPSTREAM_FAIL_TTL_MS })
                 ctx.logger.debug(`upstream: 声明抓取失败（${url}）：${String(error)}`)
-                return new Map()
+                return failed
             }
         })()
         inflight.set(url, job)
-        loaded.set(url, new Map())
+        loaded.set(url, failed)
         jobs.push(job.then((value) => { loaded.set(url, value) }).finally(() => { inflight.delete(url) }))
     }
     await Promise.all(jobs)
     for (const { providerId, url } of targets) {
         const value = loaded.get(url)
-        if (value !== undefined && value.size > 0) result.set(providerId, value)
+        // 失败（ok=false）也要带出去：roster 需要知道「这次没问到」，绝不能当成「清单为空」
+        if (value !== undefined) result.set(providerId, value)
+    }
+    return result
+}
+
+/** 抓一次上游回包快照（含完整清单与 ok 标志）：上新提示与下架判定用 */
+export async function fetchUpstream(
+    ctx: Context,
+    providers: Record<string, unknown>,
+    now = Date.now(),
+    fresh?: ReadonlySet<string>,
+): Promise<SnapshotMap> {
+    if (loader) {
+        // 测试注入点只有能力声明：当成「成功但只有这些 id」的快照，种类按 chat
+        const declarations = await loader(providers)
+        const snapshots: SnapshotMap = new Map()
+        for (const [providerId, table] of declarations) {
+            const roster = new Map<string, RosterEntry>()
+            for (const id of table.keys()) roster.set(id, { kind: 'chat' })
+            snapshots.set(providerId, { ok: true, declarations: table, roster })
+        }
+        return snapshots
+    }
+    return fetchFromEndpoints(ctx, providers, now, fresh)
+}
+
+/** 把快照收窄成「声明表」：只保留抓取成功且确有能力的提供方 */
+export function declarationsOf(snapshots: SnapshotMap): DeclarationMap {
+    const result: DeclarationMap = new Map()
+    for (const [providerId, snapshot] of snapshots) {
+        if (!snapshot.ok || snapshot.declarations.size === 0) continue
+        result.set(providerId, snapshot.declarations)
     }
     return result
 }
@@ -384,5 +505,5 @@ export async function fetchDeclarations(
     now = Date.now(),
 ): Promise<DeclarationMap> {
     if (loader) return loader(providers)
-    return fetchFromEndpoints(ctx, providers, now)
+    return declarationsOf(await fetchFromEndpoints(ctx, providers, now))
 }

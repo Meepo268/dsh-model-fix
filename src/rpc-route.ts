@@ -1,12 +1,12 @@
 /** 浏览器↔宿主 channel 路由：自注册前缀路由而非宿主 `connection.rpc.handle`（后者在 connection 服务 ctx 上求值 `owner.webServer`，而 connection 不再注入它必抛）；
- * 信任围栏与信封字段、错误文案与宿主通道对齐，类型面全取宿主 devDep（type-only，构建期擦除） */
+ * 信封字段、错误文案与宿主通道对齐，类型面全取宿主 devDep（type-only，构建期擦除）。
+ *
+ * 信任围栏在哪：0.1.x 的 connection 服务提供 `requestRejection(req)`（非受信来源 403、浏览器会话未认证 401），0.2.3-alpha 起换成
+ * `admit(request)`（同一套判定，返回 `{ peer }` 或 `{ rejection }`）。两条路都在 `src/rpc.ts` 里合成一个 `ChannelFence` 函数交给本模块：
+ * 返回 undefined 放行、返回状态码即拒绝；宿主两个 API 都没有时才退回「要求路由 auth 传进来的 `peer` 存在」。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type {
-    ConnectionRequestRejection,
-    ConnectionRpcResult,
-    HostConnectionService,
-} from '@deepseek-ai/dsh-client-connection'
+import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 
 /** endpoint 段名允许的字符（宿主 ENDPOINT_SEGMENT_PATTERN 的字面复制） */
 const ENDPOINT_SEGMENT = /^[A-Za-z0-9_$.-]+$/
@@ -17,6 +17,10 @@ const MAX_BODY_BYTES = 64 * 1024
 
 /** 端点处理函数（与宿主 ConnectionRpcHandler 同形：省略只用于信任判定、浏览器侧用不到的 peer 参，返回值不带 attachments） */
 export type EndpointHandler = (endpoint: string, payload: unknown, signal: AbortSignal) => Promise<ConnectionRpcResult<unknown>>
+
+/** 信任围栏：放行返回 undefined，拒绝返回要回给客户端的 HTTP 状态码。
+ * 合成方式见 `src/rpc.ts` 的 `fenceOf`（旧宿主 `requestRejection`、0.2.3-alpha 起 `admit`）；宿主两个 API 都没有时为 undefined */
+export type ChannelFence = (request: IncomingMessage) => number | undefined
 
 /** 从 channel 前缀路由的 pathname 切出 endpoint；前缀不符、空段、`.`/`..` 点段或非法字符返回 undefined */
 export function endpointOf(pathname: string, channel: string): string | undefined {
@@ -44,12 +48,14 @@ export function envelopeRpcId(value: unknown): string {
     return typeof rpcId === 'string' ? rpcId : INVALID_RPC_ID
 }
 
-/** 构造本 channel 的前缀路由处理器（围栏 → 方法/类型校验 → 读体 → 切端点 → 解信封与校验 method → 调 handler → 回信封） */
+/** 构造本 channel 的前缀路由处理器（围栏 → 方法/类型校验 → 读体 → 切端点 → 解信封与校验 method → 调 handler → 回信封）
+ * `fence` 为 undefined 表示宿主不提供程序化围栏，此时靠宿主路由 auth 传进来的 `peer` 判定：
+ * 有它说明宿主已在 `webserver/authorize` 放过这一请求 */
 export function createChannelRoute(
-    connection: Pick<HostConnectionService, 'requestRejection'>,
+    fence: ChannelFence | undefined,
     channel: string,
     handler: EndpointHandler,
-): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+): (req: IncomingMessage, res: ServerResponse, peer?: unknown) => Promise<void> {
     const respond = (res: ServerResponse, status: number, body: string): void => {
         res.writeHead(status, { 'content-type': 'application/json' })
         res.end(body)
@@ -57,12 +63,18 @@ export function createChannelRoute(
     const badRequest = (res: ServerResponse, rpcId: string, message: string): void => {
         respond(res, 200, JSON.stringify(serverResponse(rpcId, { ok: false, error: { code: 'gateway/bad-request', message, details: {} } })))
     }
-    return async (req, res) => {
-        // 与宿主 /api 路由同一把围栏：非受信来源 403、浏览器会话未认证 401
-        const rejection: ConnectionRequestRejection = connection.requestRejection(req)
+    return async (req, res, peer) => {
+        // 与宿主 /api 路由同一把围栏：非受信来源 403、浏览器会话未认证 401。
+        // 旧宿主调 requestRejection、0.2.3-alpha 起调 admit（合成在 fence 里）；宿主两样都没有时退回 peer 判定
+        const rejection = fence?.(req)
         if (rejection !== undefined) {
             res.writeHead(rejection)
-            res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
+            res.end(rejection === 401 ? 'unauthorized' : rejection === 403 ? 'forbidden' : 'unavailable')
+            return
+        }
+        if (fence === undefined && peer === undefined) {
+            res.writeHead(401)
+            res.end('unauthorized')
             return
         }
         if (req.method !== 'POST') {

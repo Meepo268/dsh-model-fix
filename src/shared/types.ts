@@ -52,6 +52,11 @@ export interface UserExperienceRules {
     looseMatch: boolean
     /** 显示名兜底：id 三级匹配与前缀剥离都没命中时，用模型的显示名归一后去目录里找；仍要求「去重后只剩一组参数」才采纳。默认 true，见 docs/decisions-config.md「参数来源」 */
     nameFallback: boolean
+    /** 上游上新提示：抓到的声明里出现账本没见过的模型时，在输入框旁提示一次并进「待上线」清单（不自动写配置）。默认 true */
+    notifyNewModels: boolean
+    /** 自动移除已下架模型：上游声明里连续两次都缺席的模型从配置里删掉（每轮最多 5 个，默认开）。
+     * 口径是精确 id —— 供应商改了 id 就等于下架 + 上新，旧 id 会被移除 */
+    autoRemoveModels: boolean
 }
 
 /** UI 可见性规则：控制各 UI 部件在宿主各处的挂载。不改变插件行为，只决定 UI 在不在——关闭即卸载对应席位的注册，功能本体照常运行 */
@@ -85,6 +90,30 @@ export type WrittenMap = Record<string, Record<string, string>>
  * 与 `efforts` / `written` 同为 map 形态、同样宽松解析，但它**是用户意图**（见 `src/source.ts`） */
 export type SourceMap = Record<string, Record<string, string>>
 
+/** 模型种类：由上游声明的 `modalities.output` 等元数据判定（见 `src/upstream.ts` 的 `parseRoster`）。
+ * 只有 `chat` 能进对话模型列表，其余仅用于「上新提示」里点名 */
+export type ModelKind = 'chat' | 'image' | 'video' | 'other'
+
+/** 「已见模型」账本：provider id → 见过（上游声明出现过）的模型 id 数组。
+ * 判定口径是**精确字符串**：id 差一个字符就是另一个模型（宿主发给上游的就是这串字符，改名必然连不上）。
+ * 运行时状态，宽松解析：坏值回落 {} */
+export type KnownMap = Record<string, string[]>
+
+/** 待处理的上新：provider id → 模型 id → 条目（种类与显示名只用于提示文案）。
+ * 用户「忽略」或「添加」后从本表移除；`known` 里仍留着，故同一批永不重刷 */
+export type PendingMap = Record<string, Record<string, PendingEntry>>
+
+/** 一条待处理的上新 */
+export interface PendingEntry {
+    /** 上游声明的种类；缺省按 chat 处理（宁可多给一个入口，也不要把真模型藏起来） */
+    kind: ModelKind
+    /** 上游声明的显示名；缺省时前端用 id 尾段 */
+    name?: string
+}
+
+/** 连续缺席计数：provider id → 模型 id → 次数。满 `REMOVAL_STRIKES` 才删（见 `src/roster.ts`） */
+export type MissMap = Record<string, Record<string, number>>
+
 /** 「参数来源」的「只认上游声明」取值；其余非空取值一律是 `<provider>/<modelId>` 候选键 */
 export const SOURCE_UPSTREAM = 'upstream'
 
@@ -103,6 +132,12 @@ export interface PluginConfig {
     written: WrittenMap
     /** 每模型参数来源 pin：provider → model → 来源值。用户意图（哪家提供方的参数），见 `src/source.ts` */
     sources: SourceMap
+    /** 已见模型账本：provider → 见过的模型 id。用来判「上游上新」，见 `src/roster.ts` */
+    known: KnownMap
+    /** 待处理的上新：provider → 模型 id → 条目。只影响提示与「一键上线」，不自动写配置 */
+    pending: PendingMap
+    /** 连续缺席计数：provider → 模型 id → 次数。满两次才删（见 `src/roster.ts`） */
+    missing: MissMap
     /** UI 可见性规则（只管各 UI 部件挂不挂载，不改插件行为） */
     behavior: BehaviorRules
     /** 用户体验规则（前端行为开关，不支持按提供方排除） */
@@ -123,6 +158,9 @@ export interface PluginConfigSnapshot {
     efforts: EffortMemory
     written: WrittenMap
     sources: SourceMap
+    known: KnownMap
+    pending: PendingMap
+    missing: MissMap
     behavior: BehaviorRules
     userExperience: UserExperienceRules
     /** 仅当开关为「开」时才出现在快照里（缺省=关，旧快照无需迁移） */

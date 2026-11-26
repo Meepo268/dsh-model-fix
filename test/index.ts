@@ -27,6 +27,7 @@ import { run as runSelfTune } from '@test/self-tune.test'
 import { run as runSubagent } from '@test/subagent.test'
 import { run as runStamp } from '@test/stamp.test'
 import { run as runUpstream } from '@test/upstream.test'
+import { run as runRoster } from '@test/roster.test'
 import { run as runUpdateCheck } from '@test/update-check.test'
 import { run as runSource } from '@test/source.test'
 import { run as runSourceView } from '@test/source-view.test'
@@ -93,6 +94,9 @@ section('source-view.test.ts')
 runSourceView()
 section('upstream.test.ts')
 await runUpstream()
+
+section('roster.test.ts')
+await runRoster()
 section('subagent.test.ts')
 await runSubagent()
 section('update-check.test.ts')

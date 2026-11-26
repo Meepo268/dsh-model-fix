@@ -36,6 +36,14 @@ export type CardKey =
     | 'rowShowOriginalEfforts'
     | 'rowLooseMatch'
     | 'rowNameFallback'
+    | 'rowNotifyNewModels'
+    | 'rowAutoRemoveModels'
+    | 'pendingTitle'
+    | 'pendingAdopt'
+    | 'pendingDismiss'
+    | 'pendingNonChat'
+    | 'pendingAdopted'
+    | 'pendingHint'
     | 'tipReasoning'
     | 'tipContext'
     | 'tipImage'
@@ -52,6 +60,8 @@ export type CardKey =
     | 'tipShowOriginalEfforts'
     | 'tipLooseMatch'
     | 'tipNameFallback'
+    | 'tipNotifyNewModels'
+    | 'tipAutoRemoveModels'
     | 'excludePlaceholder'
     | 'excludeAdd'
     | 'excludeInvalid'
@@ -189,6 +199,7 @@ export type CardKey =
     | 'copiedInstallUrl'
     // 输入框工具行的两枚 chip：常驻入口 + 跟随状态灯（亮绿＝实际生效中、灰＝未生效）
     | 'chipModelOpt'
+    | 'chipNewModels'
     | 'chipFollowOn'
     | 'chipFollowOnTitle'
     | 'chipFollowOff'
@@ -214,6 +225,7 @@ export type CardKey =
     | 'tipShowInFloat'
     | 'tipClassicSetting'
     // 模型优化设置卡片：输入框 chip 与悬浮按钮共用同一句提示
+    | 'tipNewModels'
     | 'tipOpenSettingCard'
     // 「返回对话」悬浮按钮自身的文案
     | 'backToChat'
@@ -263,6 +275,9 @@ export type CardKey =
     | 'sourceRefreshHint'
     | 'sourceRefreshThrottled'
     | 'sourceRefreshedCatalog'
+    | 'sourceRefreshedNoCatalog'
+    | 'sourceRefreshedRemoved'
+    | 'sourceRefreshedAdded'
     | 'sourceCatalogLine'
     | 'sourceCatalogEmpty'
     | 'sourceCatalogError'
@@ -297,6 +312,8 @@ export const ROW_KEYS: Record<RowKey, CardKey> = {
     showOriginalEfforts: 'rowShowOriginalEfforts',
     looseMatch: 'rowLooseMatch',
     nameFallback: 'rowNameFallback',
+    notifyNewModels: 'rowNotifyNewModels',
+    autoRemoveModels: 'rowAutoRemoveModels',
 }
 
 /** 配置组（瓦片）标题键映射 */
@@ -341,4 +358,6 @@ export const TIP_KEYS: Record<RowKey, CardKey> = {
     showOriginalEfforts: 'tipShowOriginalEfforts',
     looseMatch: 'tipLooseMatch',
     nameFallback: 'tipNameFallback',
+    notifyNewModels: 'tipNotifyNewModels',
+    autoRemoveModels: 'tipAutoRemoveModels',
 }

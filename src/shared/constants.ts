@@ -55,6 +55,8 @@ export const ENDPOINT_SET_SOURCE = 'setSource'
 export const ENDPOINT_REFRESH_DECLARATIONS = 'refreshDeclarations'
 /** 「拉取目录」的 endpoint 名：抓的是 models.dev 的目录数据本身（不是网关声明），再按既有闸门补填 */
 export const ENDPOINT_FETCH_CATALOG = 'fetchCatalog'
+/** 「一键上线」的 endpoint 名：把待上线的对话模型写进模型列表，再跑一轮填充补参数 */
+export const ENDPOINT_ADOPT_MODELS = 'adoptModels'
 
 /** 宿主自此版本起自带「未配置密钥的官方提供方自动隐藏」；≥ 此值时本插件的「隐藏官方API」空转 */
 export const HOST_AUTO_HIDE_SINCE = '0.2.1-alpha.2'
@@ -63,10 +65,10 @@ export const HOST_AUTO_HIDE_SINCE = '0.2.1-alpha.2'
 export const MAX_ATTEMPTS = 3
 
 /** 三个写回端点的等待上限（毫秒，跨半共享）：宿主 `rpc.call` 自身无计时器，不给就有永久占着卡片占用态的挂死路径（取舍见 docs/decisions-config.md「写回端点」） */
-export const WRITEBACK_MS = 10_000
+export const WRITEBACK_MS = 20_000
 
 /** 「刷新上游声明」的等待上限：一次抓取本身最长 10 秒（`upstream.ts` 的 FETCH_MS）＋一轮填充与写回，故比常规写回端点宽 */
-export const DECLARATION_REFRESH_MS = 25_000
+export const DECLARATION_REFRESH_MS = 30_000
 
 /** 两次手动刷新之间的最小间隔：防连点重复打端点（网关多为按量计费，白打一轮没有意义） */
 export const DECLARATION_REFRESH_THROTTLE_MS = 10_000
@@ -77,4 +79,14 @@ export const FORCE_COOLDOWN_MS = 5_000
 
 /** 「拉取目录」的等待上限：抓目录自带 10 秒超时（`constants.ts` 的 `FETCH_MS`）＋写缓存最多 3 次重试（`RETRY_DELAY_MS`）＋一轮填充，
  * 故比常规写回端点宽一档。这条上限的意义是「网络不通也不要把卡片挂在占用态」：超时后浏览器半按写回超时提示收尾 */
-export const CATALOG_REFRESH_MS = 30_000
+export const CATALOG_REFRESH_MS = 40_000
+
+/** 下架判定需要的连续缺席次数：一次抓取可能因网关抖动/分页/按密钥过滤而少给几条，
+ * 连续两次（≥ 6 小时）都缺席才动手。改这个值等于改误删概率，见 docs/decisions-config.md「模型清单对账」 */
+export const REMOVAL_STRIKES = 2
+/** 单轮最多移除的模型数：挡住「网关换命名空间」这类一次性大改把整张列表清空 */
+export const MAX_REMOVALS_PER_ROUND = 5
+/** 待上线清单的容量上限（每提供方）：避免网关一次性上架几百个模型把配置撑爆 */
+export const PENDING_CAP = 60
+/** 「一键上线」一次最多添加的模型数：提示里列出的上限，超出部分提示用户去模型列表手动加 */
+export const ADOPT_BATCH_LIMIT = 5

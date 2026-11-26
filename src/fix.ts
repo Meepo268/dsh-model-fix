@@ -15,8 +15,10 @@ import { queueTask } from '@/host'
 import { isCapacity, type IndexedCatalog } from '@/types'
 import { fieldStampsOf, isPluginWritten, mayReplace, parseStamps, stampPatched, stampSource, withStamps, writtenOf, type StampField, type StampSource } from '@/stamp'
 import { isPlainObject, providersOf, type CompatRules, type PluginConfig, type WrittenMap } from '@/shared/types'
+import { endIgnoreAll, startIgnoreAll } from '@/guard'
 import { descriptorOf } from '@/section'
-import { fetchDeclarations, type DeclarationMap } from '@/upstream'
+import { declarationsOf, fetchUpstream, type DeclarationMap, type SnapshotMap } from '@/upstream'
+import { reconcile, type RosterPlan } from '@/roster'
 import { errorText, isSettingsConflict } from '@/shared/errors'
 
 /** 指纹字段 -> 配置里的字段开关（上下文窗口与输出上限同受 context 开关管） */
@@ -184,16 +186,19 @@ export function planFill(
     return { ops, changes, compatChanges, excluded, written, stamps }
 }
 
-/** 把本轮写入的参数指纹落到插件自有段的 `written` 键（与 `efforts` 记忆同级）；失败只告警，不影响本次填充 */
-async function persistStamps(ctx: Context, written: WrittenMap): Promise<void> {
+/** 把本轮的运行时状态落到插件自有段（`written` 指纹 + 模型清单三本账）；失败只告警，不影响本次填充 */
+async function persistState(
+    ctx: Context,
+    state: { written: WrittenMap; known?: RosterPlan['known']; pending?: RosterPlan['pending']; missing?: RosterPlan['missing'] },
+): Promise<void> {
     const descriptor = descriptorOf(ctx, PLUGIN_NS)
     if (!descriptor) return
+    const ops: SettingsPathOp[] = [{ op: 'set', path: [versionKey(CONFIG_VERSION), 'written'], value: state.written }]
+    if (state.known !== undefined) ops.push({ op: 'set', path: [versionKey(CONFIG_VERSION), 'known'], value: state.known })
+    if (state.pending !== undefined) ops.push({ op: 'set', path: [versionKey(CONFIG_VERSION), 'pending'], value: state.pending })
+    if (state.missing !== undefined) ops.push({ op: 'set', path: [versionKey(CONFIG_VERSION), 'missing'], value: state.missing })
     try {
-        await queueTask(() => ctx.settings.mutate(
-            PLUGIN_NS,
-            [{ op: 'set', path: [versionKey(CONFIG_VERSION), 'written'], value: written }],
-            descriptor.revision,
-        ))
+        await queueTask(() => ctx.settings.mutate(PLUGIN_NS, ops, descriptor.revision))
     } catch (error) {
         ctx.logger.warn(`${PLUGIN_NAME}: 参数指纹落盘失败（下一轮将按手改保守处理）：${errorText(error)}`)
     }
@@ -201,9 +206,33 @@ async function persistStamps(ctx: Context, written: WrittenMap): Promise<void> {
 
 /** 填充与写回：读最新段 → `planFill` 出计划 → 写 `llm-pi-ai` → 返回变更模型数（不含 compat 计数，保持 RPC 契约）
  * 写回失败先告警再抛出；冲突限次重试时重读整段。刻意不走 writeback.ts 外壳（守卫与端点骨架不同形，理由见该文件头） */
+/** 一条模型引用：提供方 + 精确 id（网关按字符串匹配，两个提供方可能同名） */
+export interface ModelRef {
+    readonly provider: string
+    readonly id: string
+}
+
+export interface FixReport {
+    /** 本轮填充改写的模型数（不含删除） */
+    readonly changed: number
+    /** 本轮对账删掉的已下架模型 */
+    readonly removed: readonly ModelRef[]
+    /** 本轮新发现（进了待上线清单）的上游模型 */
+    readonly discovered: readonly ModelRef[]
+}
+
+/** 最近一轮 `fix()` 的对账摘要：RPC 侧要把「删了谁、新来了谁」一并回给界面（返回值只保留填充数，契约不变） */
+let lastReport: FixReport = { changed: 0, removed: [], discovered: [] }
+
+export function lastFixReport(): FixReport {
+    return lastReport
+}
+
 export async function fix(ctx: Context, force = false): Promise<number> {
-    // 上游声明只在本次修复内抓一次：冲突重试沿用同一份（同一批 providers 不会变），避免连续打端点
+    // 上游回包只在本次修复内抓一次：冲突重试沿用同一份（同一批 providers 不会变），避免连续打端点
+    let snapshots: SnapshotMap | undefined
     let declarations: DeclarationMap | undefined
+    let roster: RosterPlan | undefined
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         // 卸载后不再碰 settings（服务已 dispose，访问即抛 inactive context）
         if (!alive(ctx)) return 0
@@ -212,20 +241,52 @@ export async function fix(ctx: Context, force = false): Promise<number> {
         const providers = providersOf(descriptor.user)
         if (!providers) return 0
         const cfg = getConfig()
-        declarations ??= await fetchDeclarations(ctx, providers)
-        const plan = planFill(cfg, providers, getCatalog(), force, declarations)
-        if (plan.ops.length === 0) return 0
+        // 首轮记账的提供方要绕缓存重抓：同名地址可能还留着上一次（别的提供方）的旧快照，
+        // 拿它播种会把「后来才上架的模型」当成熟面孔，之后就再也提示不出来
+        const seedFresh = new Set(Object.keys(providers).filter((id) => cfg.known[id] === undefined))
+        snapshots ??= await fetchUpstream(ctx, providers, Date.now(), seedFresh)
+        declarations ??= declarationsOf(snapshots)
+        roster ??= reconcile(cfg, providers, snapshots)
+        // 删过模型的 providers 用对账后的版本：本轮的填充只针对留下来的行
+        const baseCfg = roster.changed ? { ...cfg, written: roster.written } : cfg
+        const plan = planFill(baseCfg, roster.providers, getCatalog(), force, declarations)
+        const ops: SettingsPathOp[] = [...plan.ops]
+        // 对账删掉的模型若该提供方没被 planFill 改写，仍需单独写回一次
+        const touched = new Set(plan.ops.filter((op) => op.path[0] === 'providers').map((op) => String(op.path[1])))
+        for (const [providerId] of roster.removed) {
+            if (touched.has(providerId)) continue
+            const provider = roster.providers[providerId]
+            if (!isPlainObject(provider)) continue
+            ops.push({ op: 'set', path: ['providers', providerId, 'models'], value: provider.models })
+        }
+        if (ops.length === 0 && !roster.changed) return 0
+        // 自己这次写回会引发 document-updated：开守卫让事件链短路，否则「写回→再填→再写」会连跑好几轮，
+        // 期间宿主一直显示忙碌（供应商卡片按钮变灰、刷新按钮点头几次才回来）
+        startIgnoreAll()
         try {
-            await queueTask(() => ctx.settings.mutate(API_NS, plan.ops, descriptor.revision))
-            ctx.logger.info(`${PLUGIN_NAME}: 已变更 ${plan.changes} 个模型（补充/同步推理级别、容量字段、图片模态、清理空字段）、${plan.compatChanges} 个提供方的兼容性优化，跳过 ${plan.excluded} 个已排除提供方`)
-            // 指纹落盘失败不算填充失败：下一轮只会把这些行当手改（更保守），不会乱写
-            if (plan.stamps > 0) await persistStamps(ctx, plan.written)
+            if (ops.length > 0) await queueTask(() => ctx.settings.mutate(API_NS, ops, descriptor.revision))
+            const removedCount = [...roster.removed.values()].reduce((sum, ids) => sum + ids.length, 0)
+            ctx.logger.info(`${PLUGIN_NAME}: 已变更 ${plan.changes} 个模型（补充/同步推理级别、容量字段、图片模态、清理空字段）、${plan.compatChanges} 个提供方的兼容性优化，跳过 ${plan.excluded} 个已排除提供方${removedCount > 0 ? `，移除 ${removedCount} 个已下架模型` : ''}`)
+            // 指纹与清单账本落盘失败不算填充失败：下一轮只会更保守，不会乱写
+            if (plan.stamps > 0 || roster.changed) {
+                await persistState(ctx, {
+                    written: plan.written,
+                    ...(roster.changed ? { known: roster.known, pending: roster.pending, missing: roster.missing } : {}),
+                })
+            }
+            lastReport = {
+                changed: plan.changes,
+                removed: [...roster.removed].flatMap(([provider, ids]) => ids.map((id) => ({ provider, id }))),
+                discovered: [...roster.discovered].flatMap(([provider, entries]) => Object.keys(entries).map((id) => ({ provider, id }))),
+            }
             return plan.changes
         } catch (error) {
             if (isSettingsConflict(error) && attempt < MAX_ATTEMPTS) continue
             ctx.logger.warn(`${PLUGIN_NAME}: ${errorText(error)}`)
             // 已告警仍抛出：调用方按需处理（RPC 回传错误 / 事件侧吞掉），不静默吞错
             throw error
+        } finally {
+            endIgnoreAll()
         }
     }
     // 不可达：循环内各路径均 return/throw，continue 仅在 attempt < MAX_ATTEMPTS 时发生；仅作类型收敛

@@ -8,12 +8,13 @@
  * 否则修好之后看起来又像坏了。
  * 弹层复用 SourcesDialog，传 `focusProvider` 让它默认只看本提供方；按钮与文案随宿主席位注入的 t 跟随界面语言 */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 // primitives 由宿主模块表注入
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RpcCarrier } from '@/client/rpc-carrier'
+import type { DecodedScope } from '@/client/scope'
 import { ensureStyles } from '@/client/card-styles'
 import { SourcesDialog } from '@/client/sources-dialog'
 import { snapshotOfResult, seatCounts, type SeatCounts, type SourceSnapshot } from '@/shared/source-view'
@@ -29,6 +30,8 @@ export interface SourceSeatProps extends SeatOwnerProps, Pick<RpcCarrier, 'sourc
     t: TranslateNS<'settings.modelFix'>
     /** 注册用的键：席位定向分发到 `settingsNs`，自定义提供方全都指向 `llm-pi-ai`，故只作兜底 */
     fallbackProvider: string
+    /** 宿主 llm-pi-ai 段：模型表被改（一键上线、对账删除、宿主里手动加删）时据此重取徽标 */
+    providersScope?: DecodedScope<readonly unknown[]>
 }
 
 /** 从 owner props 里取提供方 id：`provider.provider` 是字符串才认，取不到退回注册键 */
@@ -88,7 +91,7 @@ function badgeOf(counts: SeatCounts, t: TranslateNS<'settings.modelFix'>): { tex
 }
 
 export function SourceSeat(props: SourceSeatProps) {
-    const { t, fallbackProvider, sources, setSource, refreshDeclarations, fetchCatalog } = props
+    const { t, fallbackProvider, sources, setSource, refreshDeclarations, fetchCatalog, providersScope } = props
     // 与卡片同源的样式表：席位可能先于卡片挂载，故这里也挂一次（ensureStyles 幂等）
     useLayoutEffect(() => { ensureStyles() }, [])
     const [open, setOpen] = useState(false)
@@ -102,6 +105,22 @@ export function SourceSeat(props: SourceSeatProps) {
         })
     }, [sources, providerId])
     useEffect(() => { refresh(false) }, [refresh])
+    // 模型表变了就重取一次：徽标里的「命中 m/t」是按当前模型表算出来的，
+    // 不跟着变就会停在旧数字上（以前要切走再切回页面才刷新）
+    const providersSnap = useSyncExternalStore(
+        providersScope?.subscribe ?? (() => () => {}),
+        () => providersScope?.getSnapshot().revision,
+        () => providersScope?.getSnapshot().revision,
+    )
+    const seenRevision = useRef<number | undefined>(undefined)
+    useEffect(() => {
+        if (providersSnap === undefined) return
+        // 挂载那一轮已经取过（上面 refresh(false)），这里只跟后续变化
+        if (seenRevision.current === undefined) { seenRevision.current = providersSnap; return }
+        if (seenRevision.current === providersSnap) return
+        seenRevision.current = providersSnap
+        refresh(true)
+    }, [refresh, providersSnap])
     return (
         <div className="dsh-mf-sourceSeat">
             <Button variant="outline" title={t('sourceSeatHint')} onClick={() => { setOpen(true) }}>

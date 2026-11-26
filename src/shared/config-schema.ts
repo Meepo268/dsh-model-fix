@@ -1,7 +1,7 @@
 /** 当前版本（v8）配置形态的完整定义与解析/物化（跨半共享、零 Node 依赖）：版本常量、键前缀、最低支持版本、各组键名清单、默认值、解析函数、存储物化函数的单一入口，浏览器半 `decodeSection` 与 Node 半 `resolveConfig`/`migrateConfig`/`upgradeConfig` 共用。
  * 解析约定：整项缺失落默认；非对象、字段非布尔判非法（返回 undefined）；excludes 缺失落空数组、非数组或元素非字符串判非法；efforts 宽松解析（结构不符回落 {}）；产物只含当前 schema 的已知键。 */
 
-import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, PluginConfig, PluginConfigSnapshot, SourceMap, UserExperienceRules } from '@/shared/types'
+import type { BehaviorRules, CompatRules, EffortMemory, FieldRules, KnownMap, MissMap, ModelKind, PendingEntry, PendingMap, PluginConfig, PluginConfigSnapshot, SourceMap, UserExperienceRules } from '@/shared/types'
 import { isPlainObject } from '@/shared/types'
 
 /** 当前配置快照版本号（段内键 `version-N` 的 N）；只有不兼容才递增（见 docs/versioning.md） */
@@ -31,16 +31,20 @@ const USER_EXPERIENCE_DEFAULTS: UserExperienceRules = {
     showOriginalEfforts: true,
     looseMatch: false,
     nameFallback: true,
+    notifyNewModels: true,
+    autoRemoveModels: true,
 }
 
-/** behavior 组默认值（整组缺失或字段缺失落此）。全开是唯一与「装本插件但看不见任何 UI」相容的缺省（见 docs/versioning.md）。 */
+/** behavior 组默认值（整组缺失或字段缺失落此）。
+ *  取「模型页 + 内置插件页 + 经典设置」三处常驻、其余入口默认收起：装完就能在模型设置里找到它，
+ *  又不往输入框 / 悬浮球 / 会话流里多塞按钮（要的人自己在「UI 与行为」里打开）。 */
 const BEHAVIOR_DEFAULTS: BehaviorRules = {
     showInModels: true,
     showInBuiltinPlugins: true,
-    showInComposer: true,
-    showInFloat: true,
-    showFollowStatus: true,
-    backToChat: true,
+    showInComposer: false,
+    showInFloat: false,
+    showFollowStatus: false,
+    backToChat: false,
     classicSetting: true,
 }
 
@@ -53,6 +57,9 @@ export const DEFAULT_CONFIG: PluginConfig = {
     efforts: {},
     written: {},
     sources: {},
+    known: {},
+    pending: {},
+    missing: {},
     behavior: { ...BEHAVIOR_DEFAULTS },
     userExperience: { ...USER_EXPERIENCE_DEFAULTS },
 }
@@ -74,6 +81,8 @@ export const USER_EXPERIENCE_KEYS = [
     'showOriginalEfforts',
     'looseMatch',
     'nameFallback',
+    'notifyNewModels',
+    'autoRemoveModels',
 ] as const
 
 /** UI 可见性组的行键；新增席位可见性开关在此追加 */
@@ -208,6 +217,66 @@ function parseUserExperience(value: unknown): UserExperienceRules | undefined {
     return rules
 }
 
+/** 解析 single provider 的 id 数组：非数组或含非字符串元素即整条丢弃（账本坏一条不连累其它提供方） */
+function parseIdList(value: unknown): string[] | undefined {
+    if (!Array.isArray(value)) return undefined
+    const ids: string[] = []
+    for (const item of value) {
+        if (typeof item !== 'string' || item === '') return undefined
+        ids.push(item)
+    }
+    return ids
+}
+
+/** 已见模型账本：宽松解析，单条非法即跳过该提供方 */
+export function parseKnown(value: unknown): KnownMap {
+    const result: KnownMap = {}
+    if (!isPlainObject(value)) return result
+    for (const [provider, ids] of Object.entries(value)) {
+        const parsed = parseIdList(ids)
+        if (parsed && parsed.length > 0) result[provider] = parsed
+    }
+    return result
+}
+
+const MODEL_KINDS: readonly ModelKind[] = ['chat', 'image', 'video', 'other']
+
+/** 待处理上新：宽松解析，未知种类按 chat（宁可多给一个入口，也不要把真模型藏起来） */
+export function parsePending(value: unknown): PendingMap {
+    const result: PendingMap = {}
+    if (!isPlainObject(value)) return result
+    for (const [provider, entries] of Object.entries(value)) {
+        if (!isPlainObject(entries)) continue
+        const entryMap: Record<string, PendingEntry> = {}
+        for (const [id, entry] of Object.entries(entries)) {
+            if (id === '' || !isPlainObject(entry)) continue
+            const kind = typeof entry.kind === 'string' && (MODEL_KINDS as readonly string[]).includes(entry.kind)
+                ? entry.kind as ModelKind
+                : 'chat'
+            const name = typeof entry.name === 'string' && entry.name !== '' ? entry.name : undefined
+            entryMap[id] = name === undefined ? { kind } : { kind, name }
+        }
+        if (Object.keys(entryMap).length > 0) result[provider] = entryMap
+    }
+    return result
+}
+
+/** 连续缺席计数：宽松解析，非正整数丢弃（0 与负数是坏值，不该让模型被删） */
+export function parseMissing(value: unknown): MissMap {
+    const result: MissMap = {}
+    if (!isPlainObject(value)) return result
+    for (const [provider, entries] of Object.entries(value)) {
+        if (!isPlainObject(entries)) continue
+        const entryMap: Record<string, number> = {}
+        for (const [id, count] of Object.entries(entries)) {
+            if (id === '' || typeof count !== 'number' || !Number.isInteger(count) || count <= 0) continue
+            entryMap[id] = count
+        }
+        if (Object.keys(entryMap).length > 0) result[provider] = entryMap
+    }
+    return result
+}
+
 /** 解析单个快照值并物化默认；剥离 configVersion 等运行时不消费的键，非法返回 undefined */
 export function parseSnapshot(value: unknown): PluginConfig | undefined {
     if (!isPlainObject(value)) return
@@ -228,9 +297,12 @@ export function parseSnapshot(value: unknown): PluginConfig | undefined {
     const written = parseEfforts(value.written)
     // sources 是用户意图（认哪家提供方的参数），宽松解析但保留 trim 后的非空值
     const sources = parseSources(value.sources)
+    const known = parseKnown(value.known)
+    const pending = parsePending(value.pending)
+    const missing = parseMissing(value.missing)
     // debugLog 沿用「默认不写键」的规矩：只有明确的 true 才出现在配置里（缺省即关，坏值也按关）
     return {
-        allowUpdate, autoFill, compat, excludes, efforts, written, sources, behavior, userExperience,
+        allowUpdate, autoFill, compat, excludes, efforts, written, sources, known, pending, missing, behavior, userExperience,
         ...(value.debugLog === true ? { debugLog: true } : {}),
     }
 }
@@ -246,6 +318,9 @@ export function toStored(config: PluginConfig): PluginConfigSnapshot {
         efforts: { ...config.efforts },
         written: { ...config.written },
         sources: { ...config.sources },
+        known: { ...config.known },
+        pending: { ...config.pending },
+        missing: { ...config.missing },
         behavior: { ...config.behavior },
         userExperience: { ...config.userExperience },
         // 关着就不写这个键：缺省即关，存储面与旧版本逐字节一致

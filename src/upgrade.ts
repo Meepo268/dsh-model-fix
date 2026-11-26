@@ -63,8 +63,14 @@ const V8_SHOW_ORIGINAL_EFFORTS_DEFAULT = true
 const V8_DISABLE_STORE_DEFAULT = true
 const V8_LOOSE_MATCH_DEFAULT = false
 const V8_NAME_FALLBACK_DEFAULT = true
-const V8_BEHAVIOR_DEFAULT = true
-const V8_SHOW_IN_FLOAT_DEFAULT = true
+const V8_NOTIFY_NEW_MODELS_DEFAULT = true
+const V8_AUTO_REMOVE_MODELS_DEFAULT = true
+const V8_SHOW_IN_MODELS_DEFAULT = true
+const V8_SHOW_IN_BUILTIN_DEFAULT = true
+const V8_SHOW_IN_COMPOSER_DEFAULT = false
+const V8_SHOW_IN_FLOAT_DEFAULT = false
+const V8_SHOW_FOLLOW_STATUS_DEFAULT = false
+const V8_BACK_TO_CHAT_DEFAULT = false
 const V8_CLASSIC_SETTING_DEFAULT = true
 
 // ---------- 最低一级台阶（持守卫） ----------
@@ -109,13 +115,16 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
         // 旧版本没有指纹与来源 pin：落空表即「全部按手改处理」，升级后不会突然覆盖用户现值
         written: {},
         sources: {},
+        known: {},
+        pending: {},
+        missing: {},
         behavior: {
-            showInModels: V8_BEHAVIOR_DEFAULT,
-            showInBuiltinPlugins: V8_BEHAVIOR_DEFAULT,
-            showInComposer: V8_BEHAVIOR_DEFAULT,
+            showInModels: V8_SHOW_IN_MODELS_DEFAULT,
+            showInBuiltinPlugins: V8_SHOW_IN_BUILTIN_DEFAULT,
+            showInComposer: V8_SHOW_IN_COMPOSER_DEFAULT,
             showInFloat: V8_SHOW_IN_FLOAT_DEFAULT,
-            showFollowStatus: V8_BEHAVIOR_DEFAULT,
-            backToChat: V8_BEHAVIOR_DEFAULT,
+            showFollowStatus: V8_SHOW_FOLLOW_STATUS_DEFAULT,
+            backToChat: V8_BACK_TO_CHAT_DEFAULT,
             classicSetting: V8_CLASSIC_SETTING_DEFAULT,
         },
         userExperience: {
@@ -127,6 +136,8 @@ function upgradeTo8(config: unknown, fromVersion: number): PluginConfigSnapshot 
             showOriginalEfforts: V8_SHOW_ORIGINAL_EFFORTS_DEFAULT,
             looseMatch: V8_LOOSE_MATCH_DEFAULT,
             nameFallback: V8_NAME_FALLBACK_DEFAULT,
+            notifyNewModels: V8_NOTIFY_NEW_MODELS_DEFAULT,
+            autoRemoveModels: V8_AUTO_REMOVE_MODELS_DEFAULT,
         },
     }
 }

@@ -28,8 +28,11 @@ function cfgWith(sources: Record<string, Record<string, string>>, loose = false,
         efforts: {},
         written: {},
         sources,
-        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: true, showFollowStatus: true, backToChat: true, showInFloat: true, classicSetting: true },
-        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: loose, nameFallback },
+        known: {},
+        pending: {},
+        missing: {},
+        behavior: { showInModels: true, showInBuiltinPlugins: true, showInComposer: false, showFollowStatus: false, backToChat: false, showInFloat: false, classicSetting: true },
+        userExperience: { rememberEfforts: true, defaultHigh: true, forgetRemoved: true, followParent: false, selfTune: false, hideOfficial: true, localizeEfforts: true, showOriginalEfforts: true, looseMatch: loose, nameFallback, notifyNewModels: true, autoRemoveModels: true },
     }
 }
 

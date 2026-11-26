@@ -9,6 +9,7 @@ import type { DecodedScope } from '@/client/scope'
 import { CARD_NS } from '@/client/locale-keys'
 import { API_NS, PLUGIN_NS as MODEL_FIX_NS } from '@/shared/constants'
 import { ComposerEntry, FollowLamp, type ComposerProps } from '@/client/composer'
+import { NewModelsChip } from '@/client/new-models-chip'
 import { Card, type CardProps } from '@/client/card'
 import { SourceSeat } from '@/client/source-seat'
 
@@ -31,7 +32,8 @@ interface Part {
     slot: ManagedSlot
     /** 部件键：同一 slot 下的多个部件靠它区分（同时用作 mounted 账本的键） */
     key: string
-    flag: 'showInModels' | 'showInBuiltinPlugins' | 'showInComposer' | 'showFollowStatus'
+    /** 支配开关；缺省即常驻（新模型提醒不受 `behavior` 支配：只在有待上线条目时出现） */
+    flag: 'showInModels' | 'showInBuiltinPlugins' | 'showInComposer' | 'showFollowStatus' | undefined
     mount: () => () => void
 }
 
@@ -43,6 +45,8 @@ const FOOTER_ORDER = -999999
 /** 内置插件选项卡席位的 order：落在官方条目之后 */
 const TAB_ORDER = 20
 /** 输入框工具行两枚 chip 的 order：模型优化在前、跟随灯在后 */
+/** 新模型提醒的 order：排在模型优化之前（有待上线条目时它比入口更急） */
+const NEW_MODELS_ORDER = 4
 const COMPOSER_ORDER = 5
 const FOLLOW_ORDER = 6
 
@@ -86,6 +90,17 @@ export function applySlotVisibility(
         },
         {
             slot: 'conversation.input.left',
+            key: 'newModelsChip',
+            flag: undefined,
+            mount: () => ctx.slots.register({
+                name: 'conversation.input.left',
+                id: `${MODEL_FIX_NS}-new`,
+                order: NEW_MODELS_ORDER,
+                locale: CARD_NS,
+            }, (props) => <NewModelsChip {...props} {...composerProps} cardProps={card} />),
+        },
+        {
+            slot: 'conversation.input.left',
             key: 'composerEntry',
             flag: 'showInComposer',
             mount: () => ctx.slots.register({
@@ -116,7 +131,8 @@ export function applySlotVisibility(
         // 编排表是本文件的字面量，key 必在其中；缺失即内部错误
         if (part === undefined) return
         const dispose = mounted.get(key)
-        if (groupValue(scope.getSnapshot().value, 'behavior', part.flag)) {
+        const wanted = part.flag === undefined || groupValue(scope.getSnapshot().value, 'behavior', part.flag)
+        if (wanted) {
             if (dispose === undefined) mounted.set(key, part.mount())
         } else if (dispose !== undefined) {
             dispose()
@@ -166,6 +182,7 @@ export function applySlotVisibility(
                         setSource={card.setSource}
                         refreshDeclarations={card.refreshDeclarations}
                         fetchCatalog={card.fetchCatalog}
+                        providersScope={composerProps.providersScope}
                     />
                 )))
             }

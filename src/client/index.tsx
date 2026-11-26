@@ -70,7 +70,7 @@ function boot(
     // scope 的 form 订阅释放挂入本 fiber
     ctx.effect(() => () => { scope.dispose(); providersScope.dispose(); hostModelScope.dispose() }, `${name}: scope disposal`)
     // 浏览器半调 Node 半的全部出口（三个写回端点 + 参数来源二端点 + 刷新上游声明 + 拉取目录 + 两条诊断链的读流）见 rpc-carrier.ts
-    const { forceUpdate, fetchCatalog, resetModels, restoreModels, sources, setSource, refreshDeclarations, verifyModels, probeEfforts } =
+    const { forceUpdate, fetchCatalog, resetModels, restoreModels, sources, setSource, refreshDeclarations, verifyModels, probeEfforts, adoptModels } =
         makeRpcCarrier(rpc)
     // 共用的卡片入参：载体与 scope 逐席相同
     const cardProps = {
@@ -80,6 +80,7 @@ function boot(
         fetchCatalog,
         resetModels,
         restoreModels,
+        adoptModels,
         sources,
         setSource,
         refreshDeclarations,

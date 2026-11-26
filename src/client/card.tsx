@@ -39,6 +39,7 @@ import { FORCE_COOLDOWN_MS } from '@/shared/constants'
 import { DEFAULT_CONFIG, toStored } from '@/shared/config-schema'
 import type { CardBusy, Notice } from '@/client/card-notice'
 import { isWritebackTimeout, truncateMessage } from '@/client/card-notice'
+import { PendingBanner } from '@/client/pending-banner'
 import { useVerifyRun } from '@/client/card-verify'
 import { useProbeRun } from '@/client/card-probe'
 
@@ -356,9 +357,27 @@ export function Card(props: CardProps) {
             {notice.text}
         </p>
     ) : null
+    // 模型上新：一键上线 / 忽略。两者都写回宿主配置，pending 列表随后由 settings 变更事件自然刷新
+    const onAdoptPending = async (picked: readonly { provider: string; model: string }[]): Promise<void> => {
+        try {
+            const result = await props.adoptModels(picked)
+            setNotice(result.ok ? { text: t('pendingAdopted'), tone: 'success' } : { text: result.error.message, tone: 'error' })
+        } catch (error) {
+            setNotice({
+                    text: truncateMessage(isWritebackTimeout(error) ? t('writebackTimeout') : errorText(error)),
+                    tone: 'error',
+                })
+        }
+    }
     // 正文（状态行 + 瓦片栅格 + footer）：卡片展开体与插件页正文共用，只换容器
     const body = (
         <>
+            <PendingBanner
+                t={t}
+                pending={shown.pending}
+                disabled={!canWrite || busy !== null}
+                onAdopt={onAdoptPending}
+            />
             {!ready ? <p className="dsh-mf-line" role="status">{t('loading')}</p> : null}
             {ready && !snap.writable ? <p className="dsh-mf-line dsh-mf-warn" role="status">{t('readOnly')}</p> : null}
             {/* 五个布尔组由组枚举与键表派生，「排除提供方」形状不同单独分发；顺序见 TILE_ORDER */}

@@ -61,6 +61,25 @@ function hits(model: SourceModelView, needle: string): boolean {
     return haystack.some((value) => value.toLowerCase().includes(needle))
 }
 
+/** 一条模型引用：提供方 + 精确 id（与 Node 半 `ModelRef` 同形） */
+interface ModelRef {
+    provider: string
+    id: string
+}
+
+/** 一次刷新的结果：摘要文案 + 本轮新增/移除的具体模型（用于绿/红分行展示） */
+interface RefreshSummary {
+    text: string
+    added: readonly ModelRef[]
+    removed: readonly ModelRef[]
+}
+
+/** 模型 id 预览：最多三个，其余折成省略号（全列会把提示撑成一屏） */
+function idPreview(refs: readonly ModelRef[]): string {
+    const ids = refs.map((ref) => ref.id)
+    const head = ids.slice(0, 3).join('、')
+    return ids.length > 3 ? `${head} …` : head
+}
 interface SourcesDialogProps {
     t: Translate
     open: boolean
@@ -94,7 +113,7 @@ export function SourcesDialog({
     const [error, setError] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
     const [refreshing, setRefreshing] = useState(false)
-    const [refreshed, setRefreshed] = useState<string | null>(null)
+    const [refreshed, setRefreshed] = useState<RefreshSummary | null>(null)
     const [query, setQuery] = useState('')
     const [onlyFocus, setOnlyFocus] = useState(true)
     /** 重新取数：弹层打开时、以及每次回写成功后各来一次 */
@@ -149,28 +168,49 @@ export function SourcesDialog({
         setRefreshing(true)
         setRefreshed(null)
         try {
-            const catalog = await fetchCatalog()
-            if (!catalog.ok) {
-                setError(t('sourceFailed', { message: catalog.error.message }))
-                return
-            }
-            const catalogValue = catalog.value as { providers?: number; models?: number } | undefined
+            // 目录（models.dev）只是「按名字找参数」的底座，抓不到不该连累上游声明：
+            // 上游那份才是下架判定与参数来源的主证据，故目录失败只降级成提示里的一句附注
+            const catalog = await fetchCatalog().catch((failure: unknown) => ({
+                ok: false as const,
+                error: { message: failure instanceof Error ? failure.message : String(failure) },
+            }))
+            const catalogValue = catalog.ok
+                ? catalog.value as { providers?: number; models?: number } | undefined
+                : undefined
             const result = await refreshDeclarations()
             if (!result.ok) {
                 setError(t('sourceFailed', { message: result.error.message }))
                 return
             }
-            const value = result.value as { providers?: number; models?: number; changed?: number; throttled?: boolean } | undefined
+            const value = result.value as {
+                providers?: number
+                models?: number
+                changed?: number
+                removed?: readonly ModelRef[]
+                discovered?: readonly ModelRef[]
+                throttled?: boolean
+            } | undefined
             setError(null)
-            if (value?.throttled === true) setRefreshed(t('sourceRefreshThrottled'))
-            else {
-                setRefreshed(t('sourceRefreshedCatalog', {
-                    catalogProviders: String(catalogValue?.providers ?? 0),
-                    catalogModels: String(catalogValue?.models ?? 0),
-                    providers: String(value?.providers ?? 0),
-                    models: String(value?.models ?? 0),
-                    changed: String(value?.changed ?? 0),
-                }))
+            if (value?.throttled === true) {
+                setRefreshed({ text: t('sourceRefreshThrottled'), added: [], removed: [] })
+            } else {
+                const removedRefs = value?.removed ?? []
+                const addedRefs = value?.discovered ?? []
+                const base = catalogValue === undefined
+                    ? t('sourceRefreshedNoCatalog', {
+                        providers: String(value?.providers ?? 0),
+                        models: String(value?.models ?? 0),
+                        changed: String(value?.changed ?? 0),
+                        message: catalog.ok ? '' : catalog.error.message,
+                    })
+                    : t('sourceRefreshedCatalog', {
+                        catalogProviders: String(catalogValue.providers ?? 0),
+                        catalogModels: String(catalogValue.models ?? 0),
+                        providers: String(value?.providers ?? 0),
+                        models: String(value?.models ?? 0),
+                        changed: String(value?.changed ?? 0),
+                    })
+                setRefreshed({ text: base, added: addedRefs, removed: removedRefs })
             }
             await reload()
         } catch (failure) {
@@ -237,7 +277,21 @@ export function SourcesDialog({
                     {catalogLine(snap.catalog, t)}
                 </p>
             )}
-            {refreshed === null ? null : <p className="dsh-mf-sourceHint">{refreshed}</p>}
+            {refreshed === null ? null : (
+                <div className="dsh-mf-sourceNotice">
+                    <p className="dsh-mf-sourceHint">{refreshed.text}</p>
+                    {refreshed.added.length === 0 ? null : (
+                        <p className="dsh-mf-sourceHint dsh-mf-sourceAdded">
+                            {t('sourceRefreshedAdded', { ids: idPreview(refreshed.added), count: String(refreshed.added.length) })}
+                        </p>
+                    )}
+                    {refreshed.removed.length === 0 ? null : (
+                        <p className="dsh-mf-sourceHint dsh-mf-sourceRemoved">
+                            {t('sourceRefreshedRemoved', { ids: idPreview(refreshed.removed), count: String(refreshed.removed.length) })}
+                        </p>
+                    )}
+                </div>
+            )}
             <div className="dsh-mf-sourceBody">
                 {snap === null
                     ? (busy ? null : <p className="dsh-mf-sourceEmpty">{t('sourceEmpty')}</p>)

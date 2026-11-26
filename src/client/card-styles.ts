@@ -192,6 +192,9 @@ const STYLE_TEXT = [
     '.dsh-mf-sourceId{font-size:11px;color:var(--dsw-alias-label-caption,#adb2b8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.dsh-mf-sourceSelect{box-sizing:border-box;width:100%;height:30px;padding:0 8px;border:0.5px solid var(--dsw-alias-border-l4,rgba(0,0,0,.16));border-radius:8px;background:var(--dsw-alias-bg-layer-3,#fff);color:var(--dsw-alias-label-primary,#0f1115);font:inherit;font-size:12px}',
     '.dsh-mf-sourceHint{margin:0;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-caption,#adb2b8)}',
+    '.dsh-mf-sourceNotice{display:flex;flex-direction:column;gap:2px;margin:0 0 6px}',
+    '.dsh-mf-sourceAdded{color:var(--dsw-alias-state-success-label,#2f9e5f)}',
+    '.dsh-mf-sourceRemoved{color:var(--dsw-alias-state-warn-label,#d63b3b)}',
     '.dsh-mf-sourceError{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-label,#dd8629)}',
     '.dsh-mf-sourceEmpty{margin:8px 0;font-size:12px;color:var(--dsw-alias-label-caption,#adb2b8)}',
     // 弹层顶部工具行（搜索框 + 「只看本提供方」）：搜索框与下拉同形，但占满整行宽度

@@ -78,49 +78,65 @@ export async function run(): Promise<void> {
 
     // ---------- createChannelRoute ----------
     const okHandler = async (endpoint: string, payload: unknown): Promise<ConnectionRpcResult<unknown>> => ({ ok: true, value: { endpoint, payload } })
-    const routeWith = (rejection: 401 | 403 | undefined, handler = okHandler) => createChannelRoute({ requestRejection: () => rejection }, CHANNEL, handler)
+    /** 围栏桩：`undefined` 表示这一版宿主连程序化围栏都没有（只能靠路由 auth 的 peer） */
+    const denying = (status: number) => () => status
 
-    const runRoute = async (rejection: 401 | 403 | undefined, init: Parameters<typeof fakeRequest>[0], handler?: typeof okHandler) => {
+    const runRoute = async (
+        fence: Parameters<typeof createChannelRoute>[0],
+        init: Parameters<typeof fakeRequest>[0],
+        handler?: typeof okHandler,
+        peer?: unknown,
+    ) => {
         const res = fakeResponse()
-        await routeWith(rejection, handler)(fakeRequest(init), res)
+        await createChannelRoute(fence, CHANNEL, handler ?? okHandler)(fakeRequest(init), res, peer)
         return res
     }
 
-    // 围栏：与宿主 /api 同源，非受信 403、未认证 401，且不触碰端点
-    const forbidden = await runRoute(403, {})
+    // 围栏：与宿主 /api 同源——非受信 403、未认证 401、认证源不可用 503，且都不触碰端点
+    const forbidden = await runRoute(denying(403), {})
     check('围栏 403 时拒答且不派发端点', forbidden.status === 403 && forbidden.body === 'forbidden')
-    const unauthorized = await runRoute(401, {})
+    const unauthorized = await runRoute(denying(401), {})
     check('围栏 401 时回 unauthorized', unauthorized.status === 401 && unauthorized.body === 'unauthorized')
+    const unavailable = await runRoute(denying(503), {})
+    check('围栏 503 时回 unavailable', unavailable.status === 503 && unavailable.body === 'unavailable')
+    const admitted = await runRoute(() => undefined, { body: envelope('r1', 'forceUpdate') })
+    check('围栏放行时正常往返', admitted.status === 200)
+
+    // 宿主不提供程序化围栏：认证结果只体现为路由 auth 传进来的 peer 是否存在
+    const noPeer = await runRoute(undefined, {})
+    check('无围栏且缺 peer 回 401 且不派发端点', noPeer.status === 401 && noPeer.body === 'unauthorized')
+    check('无围栏但带 peer 正常往返', (await runRoute(undefined, { body: envelope('r1', 'forceUpdate') }, undefined, { id: 'owner' })).status === 200)
 
     // 传输层前置校验（镜像宿主 rpcFetchHandler 的状态码）
-    check('非 POST 回 404', (await runRoute(undefined, { method: 'GET' })).status === 404)
-    check('content-type 非 json 回 415', (await runRoute(undefined, { contentType: 'text/plain' })).status === 415)
-    check('content-type 带 charset 参数仍接受', (await runRoute(undefined, { contentType: 'application/json; charset=utf-8', body: envelope('r1', 'forceUpdate') })).status === 200)
-    check('content-type 数组取首项', (await runRoute(undefined, { contentType: ['application/json'], body: envelope('r1', 'forceUpdate') })).status === 200)
-    check('请求体非 JSON 回 400', (await runRoute(undefined, { body: 'not json' })).status === 400)
-    check('读体失败回 413', (await runRoute(undefined, { failBody: true })).status === 413)
+    const authed = { id: 'owner' }
+    check('非 POST 回 404', (await runRoute(undefined, { method: 'GET' }, undefined, authed)).status === 404)
+    check('content-type 非 json 回 415', (await runRoute(undefined, { contentType: 'text/plain' }, undefined, authed)).status === 415)
+    check('content-type 带 charset 参数仍接受', (await runRoute(undefined, { contentType: 'application/json; charset=utf-8', body: envelope('r1', 'forceUpdate') }, undefined, authed)).status === 200)
+    check('content-type 数组取首项', (await runRoute(undefined, { contentType: ['application/json'], body: envelope('r1', 'forceUpdate') }, undefined, authed)).status === 200)
+    check('请求体非 JSON 回 400', (await runRoute(undefined, { body: 'not json' }, undefined, authed)).status === 400)
+    check('读体失败回 413', (await runRoute(undefined, { failBody: true }, undefined, authed)).status === 413)
     // 超限（对齐 rpc-route 的 64KB 上限）：回 413 且请求流被暂停停读
     const oversizeReq = fakeRequest({ body: 'x'.repeat(64 * 1024 + 1) })
     const oversizeRes = fakeResponse()
-    await routeWith(undefined)(oversizeReq, oversizeRes)
+    await createChannelRoute(undefined, CHANNEL, okHandler)(oversizeReq, oversizeRes, authed)
     check('读体超限回 413 且暂停请求流', oversizeRes.status === 413 && oversizeReq.paused)
-    check('路径越界回 404', (await runRoute(undefined, { url: '/other/x', body: envelope('r1', 'x') })).status === 404)
+    check('路径越界回 404', (await runRoute(undefined, { url: '/other/x', body: envelope('r1', 'x') }, undefined, authed)).status === 404)
 
     // 信封不合法：回 200 + gateway/bad-request，并尽量回显 rpcId
-    const badEnvelope = await runRoute(undefined, { body: JSON.stringify({ rpcId: 'r7', nope: true }) })
+    const badEnvelope = await runRoute(undefined, { body: JSON.stringify({ rpcId: 'r7', nope: true }) }, undefined, authed)
     check('信封不合法回 bad-request 且回显 rpcId', badEnvelope.status === 200 && stable(JSON.parse(badEnvelope.body ?? '')) === stable(serverResponse('r7', { ok: false, error: { code: 'gateway/bad-request', message: 'invalid client-request message', details: {} } })), badEnvelope.body)
-    const badEnvelopeNoId = await runRoute(undefined, { body: JSON.stringify({ nope: true }) })
+    const badEnvelopeNoId = await runRoute(undefined, { body: JSON.stringify({ nope: true }) }, undefined, authed)
     check('信封不合法且无 rpcId 用占位', JSON.parse(badEnvelopeNoId.body ?? '').rpcId === 'invalid-request', badEnvelopeNoId.body)
 
     // method 与路径不一致：回 bad-request
-    const mismatch = await runRoute(undefined, { body: envelope('r1', 'resetModels') })
+    const mismatch = await runRoute(undefined, { body: envelope('r1', 'resetModels') }, undefined, authed)
     check('method 与端点不一致回 bad-request', mismatch.status === 200 && JSON.parse(mismatch.body ?? '').result.error.code === 'gateway/bad-request', mismatch.body)
 
     // 正常往返：端点与 payload 原样送达，rpcId 原样回显
-    const ok = await runRoute(undefined, { body: envelope('r42', 'forceUpdate', { ignored: true }) })
+    const ok = await runRoute(undefined, { body: envelope('r42', 'forceUpdate', { ignored: true }) }, undefined, authed)
     check('正常往返回 server-response 且回显 rpcId', ok.status === 200 && stable(JSON.parse(ok.body ?? '')) === stable(serverResponse('r42', { ok: true, value: { endpoint: 'forceUpdate', payload: { ignored: true } } })), ok.body)
 
     // 端点抛错：宿主同款 500
-    const throwing = await runRoute(undefined, { body: envelope('r1', 'forceUpdate') }, async () => { throw new Error('boom') })
+    const throwing = await runRoute(undefined, { body: envelope('r1', 'forceUpdate') }, async () => { throw new Error('boom') }, authed)
     check('端点抛错回 500', throwing.status === 500 && (throwing.body ?? '').includes('boom'), throwing.body)
 }
